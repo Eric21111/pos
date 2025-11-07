@@ -10,7 +10,6 @@ const ConfirmAddProductModal = ({ isOpen, onClose, onConfirm, productName }) => 
         className="bg-white rounded-2xl w-full max-w-md relative shadow-2xl"
         style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}
       >
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
@@ -19,7 +18,6 @@ const ConfirmAddProductModal = ({ isOpen, onClose, onConfirm, productName }) => 
         </button>
 
         <div className="p-8">
-          {/* Icon Circle */}
           <div className="flex justify-center mb-6">
             <div className="w-20 h-20 rounded-full flex items-center justify-center"
               style={{ backgroundColor: '#E8D5C4' }}
@@ -28,17 +26,14 @@ const ConfirmAddProductModal = ({ isOpen, onClose, onConfirm, productName }) => 
             </div>
           </div>
 
-          {/* Main Message */}
           <h3 className="text-xl font-bold text-gray-800 text-center mb-3">
             Are you sure you want to add this item?
           </h3>
 
-          {/* Secondary Message */}
           <p className="text-sm text-gray-500 text-center mb-8">
             This action will be apply to the inventory.
           </p>
 
-          {/* Action Buttons */}
           <div className="flex gap-4">
             <button
               onClick={onConfirm}

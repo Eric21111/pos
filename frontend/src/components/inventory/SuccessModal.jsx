@@ -10,7 +10,6 @@ const SuccessModal = ({ isOpen, onClose, message = "The item was added successfu
         className="bg-white rounded-2xl w-full max-w-md relative shadow-2xl"
         style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}
       >
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
@@ -19,7 +18,6 @@ const SuccessModal = ({ isOpen, onClose, message = "The item was added successfu
         </button>
 
         <div className="p-8">
-          {/* Animated Checkmark Icon */}
           <div className="flex justify-center mb-6">
             <div 
               className="w-20 h-20 rounded-full flex items-center justify-center relative"
@@ -53,17 +51,14 @@ const SuccessModal = ({ isOpen, onClose, message = "The item was added successfu
             </div>
           </div>
 
-          {/* Success Heading */}
           <h3 className="text-2xl font-bold text-gray-800 text-center mb-3">
             Success!
           </h3>
 
-          {/* Success Message */}
           <p className="text-sm text-gray-500 text-center mb-8">
             {message}
           </p>
 
-          {/* OK Button */}
           <button
             onClick={onClose}
             className="w-full py-3 px-6 rounded-lg font-bold text-white transition-all shadow-md hover:shadow-lg"

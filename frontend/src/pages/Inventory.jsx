@@ -29,6 +29,8 @@ import CategoryButtons from '../components/shared/CategoryButtons';
 import ProductTable from '../components/inventory/ProductTable';
 import ViewProductModal from '../components/inventory/ViewProductModal';
 import Pagination from '../components/inventory/Pagination';
+import StockInModal from '../components/inventory/StockInModal';
+import StockOutModal from '../components/inventory/StockOutModal';
 
 const Inventory = () => {
   const [products, setProducts] = useState([]);
@@ -37,7 +39,7 @@ const Inventory = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [stockStats, setStockStats] = useState({ totalItems: 0, lowStockItems: 0, outOfStockItems: 0 });
+  const [stockStats, setStockStats] = useState({ totalItems: 0, lowStockItems: 0, outOfStockItems: 0, inStockItems: 0 });
   const [openDropdown, setOpenDropdown] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [showStockModal, setShowStockModal] = useState(false);
@@ -66,7 +68,6 @@ const Inventory = () => {
     costPrice: '',
     currentStock: '',
     reorderNumber: '',
-    expirationDate: '',
     supplierName: '',
     supplierContact: '',
     itemImage: '',
@@ -98,9 +99,10 @@ const Inventory = () => {
   };
 
   const generateRandomCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
     for (let i = 0; i < 4; i++) {
-      result += Math.floor(Math.random() * 10).toString();
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
   };
@@ -119,6 +121,11 @@ const Inventory = () => {
   const generateSKU = (category, variant) => {
     const categoryCode = categoryCodeMap[category] || 'OTH';
     const randomCode = generateRandomCode();
+    
+    if (!variant || variant.trim() === '') {
+      return `${categoryCode}-${randomCode}`;
+    }
+    
     const colorCode = getColorCode(variant);
     return `${categoryCode}-${randomCode}-${colorCode}`;
   };
@@ -193,7 +200,12 @@ const Inventory = () => {
       const reorderLevel = p.reorderNumber || 10;
       return p.currentStock > 0 && p.currentStock <= reorderLevel;
     }).length;
-    setStockStats({ totalItems, lowStockItems, outOfStockItems });
+    
+    const inStockItems = productList.filter(p => {
+      const reorderLevel = p.reorderNumber || 10;
+      return p.currentStock > reorderLevel;
+    }).length;
+    setStockStats({ totalItems, lowStockItems, outOfStockItems, inStockItems });
   };
 
   const handleInputChange = (e) => {
@@ -261,7 +273,6 @@ const Inventory = () => {
       costPrice: '',
       currentStock: '',
       reorderNumber: '',
-      expirationDate: '',
       supplierName: '',
       supplierContact: '',
       itemImage: '',
@@ -274,7 +285,7 @@ const Inventory = () => {
   const handleAddProduct = async (e) => {
     e.preventDefault();
     
-    // Validation
+ 
     const hasSizeQuantities = newProduct.selectedSizes?.length > 0 && 
       Object.values(newProduct.sizeQuantities || {}).some(qty => qty > 0);
     const hasStock = parseInt(newProduct.currentStock) > 0;
@@ -284,11 +295,9 @@ const Inventory = () => {
       return;
     }
     
-    // Show confirmation modal for new products and edits
     if (!editingProduct) {
       setShowConfirmModal(true);
     } else {
-      // For edits, show edit confirmation modal
       setProductToEdit(editingProduct);
       setShowEditModal(true);
     }
@@ -320,7 +329,6 @@ const Inventory = () => {
           costPrice: parseFloat(newProduct.costPrice) || 0,
           currentStock: totalStock,
           reorderNumber: parseInt(newProduct.reorderNumber) || 0,
-          expirationDate: newProduct.expirationDate || null,
           sizes: newProduct.selectedSizes.length > 0 ? newProduct.sizeQuantities : null
         })
       });
@@ -349,7 +357,6 @@ const Inventory = () => {
         setShowAddModal(false);
         resetProductForm();
         fetchProducts();
-        // Show success modal for new products
         setSuccessMessage('The item was added successfully!');
         setShowSuccessModal(true);
       } else {
@@ -366,7 +373,6 @@ const Inventory = () => {
   const handleEditClick = (product) => {
     setOpenDropdown(null);
     
-    // Set up the product for editing
     setEditingProduct(product);
     
     const existingSizes = product.sizes ? Object.keys(product.sizes) : [];
@@ -383,7 +389,6 @@ const Inventory = () => {
       costPrice: product.costPrice || '',
       currentStock: product.currentStock || '',
       reorderNumber: product.reorderNumber || '',
-      expirationDate: product.expirationDate ? product.expirationDate.split('T')[0] : '',
       supplierName: product.supplierName || '',
       supplierContact: product.supplierContact || '',
       itemImage: product.itemImage || '',
@@ -418,7 +423,6 @@ const Inventory = () => {
           costPrice: parseFloat(newProduct.costPrice) || 0,
           currentStock: totalStock,
           reorderNumber: parseInt(newProduct.reorderNumber) || 0,
-          expirationDate: newProduct.expirationDate || null,
           sizes: newProduct.selectedSizes.length > 0 ? newProduct.sizeQuantities : null
         })
       });
@@ -551,6 +555,100 @@ const Inventory = () => {
     }
   };
 
+  const handleStockInConfirm = async (stockData) => {
+    if (!editingProduct) return;
+
+    try {
+      setLoading(true);
+      
+      const updatedSizes = { ...(editingProduct.sizes || {}) };
+      
+      stockData.selectedSizes.forEach(size => {
+        const currentQty = updatedSizes[size] || 0;
+        const addQty = stockData.sizes[size] || 0;
+        updatedSizes[size] = currentQty + addQty;
+      });
+      
+      const totalStock = Object.values(updatedSizes).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0);
+
+      const response = await fetch(`http://localhost:5000/api/products/${editingProduct._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          currentStock: totalStock,
+          sizes: updatedSizes
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setShowStockModal(false);
+        setEditingProduct(null);
+        setStockAmount('');
+        setSuccessMessage('Stock added successfully!');
+        setShowSuccessModal(true);
+        fetchProducts();
+      } else {
+        alert(data.message || 'Failed to update stock');
+      }
+    } catch (error) {
+      console.error('Error updating stock:', error);
+      alert('Failed to update stock. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStockOutConfirm = async (stockData) => {
+    if (!editingProduct) return;
+
+    try {
+      setLoading(true);
+      
+      const updatedSizes = { ...(editingProduct.sizes || {}) };
+      
+      stockData.selectedSizes.forEach(size => {
+        const currentQty = updatedSizes[size] || 0;
+        const removeQty = stockData.sizes[size] || 0;
+        updatedSizes[size] = Math.max(0, currentQty - removeQty);
+      });
+      
+      const totalStock = Object.values(updatedSizes).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0);
+
+      const response = await fetch(`http://localhost:5000/api/products/${editingProduct._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          currentStock: totalStock,
+          sizes: updatedSizes
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setShowStockModal(false);
+        setEditingProduct(null);
+        setStockAmount('');
+        setSuccessMessage('Stock removed successfully!');
+        setShowSuccessModal(true);
+        fetchProducts();
+      } else {
+        alert(data.message || 'Failed to update stock');
+      }
+    } catch (error) {
+      console.error('Error updating stock:', error);
+      alert('Failed to update stock. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatDate = (date) => {
     if (!date) return '-';
     return new Date(date).toLocaleDateString('en-US', {
@@ -576,47 +674,33 @@ const Inventory = () => {
 
         
         <div className="mb-6">
-          
-         
-          <div className="flex justify-between gap-6">
+          <h2 className="text-lg font-semibold mb-3">Category</h2>
+          <div className="flex gap-4 flex-wrap">
+            <CategoryButtons
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onSelect={setSelectedCategory}
+              size="md"
+            />
             
-            <div className="flex-1">
-              <h2 className="text-lg font-semibold mb-3">Category</h2>
-              <div className="flex gap-4 flex-wrap">
-                <CategoryButtons
-                  categories={categories}
-                  selectedCategory={selectedCategory}
-                  onSelect={setSelectedCategory}
-                  size="md"
-                />
-              </div>
+            <div className="w-[100px] h-[100px] bg-white rounded-lg shadow-md flex flex-col items-center justify-center p-3 shrink-0">
+              <div className="text-2xl font-bold text-gray-900 mb-1">{stockStats.totalItems.toLocaleString()}</div>
+              <div className="text-xs text-gray-600 text-center leading-tight">Total items</div>
             </div>
 
-            
-            <div className="flex-shrink-0">
-              <h2 className="text-lg font-semibold mb-3 opacity-0">Stats</h2>
-              <div className="bg-white rounded-lg shadow px-6 py-4">
-                <div className="grid grid-cols-3 gap-6">
-                  <div className="text-center">
-                    <div className="text-sm text-gray-600 mb-3">Total item</div>
-                    <div className="border-t border-gray-200 pt-3">
-                      <div className="text-base text-gray-900">{stockStats.totalItems}</div>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm text-gray-600 mb-3">Low Stock items</div>
-                    <div className="border-t border-gray-200 pt-3">
-                      <div className="text-base text-gray-900">{stockStats.lowStockItems}</div>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm text-gray-600 mb-3">Out of Stock items</div>
-                    <div className="border-t border-gray-200 pt-3">
-                      <div className="text-base text-gray-900">{stockStats.outOfStockItems}</div>
-                    </div>
-                </div>
-                </div>
-              </div>
+            <div className="w-[100px] h-[100px] bg-white rounded-lg shadow-md flex flex-col items-center justify-center p-3 shrink-0">
+              <div className="text-2xl font-bold text-green-600 mb-1">{stockStats.inStockItems.toLocaleString()}</div>
+              <div className="text-xs text-gray-600 text-center leading-tight">In Stock</div>
+            </div>
+
+            <div className="w-[100px] h-[100px] bg-white rounded-lg shadow-md flex flex-col items-center justify-center p-3 shrink-0">
+              <div className="text-2xl font-bold text-orange-600 mb-1">{stockStats.lowStockItems}</div>
+              <div className="text-xs text-gray-600 text-center leading-tight">Low Stock</div>
+            </div>
+
+            <div className="w-[100px] h-[100px] bg-white rounded-lg shadow-md flex flex-col items-center justify-center p-3 shrink-0">
+              <div className="text-2xl font-bold text-red-600 mb-1">{stockStats.outOfStockItems}</div>
+              <div className="text-xs text-gray-600 text-center leading-tight">Out of Stock</div>
             </div>
           </div>
         </div>
@@ -671,6 +755,7 @@ const Inventory = () => {
           handleEditProduct={handleEditClick}
           handleDeleteProduct={handleDeleteClick}
           handleViewProduct={handleViewProduct}
+          handleStockUpdate={handleStockUpdate}
           formatDate={formatDate}
         />
 
@@ -726,7 +811,6 @@ const Inventory = () => {
           onClose={() => {
             setShowEditModal(false);
             setProductToEdit(null);
-            // Keep the edit form open when canceling
           }}
           onConfirm={confirmEditProduct}
           itemName={productToEdit?.itemName || editingProduct?.itemName || ''}
@@ -739,86 +823,32 @@ const Inventory = () => {
           formatDate={formatDate}
         />
 
-   
-        {showStockModal && (
-          <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm pointer-events-none">
-            <div className="bg-white rounded-2xl w-full max-w-md relative pointer-events-auto shadow-2xl">
-            
-              <div className="flex justify-between items-center px-6 py-4 border-b">
-                <h2 className="text-xl font-bold">
-                  {stockModalType === 'in' ? 'Stock In' : 'Stock Out'}
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowStockModal(false);
-                    setEditingProduct(null);
-                    setStockAmount('');
-                  }}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ×
-                </button>
-              </div>
+        {showStockModal && stockModalType === 'in' && (
+          <StockInModal
+            isOpen={showStockModal}
+            onClose={() => {
+              setShowStockModal(false);
+              setEditingProduct(null);
+              setStockAmount('');
+            }}
+            product={editingProduct}
+            onConfirm={handleStockInConfirm}
+            loading={loading}
+          />
+        )}
 
-              <form onSubmit={handleStockSubmit}>
-                <div className="p-6">
-                  <div className="mb-4">
-                    <p className="text-sm text-gray-600 mb-2">Product: <span className="font-medium text-gray-800">{editingProduct?.itemName}</span></p>
-                    <p className="text-sm text-gray-600">Current Stock: <span className="font-medium text-gray-800">{editingProduct?.currentStock}</span></p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {stockModalType === 'in' ? 'Quantity to Add' : 'Quantity to Remove'}
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={stockAmount}
-                      onChange={(e) => setStockAmount(e.target.value)}
-                      required
-                      placeholder="Enter quantity"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                    />
-                  </div>
-
-                  {stockAmount && (
-                    <div className={`mt-4 p-3 rounded-lg ${stockModalType === 'in' ? 'bg-green-50' : 'bg-red-50'}`}>
-                      <p className="text-sm font-medium">
-                        New Stock: {stockModalType === 'in' 
-                          ? editingProduct?.currentStock + parseInt(stockAmount || 0)
-                          : Math.max(0, editingProduct?.currentStock - parseInt(stockAmount || 0))
-                        }
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-3 px-6 pb-6">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className={`flex-1 px-4 py-3 text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-all ${
-                      stockModalType === 'in' ? 'bg-green-600' : 'bg-red-600'
-                    }`}
-                  >
-                    {loading ? 'Updating...' : 'Confirm'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowStockModal(false);
-                      setEditingProduct(null);
-                      setStockAmount('');
-                    }}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+        {showStockModal && stockModalType === 'out' && (
+          <StockOutModal
+            isOpen={showStockModal}
+            onClose={() => {
+              setShowStockModal(false);
+              setEditingProduct(null);
+              setStockAmount('');
+            }}
+            product={editingProduct}
+            onConfirm={handleStockOutConfirm}
+            loading={loading}
+          />
         )}
       </div>
   );

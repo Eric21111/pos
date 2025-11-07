@@ -1,10 +1,30 @@
 import { useState, useRef, useEffect } from 'react';
-import { FaTimes, FaEdit } from 'react-icons/fa';
+import { FaTimes } from 'react-icons/fa';
 import pinIcon from '../../assets/owner/pin.svg';
+import circleIcon from '../../assets/owner/circle.svg';
+import cameraIcon from '../../assets/owner/camera.svg';
 
-const EditEmployeeProfile = ({ isOpen, onClose, employee }) => {
+const AddEmployeeModal = ({ isOpen, onClose }) => {
   const [newPin, setNewPin] = useState(['', '', '', '']);
   const [confirmPin, setConfirmPin] = useState(['', '', '', '']);
+  const [formData, setFormData] = useState({
+    name: '',
+    contactNo: '+63',
+    email: '',
+    role: 'Sales Clerk',
+    dateJoined: new Date().toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+  });
+  const [accessControl, setAccessControl] = useState({
+    posTerminal: true,
+    inventory: false,
+    viewTransactions: true,
+    generateReports: false,
+  });
+
   const newPinRefs = useRef([]);
   const confirmPinRefs = useRef([]);
 
@@ -12,6 +32,23 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee }) => {
     if (!isOpen) {
       setNewPin(['', '', '', '']);
       setConfirmPin(['', '', '', '']);
+      setFormData({
+        name: '',
+        contactNo: '+63',
+        email: '',
+        role: 'Sales Clerk',
+        dateJoined: new Date().toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        }),
+      });
+      setAccessControl({
+        posTerminal: true,
+        inventory: false,
+        viewTransactions: true,
+        generateReports: false,
+      });
     }
   }, [isOpen]);
 
@@ -91,19 +128,37 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee }) => {
     }
   };
 
-  if (!isOpen || !employee) return null;
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleAccessControlToggle = (key) => {
+    setAccessControl((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const handleUpdatePin = () => {
+    if (newPin.join('') === confirmPin.join('') && newPin.join('').length === 4) {
+      console.log('PIN updated:', newPin.join(''));
+    }
+  };
+
+  const handleAddEmployee = () => {
+    console.log('Adding employee:', { formData, accessControl, pin: newPin.join('') });
+  };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4 backdrop-blur-sm bg-transparent">
       <div className="bg-white rounded-3xl w-full max-w-6xl shadow-2xl overflow-hidden relative">
         <div className="relative">
-          <div
-            className="h-[8px] w-full"
-            style={{
-              background:
-                'radial-gradient(circle at center, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
-            }}
-          />
           <div
             className="flex justify-between items-center px-8 py-4"
             style={{
@@ -111,9 +166,11 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee }) => {
                 'linear-gradient(to right, #C2A68C, #AD7F65, #76462B)',
             }}
           >
-            <h2 className="text-white font-semibold text-lg">
-              Edit Employee Profile
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-white font-semibold text-lg">
+                Add New Employee
+              </h2>
+            </div>
             <button
               onClick={onClose}
               className="text-white hover:text-gray-200 transition"
@@ -126,53 +183,15 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee }) => {
         <div className="grid grid-cols-2 gap-8 p-8">
           <div>
             <div className="flex items-start gap-6">
-              <div className="w-32 h-32 rounded-full overflow-hidden flex-shrink-0 bg-gray-200">
-                <img
-                  src={employee.image}
-                  alt={employee.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              <div className="flex flex-col gap-3 flex-1">
-                <h3 className="text-2xl font-bold text-gray-800">
-                  {employee.name}
-                </h3>
-
-                <p className="text-[#F5A623] font-medium text-base">
-                  {employee.role}
-                </p>
-
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm text-gray-600">Permissions</span>
-                  <div className="flex gap-2 flex-wrap">
-                    <span className="border rounded-lg px-3 py-1 text-sm text-[#D3B8A0] border-[#D3B8A0] bg-transparent">
-                      POS Terminal
-                    </span>
-                    <span className="border rounded-lg px-3 py-1 text-sm text-[#D3B8A0] border-[#D3B8A0] bg-transparent">
-                      View Transaction
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm text-gray-600">Status</span>
-                  <div
-                    className={`px-3 py-1 rounded-lg text-sm font-medium w-fit ${
-                      employee.status === 'Active'
-                        ? 'bg-[#C8E6C9] text-[#388E3C]'
-                        : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {employee.status}
-                  </div>
-                </div>
+              <div className="w-60 h-60 ml-30 mt-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center relative">
+                <img src={circleIcon} alt="Circle background" className="w-full h-full object-cover" />
+                <img src={cameraIcon} alt="Camera" className="absolute w-20 h-20" />
               </div>
             </div>
 
             <div className="mt-16 flex justify-center">
               <div
-                className="w-[360px] rounded-2xl shadow-md p-2 pl-10"
+                className="w-[360px] rounded-2xl shadow-md p-2 pl-10 pr-10"
                 style={{
                   borderTop: '5px solid #AD7F65',
                   backgroundColor: '#fff',
@@ -180,7 +199,7 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee }) => {
               >
                 <h4 className="font-semibold text-[#76462B] mb-3 flex items-center gap-2">
                   <img src={pinIcon} alt="PIN icon" className="w-5 h-5" />
-                  Change PIN
+                  Set PIN
                 </h4>
 
                 <div className="space-y-3">
@@ -227,7 +246,10 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee }) => {
                 </div>
 
                 <div className="flex gap-3 mt-3 justify-end">
-                  <button className="px-5 py-2 rounded-md text-white text-sm font-medium bg-[#AD7F65] hover:opacity-90">
+                  <button
+                    onClick={handleUpdatePin}
+                    className="px-5 py-2 rounded-md text-white text-sm font-medium bg-[#AD7F65] hover:opacity-90"
+                  >
                     Update PIN
                   </button>
                   <button className="px-5 py-2 rounded-md bg-gray-100 text-sm font-medium hover:bg-gray-200">
@@ -248,28 +270,60 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee }) => {
               </h4>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-500">Name</p>
-                  <p className="font-medium text-gray-800">{employee.name}</p>
+                  <p className="text-gray-500 mb-1">Name</p>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="eg. John Doe"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
+                  />
                 </div>
                 <div>
-                  <p className="text-gray-500">Contact number</p>
-                  <p className="font-medium text-gray-800">09123478999</p>
+                  <p className="text-gray-500 mb-1">Contact No.</p>
+                  <input
+                    type="text"
+                    name="contactNo"
+                    value={formData.contactNo}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
+                  />
                 </div>
                 <div>
-                  <p className="text-gray-500">Email</p>
-                  <p className="font-medium text-gray-800">
-                    yourname12345@gmail.com
-                  </p>
+                  <p className="text-gray-500 mb-1">Email</p>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="yourname12345@gmail.com"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
+                  />
                 </div>
                 <div>
-                  <p className="text-gray-500">Date Joined</p>
-                  <p className="font-medium text-gray-800">Oct. 04, 2023</p>
+                  <p className="text-gray-500 mb-1">Role/Position</p>
+                  <select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65] bg-white"
+                  >
+                    <option value="Sales Clerk">Sales Clerk</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Cashier">Cashier</option>
+                    <option value="Supervisor">Supervisor</option>
+                  </select>
                 </div>
                 <div>
-                  <p className="text-gray-500">Position</p>
-                  <p className="font-medium text-gray-800">
-                    Employee - {employee.role}
-                  </p>
+                  <p className="text-gray-500 mb-1">Date Joined</p>
+                  <input
+                    type="text"
+                    name="dateJoined"
+                    value={formData.dateJoined}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65] bg-gray-50"
+                  />
                 </div>
               </div>
             </div>
@@ -287,40 +341,48 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee }) => {
                   'Inventory',
                   'View Transactions',
                   'Generate Reports',
-                ].map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex justify-between items-center border rounded-lg px-3 py-2 text-sm"
-                  >
-                    <span>{item}</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        defaultChecked={
-                          item === 'POS Terminal' ||
-                          item === 'View Transactions'
-                        }
-                      />
-                      <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-[#AD7F65] transition-all"></div>
-                      <div className="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition peer-checked:translate-x-5"></div>
-                    </label>
-                  </div>
-                ))}
+                ].map((item, idx) => {
+                  const accessKey = item === 'POS Terminal' ? 'posTerminal' :
+                                   item === 'Inventory' ? 'inventory' :
+                                   item === 'View Transactions' ? 'viewTransactions' :
+                                   'generateReports';
+                  return (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-center border rounded-lg px-3 py-2 text-sm"
+                    >
+                      <span>{item}</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={accessControl[accessKey]}
+                          onChange={() => handleAccessControlToggle(accessKey)}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-[#AD7F65] transition-all"></div>
+                        <div className="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition peer-checked:translate-x-5"></div>
+                      </label>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             <div className="flex justify-end gap-3">
               <button
+                onClick={handleAddEmployee}
                 className="px-6 py-2 rounded-lg text-white font-medium hover:opacity-90 transition-all"
                 style={{
                   background:
                     'linear-gradient(to right, #C2A68C, #AD7F65, #76462B)',
                 }}
               >
-                Save Changes
+                Add Employee
               </button>
-              <button className="px-6 py-2 rounded-lg bg-gray-200 font-medium hover:bg-gray-300 transition-all">
+              <button
+                onClick={onClose}
+                className="px-6 py-2 rounded-lg bg-gray-200 font-medium hover:bg-gray-300 transition-all"
+              >
                 Cancel
               </button>
             </div>
@@ -331,4 +393,5 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee }) => {
   );
 };
 
-export default EditEmployeeProfile;
+export default AddEmployeeModal;
+

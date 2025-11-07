@@ -4,12 +4,11 @@ const ViewEmployeeModal = ({ isOpen, onClose, employee }) => {
   if (!isOpen || !employee) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4">
+    <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4 backdrop-blur-sm bg-transparent">
       <div 
         className="bg-white rounded-2xl w-full max-w-2xl relative shadow-2xl overflow-hidden"
         style={{ borderRadius: '16px' }}
       >
-        {/* Header with Radial Gradient Border */}
         <div className="relative overflow-hidden" style={{ borderTopLeftRadius: '30px', borderTopRightRadius: '30px' }}>
           <div
             className="h-[10px] w-full"
@@ -33,9 +32,7 @@ const ViewEmployeeModal = ({ isOpen, onClose, employee }) => {
           </div>
         </div>
 
-        {/* Content */}
         <div className="p-6 bg-white ml-10">
-          {/* Profile Section */}
           <div className="flex items-start gap-4 mb-6">
             <div className="w-40 h-40  rounded-full overflow-hidden shrink-0">
               <img
@@ -53,7 +50,6 @@ const ViewEmployeeModal = ({ isOpen, onClose, employee }) => {
               </div>
               <p className="text-sm mb-4" style={{ color: '#FF8C42' }}>{employee.role}</p>
               
-              {/* Permissions */}
               <div className="mb-3">
                 <label className="text-sm text-gray-600 mb-2 block">Permissions:</label>
                 <div className="flex gap-2 flex-wrap">
@@ -66,7 +62,6 @@ const ViewEmployeeModal = ({ isOpen, onClose, employee }) => {
                 </div>
               </div>
 
-              {/* Status */}
               <div>
                 <label className="text-sm text-gray-600 mb-2 block">Status:</label>
                 <span
@@ -82,7 +77,6 @@ const ViewEmployeeModal = ({ isOpen, onClose, employee }) => {
             </div>
           </div>
 
-          {/* Contact Details */}
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div>
               <p className="text-sm text-gray-500 mb-1">Name</p>
@@ -106,7 +100,6 @@ const ViewEmployeeModal = ({ isOpen, onClose, employee }) => {
             </div>
           </div>
 
-          {/* Delete Account Button */}
           <div className="flex justify-end">
             <button
               className="px-6 py-2 rounded-lg text-white font-medium hover:opacity-90 transition-all"

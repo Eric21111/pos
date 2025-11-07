@@ -71,10 +71,6 @@ const ViewProductModal = ({ showViewModal, setShowViewModal, viewingProduct, for
                       <p className="text-sm text-gray-600 mt-1">{viewingProduct.variant || 'N/A'}</p>
                     </div>
                     <div>
-                      <span className="text-sm font-semibold text-gray-800">Expiration Date:</span>
-                      <p className="text-sm text-gray-600 mt-1">{viewingProduct.expirationDate ? formatDate(viewingProduct.expirationDate) : 'not applicable'}</p>
-                    </div>
-                    <div>
                       <span className="text-sm font-semibold text-gray-800">Stock:</span>
                       <p className="text-sm text-gray-600 mt-1">{viewingProduct.currentStock || 0}</p>
                     </div>

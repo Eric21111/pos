@@ -14,8 +14,9 @@ import Settings from './pages/Settings'
 import Dashboard from './pages/owner/Dashboard'
 import Reports from './pages/owner/Reports'
 import ManageEmployees from './pages/owner/ManageEmployees'
+import DiscountManagement from './pages/owner/DiscountManagement'
+import BrandPartners from './pages/owner/BrandPartners'
 
-// Layout wrapper component for pages that need sidebar
 const MainLayout = ({ children }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -36,11 +37,9 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Auth pages without sidebar */}
           <Route path="/" element={<StaffSelection />} />
           <Route path="/pin" element={<PinEntry />} />
           
-          {/* Main app pages with sidebar */}
           <Route path="/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
           <Route path="/reports" element={<MainLayout><Reports /></MainLayout>} />
           <Route path="/manage-employees" element={<MainLayout><ManageEmployees /></MainLayout>} />
@@ -48,6 +47,8 @@ function App() {
           <Route path="/terminal" element={<MainLayout><Terminal /></MainLayout>} />
           <Route path="/transactions" element={<MainLayout><Transaction /></MainLayout>} />
           <Route path="/settings" element={<MainLayout><Settings /></MainLayout>} />
+          <Route path="/discount-management" element={<MainLayout><DiscountManagement /></MainLayout>} />
+          <Route path="/brand-partners" element={<MainLayout><BrandPartners /></MainLayout>} />
         </Routes>
       </Router>
     </AuthProvider>

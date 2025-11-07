@@ -10,6 +10,7 @@ const ProductTable = ({
   handleEditProduct,
   handleDeleteProduct,
   handleViewProduct,
+  handleStockUpdate,
   formatDate
 }) => {
   return (
@@ -33,7 +34,6 @@ const ProductTable = ({
                 <th className="pb-3 px-4">Item Price</th>
                 <th className="pb-3 px-4">Date Added</th>
                 <th className="pb-3 px-4 text-center">Current Stock</th>
-                <th className="pb-3 px-4">Expiration Date</th>
                 <th className="pb-3 px-4">Last Updated</th>
                 <th className="pb-3 pl-4">Actions</th>
               </tr>
@@ -61,7 +61,6 @@ const ProductTable = ({
                       {product.currentStock}
                     </span>
                   </td>
-                  <td className="py-3 px-4">{formatDate(product.expirationDate)}</td>
                   <td className="py-3 px-4">{formatDate(product.lastUpdated)}</td>
                   <td className="py-3 pl-4">
                     <div className="relative">
@@ -110,6 +109,40 @@ const ProductTable = ({
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                             Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleStockUpdate(product, 'in');
+                              setOpenDropdown(null);
+                            }}
+                            className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b"
+                          >
+                            <div className="relative w-4 h-4 flex items-center justify-center">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                              </svg>
+                              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center border border-white">
+                                <span className="text-white text-[7px] font-bold leading-none">+</span>
+                              </span>
+                            </div>
+                            Stock In
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleStockUpdate(product, 'out');
+                              setOpenDropdown(null);
+                            }}
+                            className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b"
+                          >
+                            <div className="relative w-4 h-4 flex items-center justify-center">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                              </svg>
+                              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full flex items-center justify-center border border-white">
+                                <span className="text-white text-[7px] font-bold leading-none">-</span>
+                              </span>
+                            </div>
+                            Stock Out
                           </button>
                           <button
                             onClick={() => {

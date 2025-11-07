@@ -7,6 +7,9 @@ import OrderSummary from '../components/terminal/OrderSummary';
 import ProductCard from '../components/terminal/ProductCard';
 import Pagination from '../components/inventory/Pagination';
 import CheckoutConfirmationModal from '../components/terminal/CheckoutConfirmationModal';
+import CashPaymentModal from '../components/terminal/CashPaymentModal';
+import QRCodePaymentModal from '../components/terminal/QRCodePaymentModal';
+import DiscountModal from '../components/terminal/DiscountModal';
 
 
 import allIcon from '../assets/inventory-icons/ALL.svg';
@@ -32,6 +35,9 @@ const Terminal = () => {
   const [productSizes, setProductSizes] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showCashPaymentModal, setShowCashPaymentModal] = useState(false);
+  const [showQRPaymentModal, setShowQRPaymentModal] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
   const itemsPerPage = 10; 
 
   const categories = [
@@ -202,13 +208,46 @@ const Terminal = () => {
 
   const confirmCheckout = () => {
     setShowCheckoutModal(false);
-    // Process checkout here
     alert('Proceeding to checkout...');
-    // You can add your checkout logic here, such as:
-    // - Save transaction to database
-    // - Clear cart
-    // - Navigate to receipt page
-    // setCart([]);
+  };
+
+  const handleCashPayment = () => {
+    setShowCashPaymentModal(true);
+  };
+
+  const handleCashProceed = (amountReceived, change) => {
+    setShowCashPaymentModal(false);
+    console.log('Cash Payment:', {
+      amountReceived,
+      change,
+      total: calculateTotal()
+    });
+    alert(`Payment successful! Change: PHP ${change.toFixed(2)}`);
+  };
+
+  const handleQRPayment = () => {
+    setShowQRPaymentModal(true);
+  };
+
+  const handleQRProceed = (referenceNo, screenshot) => {
+    setShowQRPaymentModal(false);
+    console.log('QR Payment:', {
+      referenceNo,
+      screenshot,
+      total: calculateTotal()
+    });
+    alert(`QR Payment successful! Reference: ${referenceNo}`);
+  };
+
+  const handleSelectDiscount = (discount) => {
+    if (discount.discountValue.includes('%')) {
+      const percentage = parseFloat(discount.discountValue.replace('% OFF', ''));
+      const discountValue = (calculateSubtotal() * percentage) / 100;
+      setDiscountAmount(discountValue.toString());
+    } else if (discount.discountValue.includes('P') || discount.discountValue.includes('₱')) {
+      const amount = parseFloat(discount.discountValue.replace(/[P₱\sOFF]/g, ''));
+      setDiscountAmount(amount.toString());
+    }
   };
 
   return (
@@ -324,6 +363,9 @@ const Terminal = () => {
               calculateDiscount={calculateDiscount}
               calculateTotal={calculateTotal}
               handleCheckout={handleCheckout}
+              onCashPayment={handleCashPayment}
+              onQRPayment={handleQRPayment}
+              onOpenDiscountModal={() => setShowDiscountModal(true)}
             />
           </div>
         </div>
@@ -333,6 +375,26 @@ const Terminal = () => {
         isOpen={showCheckoutModal}
         onClose={() => setShowCheckoutModal(false)}
         onConfirm={confirmCheckout}
+      />
+
+      <CashPaymentModal
+        isOpen={showCashPaymentModal}
+        onClose={() => setShowCashPaymentModal(false)}
+        totalAmount={calculateTotal()}
+        onProceed={handleCashProceed}
+      />
+
+      <QRCodePaymentModal
+        isOpen={showQRPaymentModal}
+        onClose={() => setShowQRPaymentModal(false)}
+        totalAmount={calculateTotal()}
+        onProceed={handleQRProceed}
+      />
+
+      <DiscountModal
+        isOpen={showDiscountModal}
+        onClose={() => setShowDiscountModal(false)}
+        onSelectDiscount={handleSelectDiscount}
       />
     </>
   );

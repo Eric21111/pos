@@ -29,7 +29,7 @@ const Transaction = () => {
         />
 
        
-        <div className="flex gap-6">
+        <div className="flex gap-6 mt-10">
          
           <div className="flex-1 bg-white rounded-2xl shadow-lg p-6">
          
@@ -169,79 +169,46 @@ const Transaction = () => {
 
        
           <div className="w-96 bg-white rounded-2xl shadow-lg p-6">
-        
-            <h2 className="text-2xl font-bold text-center mb-6" style={{ fontFamily: 'serif', color: '#AD7F65' }}>
-              Create Your Style
-            </h2>
-
-        
             <div className="mb-6">
-              <div className="text-center mb-2">
-                <span className="text-sm font-semibold text-gray-700">Token</span>
+              <h2 className="text-xl font-bold mb-1" style={{ color: '#AD7F65' }}>
+                Transaction Id: TRX-001
+              </h2>
+              <p className="text-sm text-gray-400">
+                October 20, 2025
+              </p>
+            </div>
+
+            <div className="mb-12 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Item One</span>
+                <span className="text-sm text-gray-600">x1 P100</span>
               </div>
-              <div className="border-2 border-dashed border-gray-400 rounded-lg p-4 text-center">
-                <div className="text-lg font-bold text-gray-800 tracking-wider">
-                  0237-7746-8981-9028-5626
-                </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Item One</span>
+                <span className="text-sm text-gray-600">x1 P100</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Item One</span>
+                <span className="text-sm text-gray-600">x1 P100</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Item One</span>
+                <span className="text-sm text-gray-600">x1 P100</span>
               </div>
             </div>
 
-         
-            <div className="space-y-3 mb-6">
+            <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Token Type</span>
-                <span className="text-sm font-semibold text-gray-800">Credit</span>
-              </div>
-              
-              <div className="border-t border-dashed border-gray-300 my-3"></div>
-              
-              <div className="flex justify-between items-start">
-                <span className="text-sm text-gray-600">Customer Name</span>
-                <span className="text-sm font-semibold text-gray-800 text-right">Victor Shoaga</span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Customer Type</span>
-                <span className="text-sm font-semibold text-gray-800">R3</span>
-              </div>
-              
-              <div className="flex justify-between items-start">
-                <span className="text-sm text-gray-600">Address</span>
-                <span className="text-sm font-semibold text-gray-800 text-right max-w-[60%]">
-                  7953 Oakland St.<br />
-                  Honolulu, HI 96815
-                </span>
-              </div>
-              
-              <div className="border-t border-dashed border-gray-300 my-3"></div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Meter Number</span>
-                <span className="text-sm font-semibold text-gray-800">04172997324</span>
-              </div>
-            </div>
-
-           
-            <div className="space-y-2 mb-6 pt-4 border-t border-gray-300">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Subtotal</span>
-                <span className="text-sm font-semibold text-gray-800">PHP 100.00</span>
+                <span className="text-sm text-gray-600">Subtotal:</span>
+                <span className="text-sm text-gray-600">P400.00</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Tax</span>
-                <span className="text-sm font-semibold text-gray-800">PHP 5.00</span>
+                <span className="text-sm text-gray-600">Discount</span>
+                <span className="text-sm text-gray-600">P100.00</span>
               </div>
-              <div className="flex justify-between items-center pt-2 border-t border-gray-300">
-                <span className="text-base font-bold text-gray-800">Total</span>
-                <span className="text-base font-bold text-[#AD7F65]">PHP 100.00</span>
-              </div>
-            </div>
-
-           
-            <div className="pt-4 border-t border-gray-300">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Operator</span>
-                <span className="text-sm font-semibold text-gray-800">Ade</span>
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-sm font-semibold text-gray-800">Total:</span>
+                <span className="text-sm font-semibold text-gray-800">P300.00</span>
               </div>
             </div>
           </div>

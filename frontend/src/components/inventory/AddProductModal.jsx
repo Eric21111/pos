@@ -148,43 +148,14 @@ const AddProductModal = ({
                     </div>
                  
                     {(!newProduct.selectedSizes || newProduct.selectedSizes.length === 0) && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">Stock</label>
-                          <input
-                            type="number"
-                            name="currentStock"
-                            value={newProduct.currentStock}
-                            onChange={handleInputChange}
-                            placeholder="Add Stock"
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">
-                            Expiration Date <span className="text-gray-400">Optional</span>
-                          </label>
-                          <input
-                            type="date"
-                            name="expirationDate"
-                            value={newProduct.expirationDate}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-                    )}
-          
-                    {newProduct.selectedSizes?.length > 0 && (
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          Expiration Date <span className="text-gray-400">Optional</span>
-                        </label>
+                        <label className="block text-xs text-gray-600 mb-1">Stock</label>
                         <input
-                          type="date"
-                          name="expirationDate"
-                          value={newProduct.expirationDate}
+                          type="number"
+                          name="currentStock"
+                          value={newProduct.currentStock}
                           onChange={handleInputChange}
+                          placeholder="Add Stock"
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
                         />
                       </div>
@@ -237,7 +208,7 @@ const AddProductModal = ({
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
                       />
                     </div>
-                    <div>
+                    {/* <div>
                       <label className="block text-xs text-gray-600 mb-1">Supplier Contact</label>
                       <input
                         type="text"
@@ -247,7 +218,7 @@ const AddProductModal = ({
                         placeholder="Supplier Contact"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
                       />
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </div>

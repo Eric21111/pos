@@ -5,6 +5,7 @@ import Pagination from '../../components/inventory/Pagination';
 import ViewEmployeeModal from '../../components/owner/ViewEmployeeModal';
 import EditEmployeeModal from '../../components/owner/EditEmployeeModal';
 import DeleteEmployeeModal from '../../components/owner/DeleteEmployeeModal';
+import AddEmployeeModal from '../../components/owner/AddEmployeeModal';
 import tempStaff from '../../assets/tempstaff.png';
 import sortIcon from '../../assets/sort.svg';
 
@@ -18,9 +19,9 @@ const ManageEmployees = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [deletingEmployee, setDeletingEmployee] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const itemsPerPage = 12;
 
-  // Static employee data
   const employees = [
     { id: 1, name: 'Maria Dela Cruz', role: 'Cashier', status: 'Active', image: tempStaff },
     { id: 2, name: 'John Smith', role: 'Manager', status: 'Active', image: tempStaff },
@@ -46,7 +47,6 @@ const ManageEmployees = () => {
     currentPage * itemsPerPage
   );
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (openDropdown !== null) {
@@ -90,7 +90,6 @@ const ManageEmployees = () => {
 
   const confirmDeleteEmployee = () => {
     console.log('Deleting employee:', deletingEmployee);
-    // Add actual delete logic here
     setShowDeleteModal(false);
     setDeletingEmployee(null);
   };
@@ -104,19 +103,31 @@ const ManageEmployees = () => {
       />
       
       <div className="mt-6">
-        {/* Search and Add Employee Section */}
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4 flex-1">
-            <div className="relative" style={{ maxWidth: '400px', width: '100%' }}>
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                <FaSearch className="text-gray-400" />
-              </div>
+            <div className="flex items-center shadow-md overflow-hidden" style={{ maxWidth: '400px', width: '100%', borderRadius: '15px' }}>
+              <button
+                type="button"
+                className="px-4 py-3 flex items-center justify-center"
+                style={{ 
+                  background: 'linear-gradient(135deg, rgba(173, 127, 101, 1) 0%, rgba(118, 70, 43, 1) 100%)',
+                  borderTopLeftRadius: '15px',
+                  borderBottomLeftRadius: '15px'
+                }}
+              >
+                <FaSearch className="text-white text-sm" />
+              </button>
+              
               <input
                 type="text"
                 placeholder="Search by name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                className="flex-1 px-4 py-3 bg-white focus:outline-none text-gray-700 placeholder-gray-400"
+                style={{
+                  borderTopRightRadius: '15px',
+                  borderBottomRightRadius: '15px'
+                }}
               />
             </div>
             <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
@@ -124,8 +135,8 @@ const ManageEmployees = () => {
             </button>
           </div>
           
-          {/* Add Employee Button - Right Aligned */}
           <button
+            onClick={() => setShowAddModal(true)}
             className="px-6 py-2 text-white rounded-lg font-medium hover:opacity-90 transition-all shadow-md"
             style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
           >
@@ -134,14 +145,12 @@ const ManageEmployees = () => {
           </button>
         </div>
 
-        {/* Employee Cards Grid */}
         <div className="grid grid-cols-4 gap-6 mb-4">
           {paginatedEmployees.map((employee) => (
             <div
               key={employee.id}
               className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
             >
-              {/* Gradient Border Top */}
               <div
                 className="h-2 w-full"
                 style={{
@@ -149,7 +158,6 @@ const ManageEmployees = () => {
                 }}
               />
               
-              {/* Options Icon */}
               <div className="absolute top-4 right-4 z-10">
                 <button
                   id={`dropdown-btn-${employee.id}`}
@@ -205,7 +213,6 @@ const ManageEmployees = () => {
 
               <div className="p-6">
                 <div className="flex items-start gap-4">
-                  {/* Profile Picture */}
                   <div className="w-30 h-30 rounded-full overflow-hidden shrink-0">
                     <img
                       src={employee.image}
@@ -214,7 +221,6 @@ const ManageEmployees = () => {
                     />
                   </div>
 
-                  {/* Employee Details */}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-gray-800 text-base mb-2 ">
                       {employee.name}
@@ -236,7 +242,6 @@ const ManageEmployees = () => {
           ))}
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <Pagination
             currentPage={currentPage}
@@ -272,6 +277,13 @@ const ManageEmployees = () => {
         }}
         onConfirm={confirmDeleteEmployee}
         employee={deletingEmployee}
+      />
+
+      <AddEmployeeModal
+        isOpen={showAddModal}
+        onClose={() => {
+          setShowAddModal(false);
+        }}
       />
     </div>
   );

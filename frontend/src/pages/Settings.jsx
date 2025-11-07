@@ -1,10 +1,15 @@
 import { useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/shared/header';
 import { FaBell, FaEdit, FaUser, FaKey, FaPalette } from 'react-icons/fa';
 import { SidebarContext } from '../context/SidebarContext';
+import { useAuth } from '../context/AuthContext';
 
 const Settings = () => {
   const { isExpanded } = useContext(SidebarContext);
+  const { isOwner } = useAuth();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('personal');
   const [oldPin, setOldPin] = useState(['', '', '', '']);
   const [newPin, setNewPin] = useState(['', '', '', '']);
   const [confirmPin, setConfirmPin] = useState(['', '', '', '']);
@@ -72,11 +77,41 @@ const Settings = () => {
   
         <p className="text-gray-600 mb-6">manage your account settings and preferences</p>
 
+        {isOwner() && (
+          <div className="flex gap-3 mb-6">
+            <button
+              onClick={() => setActiveTab('personal')}
+              className={`px-6 py-3 font-medium transition-all ${
+                activeTab === 'personal'
+                  ? 'text-white shadow-md rounded-xl'
+                  : 'bg-white text-gray-800 border border-gray-200 hover:border-gray-300 rounded-lg'
+              }`}
+              style={
+                activeTab === 'personal'
+                  ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }
+                  : {}
+              }
+            >
+              Personal Information
+            </button>
+            <button
+              onClick={() => navigate('/discount-management')}
+              className="px-6 py-3 font-medium transition-all bg-white text-gray-800 border border-gray-200 hover:border-gray-300 rounded-lg"
+            >
+              Discount Management
+            </button>
+            <button
+              onClick={() => navigate('/brand-partners')}
+              className="px-6 py-3 font-medium transition-all bg-white text-gray-800 border border-gray-200 hover:border-gray-300 rounded-lg"
+            >
+              Brand Partners
+            </button>
+          </div>
+        )}
     
         <div className="bg-white rounded-2xl shadow-lg p-8">
-          {/* User Profile Overview and Profile Information - Side by Side */
+        
           <div className="grid grid-cols-2 gap-6 mb-8 items-start">
-            {/* Left Column - User Profile Overview */}
             <div className="flex items-center gap-6 mt-17 ml-40">
               <img 
                 src="https://ui-avatars.com/api/?name=Barbie+Dela+Cruz&size=120&background=AD7F65&color=fff" 
@@ -95,7 +130,6 @@ const Settings = () => {
               </div>
             </div>
 
-            {/* Right Column - Profile Information */}
             <div className={`relative transition-all duration-300 ${
               isExpanded ? 'w-full max-w-[580px]' : 'w-full max-w-[700px]'
             }`}>
@@ -214,9 +248,7 @@ const Settings = () => {
             </div>
           </div>
 
-          /* Change PIN and Preferences - Side by Side */}
           <div className="flex justify-between gap-10 ">
-            {/* Left Column - Change PIN */}
             <div className="relative w-full max-w-md mx-auto">
              
               <div className="relative pt-4 m-2.5  border-l-0 border-r-0 border-b-0 border-t-0  rounded-[30px] bg-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] w-130 h-80">
@@ -320,9 +352,8 @@ const Settings = () => {
              isExpanded ? 'w-full max-w-[600px]' : 'w-full max-w-[800px]'
            }`}>
          
-            <div className="absolute top-0 pt-4 left-0 right-0 h-1 bg-[radial-gradient(circle_at_center,_#C2A68C_0%,_#AD7F65_50%,_#76462B_100%)] rounded-t-[20px]" style={{ borderRadius: '20px 20px 0 0' }}></div>
+            <div className="absolute top-0 pt-4 left-0 right-0 h-1 bg-[radial-gradient(circle_at_center,_#C2A68C_0%,_#AD7F65_50%,_#76462B_100%)] rounded-t-[20px]" style={{ borderRadius: '20px 20px 0 0'           }}></div>
             
-            {/* Preferences Header */}
             <div className="mb-3 mt-1">
                 <div className="flex items-center gap-2 mb-1">
                 <FaPalette className="text-[#AD7F65] text-base" />

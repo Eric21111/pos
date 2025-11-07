@@ -4,9 +4,8 @@ const DeleteEmployeeModal = ({ isOpen, onClose, onConfirm, employee }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[10003] p-4 bg-black bg-opacity-50">
+    <div className="fixed inset-0 flex items-center justify-center z-[10003] p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl w-full max-w-md relative shadow-2xl">
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
@@ -14,26 +13,21 @@ const DeleteEmployeeModal = ({ isOpen, onClose, onConfirm, employee }) => {
           <FaTimes className="w-5 h-5" />
         </button>
 
-        {/* Content */}
         <div className="p-8">
-          {/* Trash Icon */}
           <div className="flex justify-center mb-6">
             <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center">
               <FaTrash className="w-10 h-10 text-red-600" />
             </div>
           </div>
 
-          {/* Question */}
           <h2 className="text-xl font-bold text-gray-800 text-center mb-2">
             Are you sure you want to delete Account?
           </h2>
 
-          {/* Warning Message */}
           <p className="text-sm text-gray-500 text-center mb-8">
             This action can not be undone
           </p>
 
-          {/* Buttons */}
           <div className="flex gap-4">
             <button
               onClick={onConfirm}
