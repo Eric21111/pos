@@ -105,60 +105,86 @@ const AddProductModal = ({
                       </div>
                     </div>
                 
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-2">
-                        Sizes <span className="text-gray-400">Optional - Select multiple sizes</span>
-                      </label>
-                      <div className="grid grid-cols-4 gap-2 mb-3">
-                        {['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Free Size'].map((size) => (
-                          <label key={size} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={newProduct.selectedSizes?.includes(size) || false}
-                              onChange={() => handleSizeToggle(size)}
-                              className="w-4 h-4 text-[#AD7F65] border-gray-300 rounded focus:ring-[#AD7F65]"
-                            />
-                            <span className="text-sm text-gray-700">{size}</span>
+                    {!editingProduct && (
+                      <>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-2">
+                            Sizes <span className="text-gray-400">Optional - Select multiple sizes</span>
                           </label>
-                        ))}
-                      </div>
-                    
-                      {newProduct.selectedSizes?.length > 0 && (
-                        <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
-                          <label className="block text-xs font-semibold text-gray-700 mb-2">
-                            Quantity per Size:
-                          </label>
-                          <div className="grid grid-cols-2 gap-3">
-                            {newProduct.selectedSizes.map((size) => (
-                              <div key={size}>
-                                <label className="block text-xs text-gray-600 mb-1">{size}</label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={newProduct.sizeQuantities?.[size] || 0}
-                                  onChange={(e) => handleSizeQuantityChange(size, e.target.value)}
-                                  placeholder="0"
-                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                                />
-                              </div>
-                            ))}
+                          <div className="grid grid-cols-4 gap-2 mb-3">
+                            {(() => {
+                              const category = newProduct.category;
+                              let sizes = [];
+                              
+                              // Clothing categories (Tops, Bottoms, Dresses)
+                              if (['Tops', 'Bottoms', 'Dresses'].includes(category)) {
+                                sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Free Size'];
+                              }
+                              // Shoes
+                              else if (category === 'Shoes') {
+                                sizes = ['5', '6', '7', '8', '9', '10', '11', '12'];
+                              }
+                              // Accessories, Head Wear, Makeup
+                              else if (['Accessories', 'Head Wear', 'Makeup'].includes(category)) {
+                                sizes = ['Free Size'];
+                              }
+                              // Others - show all options
+                              else {
+                                sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
+                              }
+                              
+                              return sizes.map((size) => (
+                                <label key={size} className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={newProduct.selectedSizes?.includes(size) || false}
+                                    onChange={() => handleSizeToggle(size)}
+                                    className="w-4 h-4 text-[#AD7F65] border-gray-300 rounded focus:ring-[#AD7F65]"
+                                  />
+                                  <span className="text-sm text-gray-700">{size}</span>
+                                </label>
+                              ));
+                            })()}
                           </div>
+                        
+                          {newProduct.selectedSizes?.length > 0 && (
+                            <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
+                              <label className="block text-xs font-semibold text-gray-700 mb-2">
+                                Quantity per Size:
+                              </label>
+                              <div className="grid grid-cols-2 gap-3">
+                                {newProduct.selectedSizes.map((size) => (
+                                  <div key={size}>
+                                    <label className="block text-xs text-gray-600 mb-1">{size}</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={newProduct.sizeQuantities?.[size] || ''}
+                                      onChange={(e) => handleSizeQuantityChange(size, e.target.value)}
+                                      placeholder="Enter quantity"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                 
-                    {(!newProduct.selectedSizes || newProduct.selectedSizes.length === 0) && (
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Stock</label>
-                        <input
-                          type="number"
-                          name="currentStock"
-                          value={newProduct.currentStock}
-                          onChange={handleInputChange}
-                          placeholder="Add Stock"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                        />
-                      </div>
+                     
+                        {(!newProduct.selectedSizes || newProduct.selectedSizes.length === 0) && (
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Stock</label>
+                            <input
+                              type="number"
+                              name="currentStock"
+                              value={newProduct.currentStock}
+                              onChange={handleInputChange}
+                              placeholder="Add Stock"
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                            />
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -249,12 +275,15 @@ const AddProductModal = ({
                       }}
                       className="hidden"
                     />
-                    {newProduct.itemImage ? (
-                      <img 
-                        src={newProduct.itemImage} 
-                        alt="Preview" 
-                        className="max-w-full max-h-full object-contain rounded-lg"
-                      />
+                    {newProduct.itemImage && newProduct.itemImage.trim() !== '' ? (
+                      <div className="w-full h-full flex items-center justify-center p-4">
+                        <img 
+                          src={newProduct.itemImage} 
+                          alt="Product Preview" 
+                          className="max-w-full max-h-full object-contain rounded-lg"
+                          style={{ display: 'block' }}
+                        />
+                      </div>
                     ) : (
                       <>
                         <div className="w-20 h-20 bg-gray-300 rounded-lg flex items-center justify-center mb-3">

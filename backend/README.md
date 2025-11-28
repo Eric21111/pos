@@ -30,6 +30,9 @@ Backend API for the POS (Point of Sale) System built with Node.js, Express, and 
 5. **Test the Connection**
    Navigate to `http://localhost:5000` to see if the server is running
 
+6. **Thermal Printer Setup**
+   - Complete steps in [PRINTER_SETUP.md](./PRINTER_SETUP.md) to enable the JK-5802H USB printer.
+
 ## 🌐 Network Access
 
 - 🌍 **For Network Access**: See [OFFLINE_NETWORK_SETUP.md](./OFFLINE_NETWORK_SETUP.md) to allow multiple clients on your network to access the POS system

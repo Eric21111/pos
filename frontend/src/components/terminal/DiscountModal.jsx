@@ -46,7 +46,9 @@ const DiscountModal = ({ isOpen, onClose, onSelectDiscount }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[10004] p-4">
+  <div
+        className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 font-poppins p-4"
+      >
       <div className="bg-white rounded-2xl w-full max-w-md h-[95vh] flex flex-col shadow-2xl">
         <div className="h-5 rounded-t-2xl" style={{ background: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)' }}></div>
         

@@ -15,11 +15,16 @@ export default function ProductCard({
 }) {
 
   const availableSizes = product.sizes && typeof product.sizes === 'object' 
-    ? Object.keys(product.sizes) 
+    ? Object.keys(product.sizes)
+        .filter((size) => product.sizes[size] > 0)
     : ['XS', 'S', 'M', 'L'];
   
  
   const getTotalStock = () => {
+    if (typeof product.currentStock === 'number') {
+      return product.currentStock;
+    }
+
     if (product.sizes && typeof product.sizes === 'object') {
       return Object.values(product.sizes).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0);
     }
@@ -101,7 +106,7 @@ export default function ProductCard({
                
                   {product.sizes && typeof product.sizes === 'object' && (
                     <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
-                      {availableSizes.map((size) => (
+                      {Object.keys(product.sizes).map((size) => (
                         <div key={size} className="text-gray-600 text-center">
                           {size}: {product.sizes[size] || 0}
                         </div>
@@ -126,8 +131,12 @@ export default function ProductCard({
               </div>
               <button
                 onClick={onAdd}
-                className="flex-1 py-2 text-white rounded-full text-xs font-semibold hover:opacity-90 transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-md"
-                style={{ background: 'linear-gradient(135deg, #D4A59A 0%, #C9A89D 100%)' }}
+                className="flex-1 py-2 text-white rounded-full text-xs font-semibold hover:opacity-90 transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-md border"
+                style={{
+                  background: 'rgba(173, 127, 101, 0.5)',
+                  borderColor: 'rgba(173, 127, 101, 1)',
+                  boxShadow: '0 2px 2px rgba(0, 0, 0, 0.25)'
+                }}
               >
                 Add
               </button>
@@ -138,8 +147,13 @@ export default function ProductCard({
         {!isExpanded && (
           <button
             onClick={onToggleExpand}
-            className="w-full mt-2 py-2 text-xs text-white rounded-lg hover:opacity-90 transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-sm hover:shadow-md"
-            style={{ background: 'rgba(173, 127, 101, 0.5)', animation: 'fadeIn 0.3s ease-out' }}
+            className="w-full mt-2 py-2 text-xs text-white rounded-lg border hover:opacity-90 transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-sm hover:shadow-md"
+            style={{
+              background: 'rgba(173, 127, 101, 0.5)',
+              borderColor: 'rgba(173, 127, 101, 1)',
+              boxShadow: '0 2px 2px rgba(0, 0, 0, 0.25)',
+              animation: 'fadeIn 0.3s ease-out'
+            }}
           >
             Add to Cart
           </button>

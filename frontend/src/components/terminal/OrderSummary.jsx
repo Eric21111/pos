@@ -76,7 +76,7 @@ const OrderSummary = ({
                 </div>
                 <div className="flex flex-col items-end justify-between gap-2">
                   <button
-                    onClick={() => removeFromCart(item._id)}
+                    onClick={() => removeFromCart(item)}
                     className="text-red-500 hover:text-red-700 text-xs"
                   >
                     ×
@@ -89,7 +89,7 @@ const OrderSummary = ({
                   </button> */}
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => updateQuantity(item._id, item.quantity - 1)}
+                      onClick={() => updateQuantity(item, item.quantity - 1)}
                       className="w-6 h-6 flex items-center justify-center bg-[#AD7F65] text-white rounded-full shadow-sm hover:bg-[#8B5F45] transition-all"
                     >
                       <FaMinus className="text-[10px]" />
@@ -98,8 +98,25 @@ const OrderSummary = ({
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => updateQuantity(item._id, item.quantity + 1)}
-                      className="w-6 h-6 flex items-center justify-center bg-[#AD7F65] text-white rounded-full shadow-sm hover:bg-[#8B5F45] transition-all"
+                      onClick={() => {
+                        const maxQty = item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined
+                          ? item.sizes[item.selectedSize]
+                          : item.currentStock;
+                        if (!maxQty || item.quantity < maxQty) {
+                          updateQuantity(item, item.quantity + 1);
+                        }
+                      }}
+                      className={`w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-all ${
+                        item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined && item.quantity >= item.sizes[item.selectedSize]
+                          ? 'bg-gray-300 text-white cursor-not-allowed'
+                          : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
+                      }`}
+                      disabled={
+                        item.selectedSize &&
+                        item.sizes &&
+                        item.sizes[item.selectedSize] !== undefined &&
+                        item.quantity >= item.sizes[item.selectedSize]
+                      }
                     >
                       <FaPlus className="text-[10px]" />
                     </button>

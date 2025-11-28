@@ -1,0 +1,518 @@
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import logo from '../assets/logo.png';
+import bgImage from '../assets/bg.png';
+
+const PIN_LENGTH = 6;
+const EMPTY_PIN = Array(PIN_LENGTH).fill('');
+
+const OwnerOnboarding = ({ onSetupComplete }) => {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const [formValues, setFormValues] = useState(() => {
+    const saved = localStorage.getItem('ownerOnboardingForm');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return {
+          firstName: '',
+          lastName: '',
+          email: '',
+          contactNo: ''
+        };
+      }
+    }
+    return {
+      firstName: '',
+      lastName: '',
+      email: '',
+      contactNo: ''
+    };
+  });
+  const [pinDigits, setPinDigits] = useState(() => {
+    const saved = localStorage.getItem('ownerOnboardingPin');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return EMPTY_PIN;
+      }
+    }
+    return EMPTY_PIN;
+  });
+  const [confirmPinDigits, setConfirmPinDigits] = useState(() => {
+    const saved = localStorage.getItem('ownerOnboardingConfirmPin');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return EMPTY_PIN;
+      }
+    }
+    return EMPTY_PIN;
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    contactNo: '',
+    pin: '',
+    confirmPin: ''
+  });
+  const [touched, setTouched] = useState({
+    firstName: false,
+    lastName: false,
+    email: false,
+    contactNo: false,
+    pin: false,
+    confirmPin: false
+  });
+
+  const pinRefs = useRef([]);
+  const confirmPinRefs = useRef([]);
+
+  const handleInputChange = (field, value) => {
+    setFormValues((prev) => {
+      const updated = {
+        ...prev,
+        [field]: value
+      };
+      // Save to localStorage
+      localStorage.setItem('ownerOnboardingForm', JSON.stringify(updated));
+      return updated;
+    });
+    
+    // Real-time validation
+    if (touched[field]) {
+      validateField(field, value);
+    }
+  };
+
+  const handleBlur = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    
+    if (field === 'contactNo') {
+      validateField(field, formValues[field]);
+    } else if (field === 'email') {
+      validateField(field, formValues[field]);
+    } else if (field === 'firstName' || field === 'lastName') {
+      validateField(field, formValues[field]);
+    }
+  };
+
+  const validateField = (field, value) => {
+    let errorMsg = '';
+    
+    switch (field) {
+      case 'firstName':
+        if (!value.trim()) {
+          errorMsg = 'First name is required';
+        }
+        break;
+      case 'lastName':
+        if (!value.trim()) {
+          errorMsg = 'Last name is required';
+        }
+        break;
+      case 'email':
+        if (!value.trim()) {
+          errorMsg = 'Email is required';
+        } else if (!value.includes('@')) {
+          errorMsg = 'Please enter a valid email address';
+        }
+        break;
+      case 'contactNo':
+        if (!value.trim()) {
+          errorMsg = 'Contact number is required';
+        } else if (!validatePhilippineNumber(value)) {
+          errorMsg = 'Invalid format. Use 09XXXXXXXXX or +639XXXXXXXXX';
+        }
+        break;
+      case 'pin':
+        const pin = typeof value === 'string' ? value : pinDigits.join('');
+        if (pin.length > 0 && pin.length < PIN_LENGTH) {
+          errorMsg = 'PIN must be exactly 6 digits';
+        }
+        // Clear error if PIN is complete
+        if (pin.length === PIN_LENGTH) {
+          errorMsg = '';
+        }
+        break;
+      case 'confirmPin':
+        const confirmPin = typeof value === 'string' ? value : confirmPinDigits.join('');
+        const mainPin = pinDigits.join('');
+        if (confirmPin.length > 0 && confirmPin.length < PIN_LENGTH) {
+          errorMsg = 'PIN must be exactly 6 digits';
+        } else if (confirmPin.length === PIN_LENGTH && mainPin.length === PIN_LENGTH && confirmPin !== mainPin) {
+          errorMsg = 'PINs do not match';
+        }
+        // Clear error if both PINs are complete and match
+        if (confirmPin.length === PIN_LENGTH && mainPin.length === PIN_LENGTH && confirmPin === mainPin) {
+          errorMsg = '';
+        }
+        break;
+      default:
+        break;
+    }
+    
+    setFieldErrors((prev) => ({ ...prev, [field]: errorMsg }));
+  };
+
+  const handleDigitChange = (type, index, value) => {
+    if (!/^\d?$/.test(value)) {
+      return;
+    }
+    const setter = type === 'pin' ? setPinDigits : setConfirmPinDigits;
+    const refs = type === 'pin' ? pinRefs : confirmPinRefs;
+    const field = type === 'pin' ? 'pin' : 'confirmPin';
+    const storageKey = type === 'pin' ? 'ownerOnboardingPin' : 'ownerOnboardingConfirmPin';
+
+    setter((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      
+      // Save to localStorage
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      
+      // Validate after update
+      if (touched[field]) {
+        setTimeout(() => {
+          validateField(field, updated.join(''));
+        }, 0);
+      }
+      
+      return updated;
+    });
+
+    if (value && index < PIN_LENGTH - 1) {
+      refs.current[index + 1]?.focus();
+    }
+    
+    // Mark as touched
+    if (!touched[field]) {
+      setTouched((prev) => ({ ...prev, [field]: true }));
+    }
+  };
+
+  const handleKeyDown = (type, index, event) => {
+    if (event.key !== 'Backspace') {
+      return;
+    }
+
+    const values = type === 'pin' ? pinDigits : confirmPinDigits;
+    const refs = type === 'pin' ? pinRefs : confirmPinRefs;
+
+    if (!values[index] && index > 0) {
+      refs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (type, event) => {
+    event.preventDefault();
+    const digits = event.clipboardData.getData('Text').replace(/\D/g, '').slice(0, PIN_LENGTH).split('');
+    if (!digits.length) {
+      return;
+    }
+
+    while (digits.length < PIN_LENGTH) {
+      digits.push('');
+    }
+
+    const setter = type === 'pin' ? setPinDigits : setConfirmPinDigits;
+    const refs = type === 'pin' ? pinRefs : confirmPinRefs;
+    setter(digits);
+
+    let lastIndex = 0;
+    digits.forEach((digit, idx) => {
+      if (digit !== '') {
+        lastIndex = idx;
+      }
+    });
+    refs.current[lastIndex]?.focus();
+  };
+
+  const validatePhilippineNumber = (number) => {
+    // Remove all spaces, dashes, and parentheses
+    const cleaned = number.replace(/[\s\-()]/g, '');
+    
+    // Check for valid Philippine number formats:
+    // 09XXXXXXXXX (11 digits starting with 09)
+    // +639XXXXXXXXX (13 characters starting with +639)
+    // 639XXXXXXXXX (12 digits starting with 639)
+    const pattern09 = /^09\d{9}$/;
+    const patternPlus63 = /^\+639\d{9}$/;
+    const pattern63 = /^639\d{9}$/;
+    
+    return pattern09.test(cleaned) || patternPlus63.test(cleaned) || pattern63.test(cleaned);
+  };
+
+  const validateForm = () => {
+    // Mark all fields as touched
+    setTouched({
+      firstName: true,
+      lastName: true,
+      email: true,
+      contactNo: true,
+      pin: true,
+      confirmPin: true
+    });
+
+    // Validate all fields
+    validateField('firstName', formValues.firstName);
+    validateField('lastName', formValues.lastName);
+    validateField('email', formValues.email);
+    validateField('contactNo', formValues.contactNo);
+    validateField('pin', pinDigits.join(''));
+    validateField('confirmPin', confirmPinDigits.join(''));
+
+    // Check if any errors exist
+    const hasErrors = 
+      !formValues.firstName.trim() ||
+      !formValues.lastName.trim() ||
+      !formValues.email.trim() ||
+      !formValues.email.includes('@') ||
+      !formValues.contactNo.trim() ||
+      !validatePhilippineNumber(formValues.contactNo) ||
+      pinDigits.join('').length !== PIN_LENGTH ||
+      confirmPinDigits.join('').length !== PIN_LENGTH ||
+      pinDigits.join('') !== confirmPinDigits.join('');
+
+    return !hasErrors;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!validateForm()) return;
+
+    setLoading(true);
+
+    const payload = {
+      name: `${formValues.firstName.trim()} ${formValues.lastName.trim()}`.trim(),
+      firstName: formValues.firstName.trim(),
+      lastName: formValues.lastName.trim(),
+      contactNo: formValues.contactNo.trim(),
+      email: formValues.email.trim(),
+      role: 'Owner',
+      pin: pinDigits.join(''),
+      permissions: {
+        posTerminal: true,
+        inventory: true,
+        viewTransactions: true,
+        generateReports: true
+      },
+      requiresPinReset: false,
+      status: 'Active',
+      dateJoinedActual: new Date().toISOString()
+    };
+
+    try {
+      const response = await fetch('http://localhost:5000/api/employees', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to create owner account.');
+      }
+
+      const ownerProfile = {
+        ...data.data,
+        id: data.data._id,
+        permissions: payload.permissions,
+        role: 'Owner'
+      };
+
+      login(ownerProfile);
+      
+      // Clear localStorage after successful account creation
+      localStorage.removeItem('ownerOnboardingForm');
+      localStorage.removeItem('ownerOnboardingPin');
+      localStorage.removeItem('ownerOnboardingConfirmPin');
+      
+      onSetupComplete?.();
+      navigate('/dashboard');
+    } catch (submissionError) {
+      console.error('Error creating owner account:', submissionError);
+      setError(submissionError.message || 'Unable to create account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderPinRow = (label, digits, type, refs) => {
+    const field = type === 'pin' ? 'pin' : 'confirmPin';
+    const hasError = fieldErrors[field];
+    
+    return (
+      <div>
+        <label className="block text-base font-medium text-gray-700 mb-4">{label}</label>
+        <div className="flex gap-3 justify-center">
+          {digits.map((digit, index) => (
+            <input
+              key={`${label}-${index}`}
+              ref={(node) => {
+                refs.current[index] = node;
+              }}
+              type="password"
+              inputMode="numeric"
+              maxLength={1}
+              value={digit}
+              onChange={(event) => handleDigitChange(type, index, event.target.value)}
+              onKeyDown={(event) => handleKeyDown(type, index, event)}
+              onPaste={(event) => handlePaste(type, event)}
+              className={`w-16 h-16 rounded-xl border-2 ${
+                hasError ? 'border-red-500' : 'border-gray-300'
+              } bg-white text-center text-2xl font-semibold text-[#2D2D2D] focus:border-[#8B7355] focus:outline-none`}
+              aria-label={`${label} digit ${index + 1}`}
+            />
+          ))}
+        </div>
+        {hasError && (
+          <p className="text-red-500 text-xs mt-2 text-center">{hasError}</p>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex w-screen h-screen overflow-hidden flex-col lg:flex-row bg-[#F5F5F5]">
+      <div className="flex-1 bg-[#F5F5F5] flex items-center justify-center px-6 py-10 lg:px-16">
+        <div className="w-full max-w-[600px]">
+          <div className="text-center mb-10">
+            <h1 className="text-5xl lg:text-6xl font-bold mb-4">
+              <span className="text-[#2D2D2D]">Welcome to </span>
+              <span className="text-[#8B7355]">CYSPOS!</span>
+            </h1>
+            <div className="w-full max-w-md h-1 bg-[#C2A68C] mx-auto" />
+          </div>
+
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">First Name</label>
+                <input
+                  type="text"
+                  className={`w-full px-4 py-3 rounded-xl border ${
+                    fieldErrors.firstName ? 'border-red-500' : 'border-gray-200'
+                  } focus:outline-none focus:border-[#8B7355] bg-white`}
+                  placeholder="John"
+                  value={formValues.firstName}
+                  onChange={(event) => handleInputChange('firstName', event.target.value)}
+                  onBlur={() => handleBlur('firstName')}
+                />
+                {fieldErrors.firstName && (
+                  <p className="text-red-500 text-xs mt-1">{fieldErrors.firstName}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Last Name</label>
+                <input
+                  type="text"
+                  className={`w-full px-4 py-3 rounded-xl border ${
+                    fieldErrors.lastName ? 'border-red-500' : 'border-gray-200'
+                  } focus:outline-none focus:border-[#8B7355] bg-white`}
+                  placeholder="Doe"
+                  value={formValues.lastName}
+                  onChange={(event) => handleInputChange('lastName', event.target.value)}
+                  onBlur={() => handleBlur('lastName')}
+                />
+                {fieldErrors.lastName && (
+                  <p className="text-red-500 text-xs mt-1">{fieldErrors.lastName}</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Contact Number</label>
+              <input
+                type="tel"
+                className={`w-full px-4 py-3 rounded-xl border ${
+                  fieldErrors.contactNo ? 'border-red-500' : 'border-gray-200'
+                } focus:outline-none focus:border-[#8B7355] bg-white`}
+                placeholder="+63 900 000 0000"
+                value={formValues.contactNo}
+                onChange={(event) => handleInputChange('contactNo', event.target.value)}
+                onBlur={() => handleBlur('contactNo')}
+              />
+              {fieldErrors.contactNo && (
+                <p className="text-red-500 text-xs mt-1">{fieldErrors.contactNo}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Username</label>
+              <div className="flex gap-0">
+                <div className="flex items-center justify-center bg-[#8B7355] rounded-l-xl px-4">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <input
+                  type="email"
+                  className={`flex-1 px-4 py-3 rounded-r-xl border-l-0 border ${
+                    fieldErrors.email ? 'border-red-500' : 'border-gray-200'
+                  } focus:outline-none focus:border-[#8B7355] bg-white`}
+                  placeholder="Enter your username..."
+                  value={formValues.email}
+                  onChange={(event) => handleInputChange('email', event.target.value)}
+                  onBlur={() => handleBlur('email')}
+                />
+              </div>
+              {fieldErrors.email && (
+                <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>
+              )}
+            </div>
+
+            <div className="text-center">
+              {renderPinRow('PIN Code', pinDigits, 'pin', pinRefs)}
+            </div>
+            <div className="text-center">
+              {renderPinRow('Confirm your PIN code', confirmPinDigits, 'confirm', confirmPinRefs)}
+            </div>
+
+            <div className="flex flex-col gap-3 items-center mt-8">
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-[#8B7355] text-white rounded-2xl px-20 py-4 text-lg font-semibold transition-all duration-300 hover:bg-[#6d5a43] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Creating...' : 'Create an account'}
+              </button>
+             
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div className="flex-1 relative flex items-center justify-center p-8 bg-[#F5F5F5] min-h-[40vh] lg:min-h-full">
+        <div
+          className="absolute inset-8 rounded-[20px] bg-cover bg-center"
+          style={{
+            backgroundImage: `linear-gradient(rgba(139, 115, 85, 0.7), rgba(139, 115, 85, 0.7)), url(${bgImage})`
+          }}
+        />
+
+        <div className="relative z-10 text-center p-12 flex items-center justify-center">
+          <img
+            src={logo}
+            alt="Create Your Style"
+            className="max-w-[80%] lg:max-w-[70%] h-auto object-contain drop-shadow-[2px_2px_8px_rgba(0,0,0,0.3)]"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default OwnerOnboarding;
+

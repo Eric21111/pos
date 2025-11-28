@@ -7,7 +7,8 @@ const {
   updateProduct,
   deleteProduct,
   getProductsByCategory,
-  searchProducts
+  searchProducts,
+  updateStockAfterTransaction
 } = require('../controllers/productController');
 
 
@@ -17,6 +18,8 @@ router.route('/')
 
 router.get('/search/:query', searchProducts);
 
+// Update stock after successful transaction
+router.post('/update-stock', updateStockAfterTransaction);
 
 router.get('/category/:category', getProductsByCategory);
 

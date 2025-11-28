@@ -1,17 +1,13 @@
 import React from 'react';
-import { FaEllipsisV } from 'react-icons/fa';
 import { MdCategory } from 'react-icons/md';
 
 const ProductTable = ({
   loading,
   filteredProducts,
-  openDropdown,
-  setOpenDropdown,
   handleEditProduct,
   handleDeleteProduct,
   handleViewProduct,
-  handleStockUpdate,
-  formatDate
+  handleStockUpdate
 }) => {
   return (
     <div className="bg-white rounded-lg shadow">
@@ -32,15 +28,17 @@ const ProductTable = ({
                 <th className="pb-3 px-4">Category</th>
                 <th className="pb-3 px-4">Variant</th>
                 <th className="pb-3 px-4">Item Price</th>
-                <th className="pb-3 px-4">Date Added</th>
                 <th className="pb-3 px-4 text-center">Current Stock</th>
-                <th className="pb-3 px-4">Last Updated</th>
                 <th className="pb-3 pl-4">Actions</th>
               </tr>
             </thead>
             <tbody className="relative">
               {filteredProducts.map((product) => (
-                <tr key={product._id} className="border-b hover:bg-gray-50">
+                <tr 
+                  key={product._id} 
+                  className="border-b hover:bg-gray-50 cursor-pointer"
+                  onClick={() => handleViewProduct(product)}
+                >
                   <td className="py-3 pr-4">
                     {product.itemImage ? (
                       <img src={product.itemImage} alt={product.itemName} className="w-12 h-12 object-cover rounded" />
@@ -55,108 +53,84 @@ const ProductTable = ({
                   <td className="py-3 px-4">{product.category}</td>
                   <td className="py-3 px-4">{product.variant || '-'}</td>
                   <td className="py-3 px-4">PHP {product.itemPrice.toFixed(2)}</td>
-                  <td className="py-3 px-4">{formatDate(product.dateAdded)}</td>
                   <td className="py-3 px-4 text-center">
-                    <span className={`px-2 py-1 rounded ${product.currentStock === 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                    <span className={`px-2 py-1 rounded font-semibold ${
+                      product.currentStock === 0 
+                        ? 'bg-red-100 text-red-700' 
+                        : product.currentStock <= (product.reorderNumber || 10)
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-green-100 text-green-700'
+                    }`}>
                       {product.currentStock}
                     </span>
                   </td>
-                  <td className="py-3 px-4">{formatDate(product.lastUpdated)}</td>
-                  <td className="py-3 pl-4">
-                    <div className="relative">
+                  <td className="py-3 pl-4" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2">
+                      {/* Stock In Button */}
                       <button
-                        id={`dropdown-btn-${product._id}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setOpenDropdown(openDropdown === product._id ? null : product._id);
+                          handleStockUpdate(product, 'in');
                         }}
-                        className="text-gray-600 hover:text-gray-900 p-2"
+                        className="p-2 hover:bg-green-50 rounded-lg transition-colors group relative"
+                        title="Stock In"
                       >
-                        <FaEllipsisV />
-                      </button>
-                      {openDropdown === product._id && (
-                        <div
-                          className="fixed w-48 bg-white rounded-lg border border-gray-200"
-                          style={{
-                            zIndex: 1000,
-                            boxShadow:
-                              '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                            top: `${(document.getElementById(`dropdown-btn-${product._id}`)?.getBoundingClientRect().top || 0) - 45}px`,
-                            left: `${(document.getElementById(`dropdown-btn-${product._id}`)?.getBoundingClientRect().left || 0) - 192}px`
-                          }}
-                        >
-                          <button
-                            onClick={() => {
-                              handleViewProduct(product);
-                              setOpenDropdown(null);
-                            }}
-                            className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b rounded-t-lg"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            View
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleEditProduct(product);
-                              setOpenDropdown(null);
-                            }}
-                            className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleStockUpdate(product, 'in');
-                              setOpenDropdown(null);
-                            }}
-                            className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b"
-                          >
-                            <div className="relative w-4 h-4 flex items-center justify-center">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                              </svg>
-                              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center border border-white">
-                                <span className="text-white text-[7px] font-bold leading-none">+</span>
-                              </span>
-                            </div>
-                            Stock In
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleStockUpdate(product, 'out');
-                              setOpenDropdown(null);
-                            }}
-                            className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b"
-                          >
-                            <div className="relative w-4 h-4 flex items-center justify-center">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                              </svg>
-                              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full flex items-center justify-center border border-white">
-                                <span className="text-white text-[7px] font-bold leading-none">-</span>
-                              </span>
-                            </div>
-                            Stock Out
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleDeleteProduct(product);
-                            }}
-                            className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 text-red-600 rounded-b-lg"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Delete
-                          </button>
+                        <div className="relative w-6 h-6 flex items-center justify-center">
+                          <svg className="w-6 h-6 text-gray-600 group-hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center border border-white">
+                            <span className="text-white text-[8px] font-bold leading-none">+</span>
+                          </span>
                         </div>
-                      )}
+                      </button>
+
+                      {/* Stock Out Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStockUpdate(product, 'out');
+                        }}
+                        className="p-2 hover:bg-red-50 rounded-lg transition-colors group relative"
+                        title="Stock Out"
+                      >
+                        <div className="relative w-6 h-6 flex items-center justify-center">
+                          <svg className="w-6 h-6 text-gray-600 group-hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center border border-white">
+                            <span className="text-white text-[8px] font-bold leading-none">-</span>
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Edit Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditProduct(product);
+                        }}
+                        className="p-2 hover:bg-blue-50 rounded-lg transition-colors group"
+                        title="Edit"
+                      >
+                        <svg className="w-6 h-6 text-blue-500 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteProduct(product);
+                        }}
+                        className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
+                        title="Delete"
+                      >
+                        <svg className="w-6 h-6 text-red-500 group-hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </div>
                   </td>
                 </tr>

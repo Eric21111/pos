@@ -3,24 +3,58 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 import bgImage from '../assets/bg.png';
-import tempStaff from '../assets/tempstaff.png';
+import defaultAvatar from '../assets/default.jpeg';
 
 const PinEntry = () => {
-  const [pin, setPin] = useState('');
-  const [showKeypad, setShowKeypad] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const [pin, setPin] = useState('');
+  const [staffInfo, setStaffInfo] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('selectedStaff');
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch {
+          sessionStorage.removeItem('selectedStaff');
+        }
+      }
+    }
+    return null;
+  });
+  const [showKeypad, setShowKeypad] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
- 
-  const staffInfo = location.state?.staff || {
-    id: 1,
-    name: 'Staff 1',
-    image: tempStaff
-  };
+  useEffect(() => {
+    if (location.state?.staff) {
+      setStaffInfo(location.state.staff);
+      try {
+        sessionStorage.setItem('selectedStaff', JSON.stringify(location.state.staff));
+      } catch (storageError) {
+        console.warn('Unable to cache selected staff', storageError);
+      }
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (!staffInfo) {
+      const cached = typeof window !== 'undefined' ? sessionStorage.getItem('selectedStaff') : null;
+      if (cached) {
+        try {
+          setStaffInfo(JSON.parse(cached));
+          return;
+        } catch {
+          sessionStorage.removeItem('selectedStaff');
+        }
+      }
+      navigate('/');
+    }
+  }, [staffInfo, navigate]);
 
   const handleNumberClick = (number) => {
-    if (pin.length < 4) {
+    if (pin.length < 6) {
       setPin(pin + number);
     }
   };
@@ -29,20 +63,102 @@ const PinEntry = () => {
     setPin(pin.slice(0, -1));
   };
 
-  const handleLogin = () => {
-    if (pin.length === 4) {
-      // Store user info in auth context
-      login(staffInfo);
-      console.log(`Logging in ${staffInfo.name} with PIN: ${pin}`);
-      
-      // Redirect owner to dashboard, others to terminal
-      if (staffInfo.name === 'owner' || staffInfo.id === 3) {
-        navigate('/dashboard');
-      } else {
-        navigate('/terminal');
-      }
+  const redirectAfterLogin = (employeeData) => {
+    if (employeeData.role === 'Owner' || employeeData.name === 'owner' || employeeData.id === 3) {
+      navigate('/dashboard');
+    } else if (employeeData.permissions?.posTerminal) {
+      navigate('/terminal');
+    } else if (employeeData.permissions?.inventory) {
+      navigate('/inventory');
+    } else if (employeeData.permissions?.viewTransactions) {
+      navigate('/transactions');
     } else {
-      alert('Please enter a 4-digit PIN');
+      navigate('/settings');
+    }
+  };
+
+  const rememberPendingTempPin = (employeeData, pinValue) => {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem('pendingTempPin', JSON.stringify({
+        employeeId: employeeData._id,
+        pin: pinValue
+      }));
+    } catch (storageError) {
+      console.warn('Unable to cache temporary PIN', storageError);
+    }
+  };
+
+  const clearPendingTempPin = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.removeItem('pendingTempPin');
+    } catch (storageError) {
+      console.warn('Unable to clear cached temporary PIN', storageError);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!staffInfo?.email) {
+      setError('Select a staff account first.');
+      return;
+    }
+    if (pin.length !== 6) {
+      setError('Please enter a 6-digit PIN');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      // Verify PIN with backend
+      const response = await fetch('http://localhost:5000/api/employees/verify-pin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: staffInfo.email,
+          pin: pin
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Store user info with permissions in auth context
+        const employeeData = {
+          ...data.data,
+          id: data.data._id,
+          image: data.data.profileImage || staffInfo.image || defaultAvatar
+        };
+        
+        login(employeeData);
+        
+        if (employeeData.requiresPinReset) {
+          rememberPendingTempPin(employeeData, pin);
+          navigate('/set-pin', { state: { employee: employeeData, tempPin: pin } });
+        } else {
+          clearPendingTempPin();
+          redirectAfterLogin(employeeData);
+        }
+        try {
+          sessionStorage.removeItem('selectedStaff');
+        } catch (storageError) {
+          console.warn('Unable to clear cached staff', storageError);
+        }
+        setPin('');
+      } else {
+        setError(data.message || 'Invalid PIN. Please try again.');
+        setPin(''); // Clear PIN on error
+      }
+    } catch (error) {
+      console.error('Error verifying PIN:', error);
+      setError('Failed to connect to server. Please make sure the backend is running.');
+      setPin(''); // Clear PIN on error
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -104,17 +220,21 @@ const PinEntry = () => {
             <div className={`flex flex-col items-center transition-all duration-500 ${showKeypad ? 'mt-10' : 'mt-0'}`}>
               <div className="w-[120px] h-[120px] rounded-full overflow-hidden mb-4">
                 <img 
-                  src={staffInfo.image} 
-                  alt={staffInfo.name}
+                  src={staffInfo?.image || defaultAvatar} 
+                  alt={staffInfo?.name || 'Employee'}
                   className="w-full h-full object-cover"
                 />
               </div>
-              <p className="text-xl font-semibold text-gray-800 mb-1" style={{ fontFamily: 'sans-serif' }}>{staffInfo.name}</p>
+              <p className="text-xl font-semibold text-gray-800 mb-1" style={{ fontFamily: 'sans-serif' }}>{staffInfo?.name || 'Select Employee'}</p>
+              <p className="text-sm text-gray-600 mb-2" style={{ fontFamily: 'sans-serif' }}>{staffInfo?.role || 'Employee'}</p>
+              {error && (
+                <p className="text-xs text-red-600 mb-4" style={{ fontFamily: 'sans-serif' }}>{error}</p>
+              )}
               <p className="text-sm text-gray-600 mb-6" style={{ fontFamily: 'sans-serif' }}>Enter your PIN</p>
               
              
               <div className="flex justify-center gap-4 mb-6">
-                {[0, 1, 2, 3].map((index) => (
+                {[0, 1, 2, 3, 4, 5].map((index) => (
                   <div
                     key={index}
                     className="w-8 h-8 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center shadow-sm"
@@ -175,11 +295,12 @@ const PinEntry = () => {
               
               {showKeypad && (
                 <button 
-                  className="bg-[#8B7355] text-white border-none rounded-full px-20 py-3 text-lg font-semibold cursor-pointer transition-all duration-300 uppercase shadow-md hover:bg-[#6d5a43] hover:shadow-lg active:translate-y-0.5"
+                  className="bg-[#8B7355] text-white border-none rounded-full px-20 py-3 text-lg font-semibold cursor-pointer transition-all duration-300 uppercase shadow-md hover:bg-[#6d5a43] hover:shadow-lg active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleLogin}
+                  disabled={loading || pin.length !== 6}
                   style={{ fontFamily: 'sans-serif' }}
                 >
-                  LOGIN
+                  {loading ? 'VERIFYING...' : 'LOGIN'}
                 </button>
               )}
             </div>
@@ -188,13 +309,24 @@ const PinEntry = () => {
           
           {!showKeypad && (
             <div className="text-center mt-8 mr-10">
-              <button 
-                className="bg-[#8B7355] text-white border-none rounded-[10px] px-20 py-3 text-lg font-semibold cursor-pointer transition-all duration-300 uppercase shadow-md hover:bg-[#6d5a43] hover:shadow-lg active:translate-y-0.5"
-                onClick={handleLogin}
-                style={{ fontFamily: 'sans-serif' }}
-              >
-                LOGIN
-              </button>
+              <div className="grid gap-3 sm:grid-cols-2 max-w-md mx-auto">
+                <button 
+                  className="bg-[#8B7355] text-white border-none rounded-[10px] px-12 py-3 text-lg font-semibold cursor-pointer transition-all duration-300 uppercase shadow-md hover:bg-[#6d5a43] hover:shadow-lg active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleLogin}
+                  disabled={loading || pin.length !== 6}
+                  style={{ fontFamily: 'sans-serif' }}
+                >
+                  {loading ? 'VERIFYING...' : 'LOGIN'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/')}
+                  className="border border-[#8B7355] text-[#8B7355] rounded-[10px] px-12 py-3 text-lg font-semibold cursor-pointer transition-all duration-300 uppercase shadow-md hover:bg-[#f4ebe1] hover:shadow-lg active:translate-y-0.5"
+                  style={{ fontFamily: 'sans-serif' }}
+                >
+                  RETURN
+                </button>
+              </div>
             </div>
           )}
         </div>

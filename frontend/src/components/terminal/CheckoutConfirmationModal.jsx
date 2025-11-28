@@ -5,7 +5,9 @@ const CheckoutConfirmationModal = ({ isOpen, onClose, onConfirm }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4 backdrop-blur-sm">
+    <div
+        className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 font-poppins p-4"
+      >
       <div 
         className="bg-white rounded-2xl w-full max-w-md relative shadow-2xl"
         style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}

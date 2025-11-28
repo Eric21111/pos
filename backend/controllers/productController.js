@@ -203,6 +203,96 @@ exports.getProductsByCategory = async (req, res) => {
   }
 };
 
+// Update stock after successful transaction
+exports.updateStockAfterTransaction = async (req, res) => {
+  try {
+   
+
+    const { items } = req.body;
+    
+    if (!items || !Array.isArray(items)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid items data'
+      });
+    }
+    
+    const findSizeKey = (sizes = {}, size = '') => {
+      const normalized = size?.toLowerCase();
+      return Object.keys(sizes).find((key) => key?.toLowerCase() === normalized);   
+    };
+    
+    // Update stock for each item
+    const updatePromises = items.map(async (item) => {
+      const product = await Product.findById(item._id);
+      
+      if (!product) {
+        throw new Error(`Product with ID ${item._id} not found`);
+      }
+      
+      // Handle products with sizes differently
+      if (product.sizes && item.size) {
+        const sizeKey = findSizeKey(product.sizes, item.size);
+        
+        if (!sizeKey) {
+          throw new Error(`Size ${item.size} not found for product ${product.itemName}`);
+        }
+        
+        // Check if there's enough stock for the specific size
+        if (product.sizes[sizeKey] < item.quantity) {
+          throw new Error(`Insufficient stock for ${product.itemName} (${item.size}). Available: ${product.sizes[sizeKey]}, Requested: ${item.quantity}`);
+        }
+        
+        // Deduct from specific size stock
+        product.sizes[sizeKey] -= item.quantity;
+        
+        // Mark sizes as modified for Mongoose to save it
+        product.markModified('sizes');
+        
+        // Also update the total currentStock
+        product.currentStock -= item.quantity;
+      } else {
+        // Regular product without sizes
+        // Check if there's enough stock
+        if (product.currentStock < item.quantity) {
+          throw new Error(`Insufficient stock for product ${product.itemName}. Available: ${product.currentStock}, Requested: ${item.quantity}`);
+        }
+        
+        // Deduct the quantity from current stock
+        product.currentStock -= item.quantity;
+      }
+      
+      product.lastUpdated = Date.now();
+      await product.save();
+      
+      return {
+        productId: product._id,
+        productName: product.itemName,
+        size: item.size || null,
+        oldStock: product.currentStock + item.quantity,
+        newStock: product.currentStock,
+        quantityDeducted: item.quantity
+      };
+    });
+    
+    const results = await Promise.all(updatePromises);
+    
+    res.json({
+      success: true,
+      message: 'Stock updated successfully',
+      updates: results
+    });
+    
+  } catch (error) {
+    console.error('Error updating stock:', error);
+    res.status(400).json({
+      success: false,
+      message: 'Error updating stock',
+      error: error.message
+    });
+  }
+};
+
 
 exports.searchProducts = async (req, res) => {
   try {

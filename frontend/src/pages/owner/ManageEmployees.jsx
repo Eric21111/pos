@@ -6,7 +6,11 @@ import ViewEmployeeModal from '../../components/owner/ViewEmployeeModal';
 import EditEmployeeModal from '../../components/owner/EditEmployeeModal';
 import DeleteEmployeeModal from '../../components/owner/DeleteEmployeeModal';
 import AddEmployeeModal from '../../components/owner/AddEmployeeModal';
-import tempStaff from '../../assets/tempstaff.png';
+import DisableAccountModal from '../../components/owner/DisableAccountModal';
+import SuccessModal from '../../components/inventory/SuccessModal';
+import TemporaryPinModal from '../../components/owner/TemporaryPinModal';
+import ResetPinConfirmModal from '../../components/owner/ResetPinConfirmModal';
+import defaultAvatar from '../../assets/default.jpeg';
 import sortIcon from '../../assets/sort.svg';
 
 const ManageEmployees = () => {
@@ -20,22 +24,47 @@ const ManageEmployees = () => {
   const [deletingEmployee, setDeletingEmployee] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [togglingEmployee, setTogglingEmployee] = useState(null);
+  const [showDisableModal, setShowDisableModal] = useState(false);
+  const [toggleAction, setToggleAction] = useState('disable');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showTempPinModal, setShowTempPinModal] = useState(false);
+  const [temporaryPin, setTemporaryPin] = useState('');
+  const [createdEmployeeName, setCreatedEmployeeName] = useState('');
+  const [showResetPinModal, setShowResetPinModal] = useState(false);
+  const [resettingEmployee, setResettingEmployee] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
   const itemsPerPage = 12;
 
-  const employees = [
-    { id: 1, name: 'Maria Dela Cruz', role: 'Cashier', status: 'Active', image: tempStaff },
-    { id: 2, name: 'John Smith', role: 'Manager', status: 'Active', image: tempStaff },
-    { id: 3, name: 'Sarah Johnson', role: 'Cashier', status: 'Inactive', image: tempStaff },
-    { id: 4, name: 'Michael Brown', role: 'Sales Associate', status: 'Active', image: tempStaff },
-    { id: 5, name: 'Emily Davis', role: 'Cashier', status: 'Active', image: tempStaff },
-    { id: 6, name: 'David Wilson', role: 'Sales Associate', status: 'Inactive', image: tempStaff },
-    { id: 7, name: 'Lisa Anderson', role: 'Cashier', status: 'Inactive', image: tempStaff },
-    { id: 8, name: 'Robert Taylor', role: 'Manager', status: 'Active', image: tempStaff },
-    { id: 9, name: 'Jennifer Martinez', role: 'Cashier', status: 'Inactive', image: tempStaff },
-    { id: 10, name: 'Christopher Lee', role: 'Sales Associate', status: 'Active', image: tempStaff },
-    { id: 11, name: 'Amanda White', role: 'Cashier', status: 'Inactive', image: tempStaff },
-    { id: 12, name: 'James Harris', role: 'Manager', status: 'Active', image: tempStaff },
-  ];
+  // Fetch employees from database
+  const fetchEmployees = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/employees');
+      const data = await response.json();
+      
+      if (data.success) {
+        // Add image property to each employee (using default avatar as default)
+        const employeesWithImages = data.data.map(emp => ({
+          ...emp,
+          image: emp.profileImage || defaultAvatar,
+          id: emp._id
+        }));
+        setEmployees(employeesWithImages);
+      }
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+      alert('Failed to fetch employees. Make sure the backend server is running.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
 
   const filteredEmployees = employees.filter(employee =>
     employee.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -82,16 +111,120 @@ const ManageEmployees = () => {
     setOpenDropdown(null);
   };
 
+  const generateRandomPin = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
+  const handleResetPin = (employee) => {
+    setOpenDropdown(null);
+    setResettingEmployee(employee);
+    setShowResetPinModal(true);
+  };
+
+  const confirmResetPin = async () => {
+    if (!resettingEmployee) return;
+
+    setShowResetPinModal(false);
+
+    try {
+      const newTempPin = generateRandomPin();
+      
+      const response = await fetch(`http://localhost:5000/api/employees/${resettingEmployee._id || resettingEmployee.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          pin: newTempPin,
+          requiresPinReset: true 
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Show temporary PIN modal
+        setCreatedEmployeeName(resettingEmployee.name);
+        setTemporaryPin(newTempPin);
+        setShowTempPinModal(true);
+        setResettingEmployee(null);
+      } else {
+        alert(data.message || 'Failed to reset PIN');
+      }
+    } catch (error) {
+      console.error('Error resetting PIN:', error);
+      alert('Failed to reset PIN. Please try again.');
+    }
+  };
+
+  const handleToggleStatus = (employee) => {
+    setOpenDropdown(null);
+    setTogglingEmployee(employee);
+    const action = employee.status === 'Active' ? 'disable' : 'enable';
+    setToggleAction(action);
+    setShowDisableModal(true);
+  };
+
+  const confirmToggleStatus = async () => {
+    if (!togglingEmployee) return;
+
+    const newStatus = togglingEmployee.status === 'Active' ? 'Inactive' : 'Active';
+    const employeeName = togglingEmployee.name;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/employees/${togglingEmployee._id || togglingEmployee.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setShowDisableModal(false);
+        setTogglingEmployee(null);
+        
+        // Show success modal
+        const actionPastTense = toggleAction === 'disable' ? 'disabled' : 'enabled';
+        setSuccessMessage(`${employeeName}'s account has been ${actionPastTense} successfully!`);
+        setShowSuccessModal(true);
+        
+        fetchEmployees();
+      } else {
+        alert(data.message || `Failed to ${toggleAction} account`);
+      }
+    } catch (error) {
+      console.error(`Error ${toggleAction}ing account:`, error);
+      alert(`Failed to ${toggleAction} account. Please try again.`);
+    }
+  };
+
   const handleDeleteEmployee = (employee) => {
     setDeletingEmployee(employee);
     setShowDeleteModal(true);
     setOpenDropdown(null);
   };
 
-  const confirmDeleteEmployee = () => {
-    console.log('Deleting employee:', deletingEmployee);
-    setShowDeleteModal(false);
-    setDeletingEmployee(null);
+  const confirmDeleteEmployee = async () => {
+    if (!deletingEmployee) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/employees/${deletingEmployee._id || deletingEmployee.id}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Refresh employee list
+        fetchEmployees();
+        setShowDeleteModal(false);
+        setDeletingEmployee(null);
+      } else {
+        alert(data.message || 'Failed to delete employee');
+      }
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      alert('Failed to delete employee. Please try again.');
+    }
   };
 
   return (
@@ -145,18 +278,39 @@ const ManageEmployees = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-4 gap-6 mb-4">
-          {paginatedEmployees.map((employee) => (
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-gray-500">Loading employees...</div>
+          </div>
+        ) : employees.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-inner border border-dashed border-gray-300">
+            <p className="text-2xl font-semibold text-gray-700 mb-3">No accounts yet</p>
+            <p className="text-gray-500 mb-6 text-center max-w-md">
+              You haven&apos;t added any employees. Click below to create the first account and assign access.
+            </p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-6 py-3 text-white rounded-lg font-medium hover:opacity-90 transition-all shadow-md"
+              style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+            >
+              + Add Your First Employee
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-6 mb-4">
+            {paginatedEmployees.map((employee) => (
             <div
               key={employee.id}
-              className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
+              className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow relative"
             >
-              <div
-                className="h-2 w-full"
-                style={{
-                  background: 'radial-gradient(circle at center, #C2A68C 0%, #AD7F65 50%, #76462B 100%)'
-                }}
-              />
+              <div className="overflow-hidden rounded-t-lg">
+                <div
+                  className="h-2 w-full"
+                  style={{
+                    background: 'radial-gradient(circle at center, #C2A68C 0%, #AD7F65 50%, #76462B 100%)'
+                  }}
+                />
+              </div>
               
               <div className="absolute top-4 right-4 z-10">
                 <button
@@ -173,10 +327,12 @@ const ManageEmployees = () => {
                 {openDropdown === employee.id && (
                   <div
                     id={`dropdown-menu-${employee.id}`}
-                    className="absolute right-0 mt-2 w-40 bg-white rounded-lg border border-gray-200 shadow-lg"
+                    className="fixed w-48 bg-white rounded-lg border border-gray-200 shadow-lg"
                     style={{
-                      zIndex: 1000,
-                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
+                      zIndex: 9999,
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                      top: `${(document.getElementById(`dropdown-btn-${employee.id}`)?.getBoundingClientRect().top || 0) + 30}px`,
+                      left: `${(document.getElementById(`dropdown-btn-${employee.id}`)?.getBoundingClientRect().left || 0) - 170}px`
                     }}
                   >
                     <button
@@ -196,7 +352,38 @@ const ManageEmployees = () => {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      Edit
+                      Update
+                    </button>
+                    <button
+                      onClick={() => handleResetPin(employee)}
+                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b text-blue-600"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      Reset PIN
+                    </button>
+                    <button
+                      onClick={() => handleToggleStatus(employee)}
+                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b ${
+                        employee.status === 'Active' ? 'text-orange-600' : 'text-green-600'
+                      }`}
+                    >
+                      {employee.status === 'Active' ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                          Disable
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Enable
+                        </>
+                      )}
                     </button>
                     <button
                       onClick={() => handleDeleteEmployee(employee)}
@@ -240,7 +427,8 @@ const ManageEmployees = () => {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
         {totalPages > 1 && (
           <Pagination
@@ -267,6 +455,7 @@ const ManageEmployees = () => {
           setEditingEmployee(null);
         }}
         employee={editingEmployee}
+        onEmployeeUpdated={fetchEmployees}
       />
 
       <DeleteEmployeeModal
@@ -284,6 +473,46 @@ const ManageEmployees = () => {
         onClose={() => {
           setShowAddModal(false);
         }}
+        onEmployeeAdded={fetchEmployees}
+        onEmployeeCreated={(name, pin) => {
+          setCreatedEmployeeName(name);
+          setTemporaryPin(pin);
+          setShowTempPinModal(true);
+        }}
+      />
+
+      <DisableAccountModal
+        isOpen={showDisableModal}
+        onClose={() => {
+          setShowDisableModal(false);
+          setTogglingEmployee(null);
+        }}
+        onConfirm={confirmToggleStatus}
+        employee={togglingEmployee}
+        action={toggleAction}
+      />
+
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        message={successMessage}
+      />
+
+      <TemporaryPinModal
+        isOpen={showTempPinModal}
+        onClose={() => setShowTempPinModal(false)}
+        employeeName={createdEmployeeName}
+        temporaryPin={temporaryPin}
+      />
+
+      <ResetPinConfirmModal
+        isOpen={showResetPinModal}
+        onClose={() => {
+          setShowResetPinModal(false);
+          setResettingEmployee(null);
+        }}
+        onConfirm={confirmResetPin}
+        employeeName={resettingEmployee?.name || ''}
       />
     </div>
   );

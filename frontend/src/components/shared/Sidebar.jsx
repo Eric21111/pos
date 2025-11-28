@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FaChevronRight, FaChevronLeft } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import terminalIcon from '../../assets/icons/terminal.svg';
 import inventoryIcon from '../../assets/icons/invenory.svg';
@@ -18,7 +17,8 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const { logout, isOwner } = useAuth();
+  const [inventoryExpanded, setInventoryExpanded] = useState(false);
+  const { logout, isOwner, hasPermission } = useAuth();
 
   // Define all menu items in the correct order
   const allMenuItems = [
@@ -27,56 +27,79 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
       icon: dashboardIcon,
       path: '/dashboard',
       gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
-      ownerOnly: true
+      ownerOnly: true,
+      requiredPermission: null // Owner only, no permission check needed
     },
     {
       name: 'POS / Terminal',
       icon: terminalIcon,
       path: '/terminal',
       gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
-      ownerOnly: false
+      ownerOnly: false,
+      requiredPermission: 'posTerminal'
     },
     {
       name: 'Inventory',
       icon: inventoryIcon,
       path: '/inventory',
       gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
-      ownerOnly: false
+      ownerOnly: false,
+      requiredPermission: 'inventory'
     },
     {
       name: 'Transactions',
       icon: transactionIcon,
       path: '/transactions',
       gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
-      ownerOnly: false
+      ownerOnly: false,
+      requiredPermission: 'viewTransactions'
     },
     {
       name: 'Reports / Analytics',
       icon: reportsIcon,
       path: '/reports',
       gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
-      ownerOnly: true
+      ownerOnly: true,
+      requiredPermission: 'generateReports'
     },
     {
       name: 'Manage Employees',
       icon: manageIcon,
       path: '/manage-employees',
       gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
-      ownerOnly: true
+      ownerOnly: true,
+      requiredPermission: null // Owner only
     },
     {
       name: 'Settings',
       icon: settingsIcon,
       path: '/settings',
       gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
-      ownerOnly: false
+      ownerOnly: false,
+      requiredPermission: null // Everyone can access settings
     }
   ];
 
-  // Filter menu items based on user role
-  const menuItems = isOwner() 
-    ? allMenuItems
-    : allMenuItems.filter(item => !item.ownerOnly);
+  // Filter menu items based on user role and permissions
+  const menuItems = allMenuItems.filter(item => {
+    // Owner has access to everything
+    if (isOwner()) {
+      return true;
+    }
+    
+    // If item is owner-only and user is not owner, hide it
+    if (item.ownerOnly) {
+      return false;
+    }
+    
+    // If no permission required, show it
+    if (!item.requiredPermission) {
+      return true;
+    }
+    
+    // Check if user has the required permission
+    return hasPermission(item.requiredPermission);
+  });
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -92,6 +115,28 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
   const isActive = (path) => {
     return location.pathname === path;
   };
+
+  // Check if any inventory sub-route is active
+  const isInventoryActive = () => {
+    const inventoryPaths = ['/inventory', '/stock-movement', '/brand-partners', '/categories'];
+    return inventoryPaths.some(path => location.pathname === path);
+  };
+
+  // Inventory sub-menu items
+  const inventorySubItems = [
+    { name: 'Products', path: '/inventory' },
+    { name: 'Stock Movement', path: '/stock-movement' },
+    { name: 'Brand Partners', path: '/brand-partners' },
+    { name: 'Categories', path: '/categories' }
+  ];
+
+  // Auto-expand inventory if on any inventory sub-route
+  useEffect(() => {
+    const inventoryPaths = ['/inventory', '/stock-movement', '/brand-partners', '/categories'];
+    if (inventoryPaths.some(path => location.pathname === path)) {
+      setInventoryExpanded(true);
+    }
+  }, [location.pathname]);
 
   return (
     <>
@@ -135,24 +180,132 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
               }}
             />
           </div>
-          {!isExpanded && (
-            <div className="absolute right-2 top-2">
-              <FaChevronRight className="text-gray-400 w-4 h-4" />
-            </div>
-          )}
-          {isExpanded && (
-            <div className="absolute right-2 top-2">
-              <FaChevronLeft className="text-gray-400 w-4 h-4" />
-            </div>
-          )}
         </div>
 
         
-        <nav className={`flex-1 overflow-hidden pb-8 px-2 ${
+        <nav className={`flex-1 overflow-y-auto overflow-x-hidden pb-8 px-2 ${
           isExpanded ? 'pt-15' : 'pt-15'
         }`}>
           <div className="space-y-3">
             {menuItems.map((item) => {
+              // Special handling for Inventory dropdown
+              if (item.name === 'Inventory') {
+                const inventoryActive = isInventoryActive();
+                const hasInventoryPermission = isOwner() || hasPermission('inventory');
+                
+                if (!hasInventoryPermission) return null;
+
+                return (
+                  <div key={item.path} className="space-y-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isExpanded) {
+                          navigate('/inventory');
+                          return;
+                        }
+                        setInventoryExpanded(!inventoryExpanded);
+                      }}
+                      className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
+                        inventoryActive 
+                          ? 'shadow-lg' 
+                          : 'hover:bg-gray-50'
+                      }`}
+                      style={inventoryActive ? {
+                        background: item.gradient,
+                        boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
+                      } : {}}
+                    >
+                      <div className="flex items-center flex-1">
+                        <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
+                          <img 
+                            src={item.icon} 
+                            alt={item.name}
+                            className={`w-6 h-6 transition-all duration-300 ${
+                              inventoryActive ? 'brightness-0 invert' : 'opacity-80 group-hover:opacity-100'
+                            }`}
+                          />
+                        </div>
+                        
+                        {isExpanded && (
+                          <span
+                            className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
+                              inventoryActive ? 'text-white' : 'text-gray-800 group-hover:text-[#76462B]'
+                            }`}
+                            style={{
+                              fontSize: '16px'
+                            }}
+                          >
+                            {item.name}
+                          </span>
+                        )}
+                      </div>
+
+                      {isExpanded && (
+                        <svg
+                          className={`w-5 h-5 mr-4 transition-transform duration-300 ${
+                            inventoryExpanded ? 'rotate-180' : ''
+                          } ${inventoryActive ? 'text-white' : 'text-gray-600'}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      )}
+
+                      {inventoryActive && (
+                        <div 
+                          className="absolute inset-0 rounded-2xl"
+                          style={{
+                            background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)',
+                            pointerEvents: 'none'
+                          }}
+                        />
+                      )}
+                    </button>
+
+                    {/* Sub-menu items */}
+                    {isExpanded && inventoryExpanded && (
+                      <div className="ml-4 space-y-1">
+                        {inventorySubItems.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <button
+                              key={subItem.path}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(subItem.path);
+                              }}
+                              className={`w-full flex items-center rounded-lg transition-all duration-300 group relative overflow-hidden py-2.5 ${
+                                subActive
+                                  ? 'bg-[#F5E6D3]'
+                                  : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              {subActive && (
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#8B7355] rounded-r"></div>
+                              )}
+                              <span
+                                className={`font-medium transition-all duration-300 whitespace-nowrap ml-6 ${
+                                  subActive ? 'text-[#76462B] font-semibold' : 'text-gray-700 group-hover:text-[#76462B]'
+                                }`}
+                                style={{
+                                  fontSize: '15px'
+                                }}
+                              >
+                                {subItem.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // Regular menu items (non-Inventory)
               const active = isActive(item.path);
               
               return (

@@ -20,11 +20,26 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isOwner = () => {
-    return currentUser?.name === 'owner' || currentUser?.id === 3;
+    return currentUser?.role === 'Owner' || currentUser?.name === 'owner' || currentUser?.id === 3;
+  };
+
+  // Check if user has a specific permission
+  const hasPermission = (permission) => {
+    if (!currentUser) return false;
+    
+    // Owner has all permissions
+    if (isOwner()) return true;
+    
+    // Check user permissions
+    if (currentUser.permissions && currentUser.permissions[permission] !== undefined) {
+      return currentUser.permissions[permission];
+    }
+    
+    return false;
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, isOwner }}>
+    <AuthContext.Provider value={{ currentUser, login, logout, isOwner, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

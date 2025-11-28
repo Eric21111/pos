@@ -1,22 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
 import { FaTimes } from 'react-icons/fa';
-import pinIcon from '../../assets/owner/pin.svg';
 import circleIcon from '../../assets/owner/circle.svg';
 import cameraIcon from '../../assets/owner/camera.svg';
 
-const AddEmployeeModal = ({ isOpen, onClose }) => {
-  const [newPin, setNewPin] = useState(['', '', '', '']);
-  const [confirmPin, setConfirmPin] = useState(['', '', '', '']);
+const getDisplayDate = () =>
+  new Date().toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+const getTodayISO = () => new Date().toISOString().split('T')[0];
+
+const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated }) => {
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     contactNo: '+63',
     email: '',
     role: 'Sales Clerk',
-    dateJoined: new Date().toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    }),
+    dateCreated: getDisplayDate(),
+    dateJoined: getTodayISO(),
   });
   const [accessControl, setAccessControl] = useState({
     posTerminal: true,
@@ -24,24 +28,26 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
     viewTransactions: true,
     generateReports: false,
   });
+  const [profilePreview, setProfilePreview] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const fileInputRef = useRef(null);
 
-  const newPinRefs = useRef([]);
-  const confirmPinRefs = useRef([]);
+  // Generate random 6-digit PIN
+  const generateRandomPin = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
 
   useEffect(() => {
     if (!isOpen) {
-      setNewPin(['', '', '', '']);
-      setConfirmPin(['', '', '', '']);
       setFormData({
-        name: '',
+        firstName: '',
+        lastName: '',
         contactNo: '+63',
         email: '',
         role: 'Sales Clerk',
-        dateJoined: new Date().toLocaleDateString('en-US', {
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric',
-        }),
+        dateCreated: getDisplayDate(),
+        dateJoined: getTodayISO(),
       });
       setAccessControl({
         posTerminal: true,
@@ -49,84 +55,24 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
         viewTransactions: true,
         generateReports: false,
       });
+      setProfilePreview('');
     }
   }, [isOpen]);
-
-  const handlePinChange = (index, value, pinType) => {
-    if (value && !/^\d$/.test(value)) return;
-
-    if (pinType === 'new') {
-      const updatedPin = [...newPin];
-      updatedPin[index] = value;
-      setNewPin(updatedPin);
-
-      if (value && index < 3) {
-        newPinRefs.current[index + 1]?.focus();
-      }
-    } else {
-      const updatedPin = [...confirmPin];
-      updatedPin[index] = value;
-      setConfirmPin(updatedPin);
-
-      if (value && index < 3) {
-        confirmPinRefs.current[index + 1]?.focus();
-      }
-    }
+  const handleImageSelect = () => {
+    fileInputRef.current?.click();
   };
 
-  const handlePinKeyDown = (e, index, pinType) => {
-    if (e.key === 'Backspace') {
-      if (e.target.value) {
-        e.preventDefault();
-        if (pinType === 'new') {
-          const updatedPin = [...newPin];
-          updatedPin[index] = '';
-          setNewPin(updatedPin);
-        } else {
-          const updatedPin = [...confirmPin];
-          updatedPin[index] = '';
-          setConfirmPin(updatedPin);
-        }
-      } else if (index > 0) {
-        e.preventDefault();
-        if (pinType === 'new') {
-          newPinRefs.current[index - 1]?.focus();
-        } else {
-          confirmPinRefs.current[index - 1]?.focus();
-        }
-      }
-    }
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfilePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handlePinPaste = (e, pinType) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').slice(0, 4);
-    const digits = pastedData.split('').filter(char => /^\d$/.test(char));
-
-    if (pinType === 'new') {
-      const updatedPin = [...newPin];
-      digits.forEach((digit, i) => {
-        if (i < 4) {
-          updatedPin[i] = digit;
-        }
-      });
-      setNewPin(updatedPin);
-      const nextEmptyIndex = updatedPin.findIndex(val => val === '');
-      const focusIndex = nextEmptyIndex === -1 ? 3 : nextEmptyIndex;
-      newPinRefs.current[focusIndex]?.focus();
-    } else {
-      const updatedPin = [...confirmPin];
-      digits.forEach((digit, i) => {
-        if (i < 4) {
-          updatedPin[i] = digit;
-        }
-      });
-      setConfirmPin(updatedPin);
-      const nextEmptyIndex = updatedPin.findIndex(val => val === '');
-      const focusIndex = nextEmptyIndex === -1 ? 3 : nextEmptyIndex;
-      confirmPinRefs.current[focusIndex]?.focus();
-    }
-  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -143,14 +89,85 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
     }));
   };
 
-  const handleUpdatePin = () => {
-    if (newPin.join('') === confirmPin.join('') && newPin.join('').length === 4) {
-      console.log('PIN updated:', newPin.join(''));
+  const handleAddEmployee = async () => {
+    // Validate form
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.contactNo || !formData.dateJoined) {
+      setError('Please fill in all required fields');
+      return;
     }
-  };
 
-  const handleAddEmployee = () => {
-    console.log('Adding employee:', { formData, accessControl, pin: newPin.join('') });
+    setError('');
+    setLoading(true);
+
+    // Generate random temporary PIN
+    const tempPin = generateRandomPin();
+
+    try {
+      const response = await fetch('http://localhost:5000/api/employees', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim(),
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          contactNo: formData.contactNo,
+          email: formData.email,
+          role: formData.role,
+          pin: tempPin,
+          dateJoined: new Date(formData.dateCreated),
+          dateJoinedActual: new Date(formData.dateJoined),
+          profileImage: profilePreview,
+          permissions: accessControl,
+          requiresPinReset: true
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const employeeName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
+        
+        // Reset form
+        setFormData({
+          firstName: '',
+          lastName: '',
+          contactNo: '+63',
+          email: '',
+          role: 'Sales Clerk',
+          dateCreated: getDisplayDate(),
+          dateJoined: getTodayISO(),
+        });
+        setAccessControl({
+          posTerminal: true,
+          inventory: false,
+          viewTransactions: true,
+          generateReports: false,
+        });
+        setProfilePreview('');
+        
+        // Close add modal
+        onClose();
+        
+        // Notify parent to show temporary PIN modal
+        if (onEmployeeCreated) {
+          onEmployeeCreated(employeeName, tempPin);
+        }
+        
+        // Refresh employee list
+        if (onEmployeeAdded) {
+          onEmployeeAdded();
+        }
+      } else {
+        setError(data.message || 'Failed to add employee');
+      }
+    } catch (error) {
+      console.error('Error adding employee:', error);
+      setError('Failed to connect to server. Please make sure the backend is running.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -183,80 +200,28 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
         <div className="grid grid-cols-2 gap-8 p-8">
           <div>
             <div className="flex items-start gap-6">
-              <div className="w-60 h-60 ml-30 mt-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center relative">
-                <img src={circleIcon} alt="Circle background" className="w-full h-full object-cover" />
-                <img src={cameraIcon} alt="Camera" className="absolute w-20 h-20" />
-              </div>
-            </div>
-
-            <div className="mt-16 flex justify-center">
-              <div
-                className="w-[360px] rounded-2xl shadow-md p-2 pl-10 pr-10"
-                style={{
-                  borderTop: '5px solid #AD7F65',
-                  backgroundColor: '#fff',
-                }}
+              <button
+                type="button"
+                onClick={handleImageSelect}
+                className="w-60 h-60 ml-30 mt-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center relative focus:outline-none"
               >
-                <h4 className="font-semibold text-[#76462B] mb-3 flex items-center gap-2">
-                  <img src={pinIcon} alt="PIN icon" className="w-5 h-5" />
-                  Set PIN
-                </h4>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-600">New Pin</p>
-                    <div className="flex gap-2">
-                      {Array(4)
-                        .fill('')
-                        .map((_, i) => (
-                          <input
-                            key={i}
-                            ref={(el) => (newPinRefs.current[i] = el)}
-                            type="password"
-                            maxLength="1"
-                            value={newPin[i]}
-                            onChange={(e) => handlePinChange(i, e.target.value, 'new')}
-                            onKeyDown={(e) => handlePinKeyDown(e, i, 'new')}
-                            onPaste={(e) => handlePinPaste(e, 'new')}
-                            className="w-10 h-10 bg-white border border-gray-300 rounded-lg text-center text-lg shadow-sm focus:outline-none focus:border-[#AD7F65] focus:shadow-md transition-all"
-                          />
-                        ))}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-600">Confirm PIN</p>
-                    <div className="flex gap-2">
-                      {Array(4)
-                        .fill('')
-                        .map((_, i) => (
-                          <input
-                            key={i}
-                            ref={(el) => (confirmPinRefs.current[i] = el)}
-                            type="password"
-                            maxLength="1"
-                            value={confirmPin[i]}
-                            onChange={(e) => handlePinChange(i, e.target.value, 'confirm')}
-                            onKeyDown={(e) => handlePinKeyDown(e, i, 'confirm')}
-                            onPaste={(e) => handlePinPaste(e, 'confirm')}
-                            className="w-10 h-10 bg-white border border-gray-300 rounded-lg text-center text-lg shadow-sm focus:outline-none focus:border-[#AD7F65] focus:shadow-md transition-all"
-                          />
-                        ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 mt-3 justify-end">
-                  <button
-                    onClick={handleUpdatePin}
-                    className="px-5 py-2 rounded-md text-white text-sm font-medium bg-[#AD7F65] hover:opacity-90"
-                  >
-                    Update PIN
-                  </button>
-                  <button className="px-5 py-2 rounded-md bg-gray-100 text-sm font-medium hover:bg-gray-200">
-                    Cancel
-                  </button>
-                </div>
-              </div>
+                {profilePreview ? (
+                  <img src={profilePreview} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <>
+                    <img src={circleIcon} alt="Circle background" className="w-full h-full object-cover" />
+                    <img src={cameraIcon} alt="Camera" className="absolute w-20 h-20 opacity-80" />
+                    <span className="absolute bottom-6 text-white text-sm font-medium">Upload Photo</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </button>
             </div>
           </div>
 
@@ -270,13 +235,24 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
               </h4>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-500 mb-1">Name</p>
+                  <p className="text-gray-500 mb-1">First Name (Username)</p>
                   <input
                     type="text"
-                    name="name"
-                    value={formData.name}
+                    name="firstName"
+                    value={formData.firstName}
                     onChange={handleInputChange}
-                    placeholder="eg. John Doe"
+                    placeholder="e.g. John"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
+                  />
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Last Name</p>
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    placeholder="e.g. Doe"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
                   />
                 </div>
@@ -297,7 +273,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    placeholder="yourname12345@gmail.com"
+                    placeholder="user@example.com"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
                   />
                 </div>
@@ -316,13 +292,23 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
                   </select>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Date Joined</p>
+                  <p className="text-gray-500 mb-1">Date Created</p>
                   <input
                     type="text"
-                    name="dateJoined"
-                    value={formData.dateJoined}
+                    name="dateCreated"
+                    value={formData.dateCreated}
                     readOnly
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65] bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Date Joined</p>
+                  <input
+                    type="date"
+                    name="dateJoined"
+                    value={formData.dateJoined}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65] bg-white"
                   />
                 </div>
               </div>
@@ -368,20 +354,28 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
               </div>
             </div>
 
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4">
+                {error}
+              </div>
+            )}
+
             <div className="flex justify-end gap-3">
               <button
                 onClick={handleAddEmployee}
-                className="px-6 py-2 rounded-lg text-white font-medium hover:opacity-90 transition-all"
+                disabled={loading}
+                className="px-6 py-2 rounded-lg text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background:
                     'linear-gradient(to right, #C2A68C, #AD7F65, #76462B)',
                 }}
               >
-                Add Employee
+                {loading ? 'Adding...' : 'Add Employee'}
               </button>
               <button
                 onClick={onClose}
-                className="px-6 py-2 rounded-lg bg-gray-200 font-medium hover:bg-gray-300 transition-all"
+                disabled={loading}
+                className="px-6 py-2 rounded-lg bg-gray-200 font-medium hover:bg-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import Header from '../components/shared/header';
 import { FaPlus, FaMinus, FaEdit } from 'react-icons/fa';
 import { MdCategory } from 'react-icons/md';
@@ -10,6 +11,7 @@ import CheckoutConfirmationModal from '../components/terminal/CheckoutConfirmati
 import CashPaymentModal from '../components/terminal/CashPaymentModal';
 import QRCodePaymentModal from '../components/terminal/QRCodePaymentModal';
 import DiscountModal from '../components/terminal/DiscountModal';
+import RemoveItemPinModal from '../components/terminal/RemoveItemPinModal';
 
 
 import allIcon from '../assets/inventory-icons/ALL.svg';
@@ -23,6 +25,8 @@ import headWearIcon from '../assets/inventory-icons/head wear.svg';
 import othersIcon from '../assets/inventory-icons/Others.svg';
 
 const Terminal = () => {
+  const { currentUser } = useAuth();
+  const userId = currentUser?._id || currentUser?.id || currentUser?.email || 'guest';
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -38,7 +42,29 @@ const Terminal = () => {
   const [showCashPaymentModal, setShowCashPaymentModal] = useState(false);
   const [showQRPaymentModal, setShowQRPaymentModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [cartReadyForSync, setCartReadyForSync] = useState(false);
+  const [showRemoveItemModal, setShowRemoveItemModal] = useState(false);
+  const [itemToRemove, setItemToRemove] = useState(null);
   const itemsPerPage = 10; 
+
+  const resolveItemSize = (item = {}) => {
+    if (item.selectedSize) return item.selectedSize;
+    if (item.sizes && typeof item.sizes === 'object') {
+      return Object.keys(item.sizes)[0] || '';
+    }
+    if (item.size) return item.size;
+    return '';
+  };
+
+  const normalizeCartItem = (item = {}) => ({
+    ...item,
+    _id: item._id || item.productId || item.id,
+    productId: item.productId || item._id || item.id,
+    itemPrice: item.itemPrice || 0,
+    quantity: item.quantity || 1,
+    selectedSize: resolveItemSize(item),
+    sizes: item.sizes || productSizes[item._id || item.productId] || productSizes[item.productId || item._id] || {}
+  });
 
   const categories = [
     { name: 'All', icon: allIcon },
@@ -52,10 +78,82 @@ const Terminal = () => {
     { name: 'Others', icon: othersIcon }
   ];
 
- 
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    try {
+      const savedCart = localStorage.getItem('pos_cart');
+      if (savedCart) {
+        const parsedCart = JSON.parse(savedCart);
+        if (Array.isArray(parsedCart)) {
+          setCart(parsedCart.map((item) => normalizeCartItem({
+            ...item,
+            sizes: item.sizes || productSizes[item._id || item.productId] || {}
+          })));
+        }
+      }
+    } catch (error) {
+      console.warn('Unable to load saved cart', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    let isMounted = true;
+
+    const fetchCartFromServer = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/api/cart/${encodeURIComponent(userId)}`);
+        const data = await response.json();
+
+        if (isMounted && data.success && data.data?.items?.length) {
+          setCart(data.data.items.map(normalizeCartItem));
+        }
+      } catch (error) {
+        console.warn('Unable to load cart from server', error);
+      } finally {
+        if (isMounted) {
+          setCartReadyForSync(true);
+        }
+      }
+    };
+
+    fetchCartFromServer();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !cartReadyForSync) return;
+
+    const saveCartToServer = async () => {
+      try {
+        await fetch(`http://localhost:5000/api/cart/${encodeURIComponent(userId)}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ items: cart })
+        });
+      } catch (error) {
+        console.warn('Unable to save cart to server', error);
+      }
+    };
+
+    saveCartToServer();
+  }, [cart, userId, cartReadyForSync]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pos_cart', JSON.stringify(cart));
+    } catch (error) {
+      console.warn('Unable to persist cart', error);
+    }
+  }, [cart]);
 
  
   useEffect(() => {
@@ -71,6 +169,7 @@ const Terminal = () => {
       
       if (data.success) {
         setProducts(data.data);
+       
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -132,6 +231,7 @@ const Terminal = () => {
 
     const productToAdd = {
       ...product,
+      productId: product._id,
       selectedSize: size,
       quantity: quantity
     };
@@ -156,22 +256,37 @@ const Terminal = () => {
   };
 
   const addToCart = (product) => {
-    const existingItem = cart.find(item => item._id === product._id);
+    const defaultSize = product.sizes && typeof product.sizes === 'object'
+      ? Object.keys(product.sizes)[0] || ''
+      : (product.size || '');
+    
+    const existingItem = cart.find(item => 
+      item._id === product._id && (item.selectedSize || '') === (defaultSize || '')
+    );
     
     if (existingItem) {
       setCart(cart.map(item => 
-        item._id === product._id 
+        item._id === product._id && (item.selectedSize || '') === (defaultSize || '')
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
     } else {
-      setCart([...cart, { ...product, quantity: 1 }]);
+      setCart([...cart, { ...product, productId: product._id, selectedSize: defaultSize, quantity: 1 }]);
     }
   };
 
-  const updateQuantity = (productId, newQuantity) => {
+  const updateQuantity = (itemOrId, newQuantity) => {
+    // Handle both item object and productId for backward compatibility
+    const item = typeof itemOrId === 'object' ? itemOrId : cart.find(i => i._id === itemOrId);
+    const productId = typeof itemOrId === 'object' ? itemOrId._id : itemOrId;
+    
     if (newQuantity <= 0) {
-      removeFromCart(productId);
+      // Show PIN modal before removing
+      if (item) {
+        handleRemoveItemClick(item);
+      } else {
+        removeFromCart(productId);
+      }
     } else {
       setCart(cart.map(item => 
         item._id === productId 
@@ -181,8 +296,63 @@ const Terminal = () => {
     }
   };
 
-  const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item._id !== productId));
+  const handleRemoveItemClick = (item) => {
+    setItemToRemove(item);
+    setShowRemoveItemModal(true);
+  };
+
+  const recordVoidedItem = async (item) => {
+    try {
+      await fetch('http://localhost:5000/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId,
+          performedById: currentUser?._id || currentUser?.id,
+          performedByName: currentUser?.name,
+          items: [
+            {
+              productId: item.productId || item._id,
+              itemName: item.itemName,
+              sku: item.sku,
+              variant: item.variant,
+              selectedSize: resolveItemSize(item) || null,
+              quantity: item.quantity || 1,
+              price: item.itemPrice || 0
+            }
+          ],
+          paymentMethod: 'void',
+          amountReceived: 0,
+          changeGiven: 0,
+          referenceNo: `VOID-${Date.now()}`,
+          totalAmount: (item.itemPrice || 0) * (item.quantity || 1),
+          status: 'Voided'
+        })
+      });
+    } catch (error) {
+      console.warn('Failed to record void transaction', error);
+    }
+  };
+
+  const confirmRemoveItem = () => {
+    if (itemToRemove) {
+      setCart(cart.filter(item => {
+        const sameProduct = (item._id || item.productId) === (itemToRemove._id || itemToRemove.productId);
+        const sameSize = (resolveItemSize(item) || '') === (resolveItemSize(itemToRemove) || '');
+        return !(sameProduct && sameSize);
+      }));
+      recordVoidedItem(itemToRemove);
+      setItemToRemove(null);
+      setShowRemoveItemModal(false);
+    }
+  };
+
+  const removeFromCart = (item) => {
+    // This function is called from OrderSummary
+    // Show PIN verification modal first
+    handleRemoveItemClick(item);
   };
 
   const calculateSubtotal = () => {
@@ -215,28 +385,84 @@ const Terminal = () => {
     setShowCashPaymentModal(true);
   };
 
-  const handleCashProceed = (amountReceived, change) => {
+  const mapCartItemsForStockUpdate = () =>
+    cart.map(item => ({
+      _id: item.productId || item._id,
+      size: resolveItemSize(item) || null,
+      quantity: item.quantity || 1
+    }));
+
+  const mapCartItemsForTransaction = () =>
+    cart.map(item => ({
+      productId: item.productId || item._id,
+      itemName: item.itemName,
+      sku: item.sku,
+      variant: item.variant,
+      selectedSize: resolveItemSize(item) || null,
+      quantity: item.quantity || 1,
+      price: item.itemPrice || 0
+    }));
+
+  const finalizeTransaction = async (meta = {}) => {
+    if (!cart.length) return;
+
+    try {
+      const response = await fetch('http://localhost:5000/api/products/update-stock', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ items: mapCartItemsForStockUpdate() })
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update stock');
+      }
+
+      await fetch('http://localhost:5000/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId,
+          items: mapCartItemsForTransaction(),
+          paymentMethod: meta.paymentMethod || 'unknown',
+          amountReceived: meta.amountReceived,
+          changeGiven: meta.change,
+          referenceNo: meta.referenceNo,
+          receiptNo: meta.receiptNo,
+          totalAmount: calculateTotal(),
+          performedById: currentUser?._id || currentUser?.id,
+          performedByName: currentUser?.name,
+          status: 'Completed'
+        })
+      });
+
+      await fetchProducts();
+      setCart([]);
+    } catch (error) {
+      console.error('Error finalizing transaction:', error);
+      alert('Transaction completed but stock update failed. Please refresh and verify inventory.');
+    }
+  };
+
+  const handleCashProceed = async (amountReceived, change, receiptNo) => {
+    console.log('handleCashProceed received receiptNo:', receiptNo);
     setShowCashPaymentModal(false);
-    console.log('Cash Payment:', {
-      amountReceived,
-      change,
-      total: calculateTotal()
-    });
-    alert(`Payment successful! Change: PHP ${change.toFixed(2)}`);
+    await finalizeTransaction({ paymentMethod: 'cash', amountReceived, change, receiptNo });
   };
 
   const handleQRPayment = () => {
     setShowQRPaymentModal(true);
   };
 
-  const handleQRProceed = (referenceNo, screenshot) => {
+  const handleQRProceed = async (referenceNo, screenshot, receiptNo) => {
+    console.log('handleQRProceed received receiptNo:', receiptNo);
     setShowQRPaymentModal(false);
-    console.log('QR Payment:', {
-      referenceNo,
-      screenshot,
-      total: calculateTotal()
-    });
-    alert(`QR Payment successful! Reference: ${referenceNo}`);
+    await finalizeTransaction({ paymentMethod: 'qr', referenceNo, screenshot, receiptNo });
   };
 
   const handleSelectDiscount = (discount) => {
@@ -254,7 +480,7 @@ const Terminal = () => {
     <>
       <div className="relative flex flex-col h-screen">
        
-        <div className="absolute top-0 left-0 right-[420px] bg-white px-6 py-4 z-20">
+        <div className="absolute top-0 left-0 right-[420px] bg-white px-6 py-4 z-10 overflow-hidden" style={{ paddingRight: '24px' }}>
           <Header 
             pageName="Terminal"
             showSearch={true}
@@ -265,6 +491,9 @@ const Terminal = () => {
             showBorder={false}
             hidePageName={true}
             centerProfile={false}
+            profileMinWidth="220px"
+            profilePadding="px-4"
+            profileGap="gap-3"
           />
         </div>
         
@@ -352,7 +581,7 @@ const Terminal = () => {
           </div>
           
          
-          <div className="w-[420px] bg-gray-50 border-l-0 p-4">
+          <div className="w-[420px] bg-gray-50 border-l-0 p-4 relative z-30">
             <OrderSummary
               cart={cart}
               removeFromCart={removeFromCart}
@@ -382,6 +611,7 @@ const Terminal = () => {
         onClose={() => setShowCashPaymentModal(false)}
         totalAmount={calculateTotal()}
         onProceed={handleCashProceed}
+        cartItems={cart}
       />
 
       <QRCodePaymentModal
@@ -389,12 +619,23 @@ const Terminal = () => {
         onClose={() => setShowQRPaymentModal(false)}
         totalAmount={calculateTotal()}
         onProceed={handleQRProceed}
+        cartItems={cart}
       />
 
       <DiscountModal
         isOpen={showDiscountModal}
         onClose={() => setShowDiscountModal(false)}
         onSelectDiscount={handleSelectDiscount}
+      />
+
+      <RemoveItemPinModal
+        isOpen={showRemoveItemModal}
+        onClose={() => {
+          setShowRemoveItemModal(false);
+          setItemToRemove(null);
+        }}
+        onConfirm={confirmRemoveItem}
+        item={itemToRemove}
       />
     </>
   );

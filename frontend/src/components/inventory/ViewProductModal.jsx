@@ -4,8 +4,15 @@ const ViewProductModal = ({ showViewModal, setShowViewModal, viewingProduct, for
   if (!showViewModal || !viewingProduct) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm pointer-events-none">
-      <div className="bg-white rounded-2xl w-full max-w-5xl relative pointer-events-auto overflow-hidden" style={{ maxHeight: '90vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.1)' }}>
+    <div 
+      className="fixed inset-0 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm  bg-opacity-30"
+      onClick={() => setShowViewModal(false)}
+    >
+      <div 
+        className="bg-white rounded-2xl w-full max-w-5xl relative overflow-hidden" 
+        style={{ maxHeight: '90vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.1)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="h-7 bg-gradient-to-r from-[#AD7F65] to-[#C99B7F]"></div>
         <div className="flex justify-between items-center px-6 py-4">
           <h2 className="text-xl font-bold">Product Details</h2>
@@ -72,7 +79,12 @@ const ViewProductModal = ({ showViewModal, setShowViewModal, viewingProduct, for
                     </div>
                     <div>
                       <span className="text-sm font-semibold text-gray-800">Stock:</span>
-                      <p className="text-sm text-gray-600 mt-1">{viewingProduct.currentStock || 0}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {viewingProduct.sizes && typeof viewingProduct.sizes === 'object' && Object.keys(viewingProduct.sizes).length > 0
+                          ? Object.values(viewingProduct.sizes).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0)
+                          : (viewingProduct.currentStock || 0)
+                        } pcs
+                      </p>
                     </div>
                   </div>
                 </div>
