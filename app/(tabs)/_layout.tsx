@@ -1,33 +1,120 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs } from "expo-router";
+import React from "react";
+import { Image, useWindowDimensions } from "react-native";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { HapticTab } from "@/components/haptic-tab";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         headerShown: false,
         tabBarButton: HapticTab,
-      }}>
+        tabBarStyle: {
+          height: 60,
+          paddingTop: 8,
+          paddingBottom: 8,
+          borderTopWidth: 0,
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          backgroundColor: '#fff',
+          display: isLandscape ? 'none' : 'flex',
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: "",
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={
+                focused
+                  ? require("../(tabs)/iconz/home-active.png") // when active
+                  : require("../(tabs)/iconz/home-inactive.png") // when inactive
+              }
+              style={{ width: 28, height: 28, marginTop: 8 }}
+              resizeMode="contain"
+            />
+          ),
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="transaction"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: "",
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={
+                focused
+                  ? require("../(tabs)/iconz/transaction-active.png") // when active
+                  : require("../(tabs)/iconz/transaction-inactive.png") // when inactive
+              }
+              style={{ width: 28, height: 28, marginTop: 8 }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="analytics"
+        options={{
+          title: "",
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={
+                focused
+                  ? require("../(tabs)/iconz/analytics-active.png") // when active
+                  : require("../(tabs)/iconz/analytics-inactive.png") // when inactive
+              }
+              style={{ width: 28, height: 28, marginTop: 8 }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="inventory"
+        options={{
+          title: "",
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={
+                focused
+                  ? require("../(tabs)/iconz/basket-active.png") // when active
+                  : require("../(tabs)/iconz/basket-inactive.png") // when inactive
+              }
+              style={{ width: 28, height: 28, marginTop: 8 }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "",
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={
+                focused
+                  ? require("../(tabs)/iconz/profile-active.png") // when active
+                  : require("../(tabs)/iconz/profile-inactive.png") // when inactive
+              }
+              style={{ width: 28, height: 28, marginTop: 8 }}
+              resizeMode="contain"
+            />
+          ),
         }}
       />
     </Tabs>
