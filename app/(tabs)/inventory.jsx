@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEffect, useState } from "react";
 import {
+  Alert,
   Dimensions,
   FlatList,
   Platform,
@@ -75,7 +76,7 @@ const InventoryTable = ({ items, onBack }) => {
       brand: 'Levi\'s', 
       category: 'Tops', 
       price: 2499.99, 
-      stock: 5, 
+      stock: 3, 
       dateAdded: '2025-11-20',
       image: 'https://example.com/jacket.jpg'
     },
@@ -151,51 +152,65 @@ const InventoryTable = ({ items, onBack }) => {
         <Text style={[styles.tableCell, { flex: 1 }]}>{brand}</Text>
         <Text style={[styles.tableCell, { flex: 1 }]}>{category}</Text>
         <Text style={[styles.tableCell, { flex: 0.8 }]}>₱{typeof price === 'number' ? price.toFixed(2) : '0.00'}</Text>
-        <Text style={[styles.tableCell, { flex: 0.5, color: (stock || 0) < 5 ? '#E74C3C' : '#000' }]}>{stock}</Text>
+        <Text style={[styles.tableCell, { flex: 0.5, color: (stock || 0) < 4 ? '#E74C3C' : '#000' }]}>{stock}</Text>
         <Text style={[styles.tableCell, { flex: 0.8 }]}>{dateAdded}</Text>
-        <View style={[styles.tableCell, { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }]}>
-          <TouchableOpacity 
-            onPress={() => handleAction('edit', id)}
-            style={styles.actionButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name="pencil" 
-              size={20} 
-              color="#4a90e2" 
-            />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            onPress={() => handleAction('archive', id)}
-            style={styles.actionButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name="trash" 
-              size={20} 
-              color="#e74c3c" 
-            />
-          </TouchableOpacity>
+        <View style={[styles.tableCell, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
+          <View style={styles.actionButtonContainer}>
+            <TouchableOpacity 
+              onPress={() => handleAction('archive', id)}
+              style={styles.actionButton}
+              activeOpacity={0.8}
+            >
+              <Ionicons 
+                name="archive-outline" 
+                size={20} 
+                color="#8B4513"
+                style={{ 
+                  textShadowColor: 'transparent',
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: 0
+                }}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
   };
 
   const handleAction = (action, itemId) => {
-    console.log(`${action} item ${itemId}`);
-    // Add your action handlers here
+    if (action === 'archive') {
+      Alert.alert(
+        'Archive Item',
+        'Are you sure you want to archive this item?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Archive',
+            style: 'destructive',
+            onPress: () => {
+              // Handle archive logic here
+              console.log(`Archiving item ${itemId}`);
+              // Add your actual archive logic here
+              // For example: archiveItem(itemId);
+            },
+          },
+        ],
+        { cancelable: true }
+      );
+    } else {
+      console.log(`${action} item ${itemId}`);
+      // Handle other actions
+    }
   };
 
   return (
     <SafeAreaView style={styles.tableContainer}>
       <View style={styles.tableHeader}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={20} color="#fff" />
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-        </View>
+        <View style={styles.headerLeft} />
         <Text style={styles.tableTitle}>Inventory Table</Text>
         <TouchableOpacity onPress={onBack} style={styles.closeButton}>
           <Ionicons name="close" size={24} color="#fff" />
@@ -210,7 +225,7 @@ const InventoryTable = ({ items, onBack }) => {
         <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>Price</Text>
         <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>Stock</Text>
         <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>Date Added</Text>
-        <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Actions</Text>
+        <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'center' }]}>Actions</Text>
       </View>
       
       <FlatList
@@ -391,15 +406,18 @@ export default function Inventory() {
 }
 
 const styles = StyleSheet.create({
+  actionButtonContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   actionButton: {
     padding: 8,
-    borderRadius: 20,
-    transition: 'background-color 0.2s',
-    elevation: 0,
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 0 },
-    marginHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    width: 36,
+    height: 36,
   },
 
   tableContainer: {
@@ -436,7 +454,7 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 20,
+    marginLeft: 10,  // Reduced from 20 to 10 to move it left
     borderWidth: 2,
     borderColor: '#fff',
     elevation: 5,
@@ -445,11 +463,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
   },
-  backButtonText: {
-    color: '#fff',
-    marginLeft: 5,
-    fontSize: 16,
-  },
   tableTitle: {
     color: '#fff',
     fontSize: 18,
@@ -457,16 +470,17 @@ const styles = StyleSheet.create({
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: '#f5f5f5',
-    paddingVertical: 12,
+    backgroundColor: '#F5F0E5',
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderTopWidth: 1,
+    borderColor: '#E0D9C8',
   },
   tableHeaderCell: {
-    fontWeight: 'bold',
+    fontWeight: '600',
     textAlign: 'left',
     paddingHorizontal: 12,
-    color: '#333',
+    color: '#333333',
   },
   tableRow: {
     flexDirection: 'row',

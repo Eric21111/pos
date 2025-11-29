@@ -11,15 +11,16 @@ import {
 
 export default function PinLogin() {
   const [pin, setPin] = useState("");
+  const PIN_LENGTH = 6;
   const [showModal, setShowModal] = useState(false);
   const router = useRouter();
 
-  const correctPin = "1234";
+  const correctPin = "123456";
 
   const handleKeyPress = (value: string) => {
     if (value === "del") {
       setPin(pin.slice(0, -1));
-    } else if (pin.length < 4) {
+    } else if (pin.length < PIN_LENGTH) {
       setPin(pin + value);
     }
   };
@@ -49,9 +50,15 @@ export default function PinLogin() {
         <Text style={styles.title}>Enter your PIN</Text>
 
         <View style={styles.pinContainer}>
-          {[0, 1, 2, 3].map((i) => (
-            <View key={i} style={styles.pinBox}>
-              <Text style={styles.pinText}>{pin[i] ? "*" : ""}</Text>
+          {Array.from({length: PIN_LENGTH}, (_, i) => i).map((i) => (
+            <View 
+              key={i} 
+              style={[
+                styles.pinBox,
+                pin[i] ? styles.pinBoxFilled : null
+              ]}
+            >
+              <Text style={[styles.pinText, pin[i] ? styles.pinFilled : null]}>{pin[i] ? "•" : ""}</Text>
             </View>
           ))}
         </View>
@@ -82,9 +89,9 @@ export default function PinLogin() {
         <TouchableOpacity
           style={[
             styles.loginButton,
-            pin.length < 4 && styles.loginButtonDisabled,
+            pin.length !== 6 && styles.loginButtonDisabled,
           ]}
-          disabled={pin.length < 4}
+          disabled={pin.length !== 6}
           onPress={handleLogin}
         >
           <Text style={styles.loginButtonText}>LOGIN</Text>
@@ -147,19 +154,42 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   pinBox: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    marginHorizontal: 8,
-    backgroundColor: "#eee",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginHorizontal: 6,
+    backgroundColor: "#f5f5f5",
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 1.2,
+    elevation: 1.5,
+  },
+  pinBoxFilled: {
+    backgroundColor: "#f5f5f5",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1.5,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  pinFilled: {
+    color: "#000",
   },
   pinText: {
-    fontSize: 24,
-    fontWeight: "light",
-    color: "#333",
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#000",
     textAlign: "center",
+    lineHeight: 30,
   },
   keypad: {
     marginBottom: 12,
