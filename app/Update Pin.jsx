@@ -3,12 +3,12 @@ import { useNavigation } from "@react-navigation/native";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Modal,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 export default function UpdatePin() {
@@ -27,7 +27,8 @@ export default function UpdatePin() {
   const [successModal, setSuccessModal] = useState(false);
 
   // Fake OLD PIN (replace with backend response later)
-  const storedOldPin = "1234";
+  const storedOldPin = "123456";
+  const PIN_LENGTH = 6;
 
   const handleConfirm = () => {
     setMessage("");
@@ -38,8 +39,8 @@ export default function UpdatePin() {
       return;
     }
 
-    if (newPin.length !== 4) {
-      setMessage("New PIN must be 4 digits.");
+    if (newPin.length !== PIN_LENGTH) {
+      setMessage(`New PIN must be ${PIN_LENGTH} digits.`);
       setMessageColor("red");
       return;
     }
@@ -67,11 +68,11 @@ export default function UpdatePin() {
         <TextInput
           value={value}
           onChangeText={(text) => {
-            if (text.length <= 4) setValue(text);
+            if (text.length <= PIN_LENGTH) setValue(text);
           }}
           secureTextEntry={!show}
           keyboardType="numeric"
-          maxLength={4}
+          maxLength={PIN_LENGTH}
           style={styles.input}
         />
 
@@ -123,8 +124,8 @@ export default function UpdatePin() {
 
       {/* Instruction / Description below Confirm button */}
       <Text style={styles.instruction}>
-        Make sure your new PIN is 4 digits. need to enter the correct old pin
-        and then enter the new pin and then re enter new pin
+        Make sure your new PIN is 6 digits. Need to enter the correct old pin,
+        then enter the new pin, and then re-enter the new pin
       </Text>
 
       {/* SUCCESS POP NOTIFICATION */}
