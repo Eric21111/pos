@@ -49,7 +49,7 @@ const InventoryTable = ({ items, onBack }) => {
     },
     { 
       id: 2, 
-      sku: 'JCK002', 
+      sku: 'UKM123', 
       name: 'Denim Jacket', 
       brand: 'Levi\'s', 
       category: 'Tops', 
@@ -60,7 +60,7 @@ const InventoryTable = ({ items, onBack }) => {
     },
     { 
       id: 3, 
-      sku: 'JCK002', 
+      sku: 'UKF342', 
       name: 'Denim Jacket', 
       brand: 'Levi\'s', 
       category: 'Tops', 
@@ -71,7 +71,7 @@ const InventoryTable = ({ items, onBack }) => {
     },
     { 
       id: 4, 
-      sku: 'JCK002', 
+      sku: 'ERC144', 
       name: 'Denim Jacket', 
       brand: 'Levi\'s', 
       category: 'Tops', 
@@ -82,7 +82,7 @@ const InventoryTable = ({ items, onBack }) => {
     },
     { 
       id: 5, 
-      sku: 'JCK002', 
+      sku: 'OBS092', 
       name: 'Denim Jacket', 
       brand: 'Levi\'s', 
       category: 'Tops', 
@@ -147,32 +147,20 @@ const InventoryTable = ({ items, onBack }) => {
     
     return (
       <View style={styles.tableRow}>
-        <Text style={[styles.tableCell, { flex: 0.8 }]}>{sku}</Text>
-        <Text style={[styles.tableCell, { flex: 1.5 }]}>{name}</Text>
-        <Text style={[styles.tableCell, { flex: 1 }]}>{brand}</Text>
-        <Text style={[styles.tableCell, { flex: 1 }]}>{category}</Text>
-        <Text style={[styles.tableCell, { flex: 0.8 }]}>₱{typeof price === 'number' ? price.toFixed(2) : '0.00'}</Text>
-        <Text style={[styles.tableCell, { flex: 0.5, color: (stock || 0) < 4 ? '#E74C3C' : '#000' }]}>{stock}</Text>
-        <Text style={[styles.tableCell, { flex: 0.8 }]}>{dateAdded}</Text>
-        <View style={[styles.tableCell, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
-          <View style={styles.actionButtonContainer}>
-            <TouchableOpacity 
-              onPress={() => handleAction('archive', id)}
-              style={styles.actionButton}
-              activeOpacity={0.8}
-            >
-              <Ionicons 
-                name="archive-outline" 
-                size={20} 
-                color="#8B4513"
-                style={{ 
-                  textShadowColor: 'transparent',
-                  textShadowOffset: { width: 0, height: 0 },
-                  textShadowRadius: 0
-                }}
-              />
-            </TouchableOpacity>
-          </View>
+        <Text style={[styles.tableCell, { flex: 0.7 }]}>{sku}</Text>
+        <Text style={[styles.tableCell, { flex: 1.3 }]}>{name}</Text>
+        <Text style={[styles.tableCell, { flex: 0.9 }]}>{brand}</Text>
+        <Text style={[styles.tableCell, { flex: 0.9 }]}>{category}</Text>
+        <Text style={[styles.tableCell, { flex: 0.7 }]}>₱{typeof price === 'number' ? price.toFixed(2) : '0.00'}</Text>
+        <Text style={[styles.tableCell, { flex: 0.4, color: (stock || 0) < 4 ? '#E74C3C' : '#000' }]}>{stock}</Text>
+        <Text style={[styles.tableCell, { flex: 0.7 }]}>{dateAdded}</Text>
+        <View style={[styles.tableCell, { flex: 0.4, justifyContent: 'center' }]}>
+          <TouchableOpacity 
+            onPress={() => handleAction('archive', id)}
+            style={styles.archiveButton}
+          >
+            <Ionicons name="archive-outline" size={18} color="#8B4513" />
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -218,14 +206,14 @@ const InventoryTable = ({ items, onBack }) => {
       </View>
       
       <View style={styles.tableHeaderRow}>
-        <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>SKU</Text>
-        <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Item Name</Text>
-        <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Brand</Text>
-        <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Category</Text>
-        <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>Price</Text>
-        <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>Stock</Text>
-        <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>Date Added</Text>
-        <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'center' }]}>Actions</Text>
+        <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>SKU</Text>
+        <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Item Name</Text>
+        <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Brand</Text>
+        <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Category</Text>
+        <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Price</Text>
+        <Text style={[styles.tableHeaderCell, { flex: 0.4 }]}>Stock</Text>
+        <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Date Added</Text>
+        <Text style={[styles.tableHeaderCell, { flex: 0.4, textAlign: 'center' }]}>Action</Text>
       </View>
       
       <FlatList
@@ -255,20 +243,37 @@ export default function Inventory() {
     {
       id: 101,
       name: "Summer Dress",
-      description: "Floral pattern summer dress",
+      category: "Dresses",
+      stock: 15,
       dateAdded: "Today",
     },
     {
       id: 102,
-      name: "Casual Shirt",
-      description: "Lightweight casual shirt",
-      dateAdded: "Yesterday",
+      name: "KBB Shirt",
+      category: "Tops",
+      stock: 8,
+      dateAdded: "Today",
     },
     {
       id: 103,
-      name: "Denim Jacket",
-      description: "Classic blue denim jacket",
+      name: "Eric Pants",
+      category: "Bottoms",
+      stock: 3,
+      dateAdded: "Yesterday",
+    },
+    {
+      id: 104,
+      name: "Slim Fit Jeans",
+      category: "Bottoms",
+      stock: 12,
       dateAdded: "2 days ago",
+    },
+    {
+      id: 105,
+      name: "Leather Belt",
+      category: "Accessories",
+      stock: 20,
+      dateAdded: "3 days ago",
     },
   ];
 
@@ -297,6 +302,25 @@ export default function Inventory() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* TOP ACTION BUTTONS */}
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: '#8B4513', flex: 1 }]}
+              onPress={() => setShowAddItem(true)}
+            >
+              <Ionicons name="add" size={20} color="#fff" style={styles.buttonIcon} />
+              <Text style={styles.actionButtonText}>Add Item</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: '#3E2723', flex: 1 }]}
+              onPress={() => router.push('/ItemArchive')}
+            >
+              <Ionicons name="archive" size={18} color="#fff" style={styles.buttonIcon} />
+              <Text style={styles.actionButtonText}>Item Archive</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* INVENTORY VALUE CARD */}
           <View style={styles.card}>
             <Text style={styles.mainValue}>₱450,000</Text>
@@ -337,25 +361,6 @@ export default function Inventory() {
             </View>
           </View>
 
-          {/* TOP ACTION BUTTONS */}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#8B4513', flex: 1 }]}
-              onPress={() => setShowAddItem(true)}
-            >
-              <Ionicons name="add" size={20} color="#fff" style={styles.buttonIcon} />
-              <Text style={styles.actionButtonText}>Add Item</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#3E2723', flex: 1 }]}
-              onPress={() => router.push('/ItemArchive')}
-            >
-              <Ionicons name="archive" size={18} color="#fff" style={styles.buttonIcon} />
-              <Text style={styles.actionButtonText}>Item Archive</Text>
-            </TouchableOpacity>
-          </View>
-
           {/* RECENTLY ADDED ITEMS */}
           <View style={styles.recentlyAddedContainer}>
             <View style={styles.headerRow}>
@@ -374,9 +379,15 @@ export default function Inventory() {
               >
                 <View style={styles.recentItemContent}>
                   <Text style={styles.recentItemName}>{item.name}</Text>
-                  <Text style={styles.recentItemDescription}>
-                    {item.description}
-                  </Text>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.recentItemCategory}>
+                      {item.category}
+                    </Text>
+                    <Text style={styles.separator}>•</Text>
+                    <Text style={[styles.stockText, { color: item.stock < 5 ? '#DC2626' : '#0369A1' }]}>
+                      {item.stock} in stock
+                    </Text>
+                  </View>
                 </View>
                 <Text style={styles.recentItemDate}>{item.dateAdded}</Text>
               </TouchableOpacity>
@@ -406,18 +417,30 @@ export default function Inventory() {
 }
 
 const styles = StyleSheet.create({
-  actionButtonContainer: {
+  actionButtonsContainer: {
     width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 10,
+    gap: 10,
   },
   actionButton: {
-    padding: 8,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'transparent',
-    width: 36,
-    height: 36,
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
   },
 
   tableContainer: {
@@ -484,13 +507,17 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: 'row',
-    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
-    paddingVertical: 12,
+    paddingVertical: 8,
     alignItems: 'center',
-    minHeight: 50,
-    zIndex: 1,
+  },
+  archiveButton: {
+    padding: 6,
+    borderRadius: 4,
+    backgroundColor: 'rgba(139, 69, 19, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tableCell: {
     padding: 10,
@@ -704,15 +731,29 @@ const styles = StyleSheet.create({
   recentItemContent: {
     flex: 1,
   },
-  recentItemName: {
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    flexWrap: 'wrap',
+  },
+  recentItemCategory: {
     fontSize: 12,
+    color: '#6B7280',
+  },
+  separator: {
+    marginHorizontal: 6,
+    color: '#D1D5DB',
+  },
+  stockText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  recentItemName: {
+    fontSize: 14,
     fontWeight: "600",
     color: "#333",
     marginBottom: 4,
-  },
-  recentItemDescription: {
-    fontSize: 11,
-    color: "#999",
   },
   recentItemDate: {
     fontSize: 10,

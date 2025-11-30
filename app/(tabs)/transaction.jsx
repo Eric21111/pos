@@ -1,35 +1,95 @@
 import Header from "@/components/shared/header";
 import { Ionicons } from "@expo/vector-icons";
 import * as Print from "expo-print";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+// Function to format date and time
+const formatDateTime = (date = new Date()) => {
+  const options = { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  };
+  return date.toLocaleString('en-US', options);
+};
 
 export default function Transaction() {
   const [search, setSearch] = useState("");
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [currentDateTime, setCurrentDateTime] = useState(formatDateTime());
+
+  // Update current time every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDateTime(formatDateTime());
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(timer);
+  }, []);
   
   // Void logs data - moved to VoidLog.jsx
 
-  const cashierName = "John Doe";
+  // Function to get cashier name based on transaction ID (odd/even)
+  const getCashierName = (transactionId) => {
+    const idNum = parseInt(transactionId.split('-')[1]);
+    return idNum % 2 === 0 ? 'Ferrose Marie Obias' : 'Pia Pendergat';
+  };
+
+  // Default cashier name (can be used when no transaction is selected)
+  const defaultCashier = 'Ferrose Marie Obias';
 
   const [transactions, setTransactions] = useState([
-    { id: "TRX-101", date: "October 1, 2027", status: "Paid" },
-    { id: "TRX-103", date: "October 5, 2027", status: "Returned" },
-    { id: "TRX-104", date: "October 7, 2027", status: "Paid" },
-    { id: "TRX-105", date: "October 9, 2027", status: "Paid" },
-    { id: "TRX-106", date: "October 10, 2027", status: "Paid" },
-    { id: "TRX-107", date: "October 11, 2027", status: "Returned" },
+    { 
+      id: "TRX-101", 
+      date: "October 1, 2027, 10:30 AM", 
+      status: "Paid",
+      timestamp: new Date(2027, 9, 1, 10, 30).getTime()
+    },
+    { 
+      id: "TRX-103", 
+      date: "October 5, 2027, 2:15 PM", 
+      status: "Returned",
+      timestamp: new Date(2027, 9, 5, 14, 15).getTime()
+    },
+    { 
+      id: "TRX-104", 
+      date: "October 7, 2027, 9:45 AM", 
+      status: "Paid",
+      timestamp: new Date(2027, 9, 7, 9, 45).getTime()
+    },
+    { 
+      id: "TRX-105", 
+      date: "October 9, 2027, 3:20 PM", 
+      status: "Paid",
+      timestamp: new Date(2027, 9, 9, 15, 20).getTime()
+    },
+    { 
+      id: "TRX-106", 
+      date: "October 10, 2027, 11:10 AM", 
+      status: "Paid",
+      timestamp: new Date(2027, 9, 10, 11, 10).getTime()
+    },
+    { 
+      id: "TRX-107", 
+      date: "October 11, 2027, 4:30 PM", 
+      status: "Returned",
+      timestamp: new Date(2027, 9, 11, 16, 30).getTime()
+    },
   ]);
 
   const transactionDetails = {
@@ -67,11 +127,7 @@ export default function Transaction() {
         t.date.toLowerCase().includes(search.toLowerCase()) ||
         t.status.toLowerCase().includes(search.toLowerCase())
     )
-    .sort((a, b) => {
-      const numA = parseInt(a.id.split("-")[1]);
-      const numB = parseInt(b.id.split("-")[1]);
-      return numB - numA;
-    });
+    .sort((a, b) => b.timestamp - a.timestamp); // Sort by timestamp in descending order
 
   const handleView = (item) => {
     setSelectedTransaction(item);
@@ -93,9 +149,10 @@ export default function Transaction() {
 
     let htmlContent = `
       <div style="width:220px; font-family: monospace; padding:10px;">
-        <h2 style="text-align:center; margin:0;">CREATE YOUR STYLE</h2>
-        <p style="text-align:center; margin:0;">Cashier: ${cashierName}</p>
-        <p style="text-align:center; margin:0;">Date: ${
+        <h2 style="text-align:center; margin:0; font-size: 18px;">CREATE YOUR STYLE</h2>
+        <p style="text-align:center; margin:2px 0; font-size: 10px;">KM 7 Pasonanca, Zamboanga City</p>
+        <p style="text-align:center; margin:0;">Cashier: ${getCashierName(selectedTransaction.id)}</p>
+        <p style="text-align:center; margin:0;">Date & Time: ${
           selectedTransaction.date
         }</p>
         <p style="text-align:center; margin:0;">Status: ${
@@ -164,7 +221,7 @@ export default function Transaction() {
         <View style={styles.logHeader}>
           <Text style={styles.transactionId}>{item.id}</Text>
           <Text style={styles.date}>
-              {cashierName}
+              {getCashierName(item.id)}
           </Text>
         </View>
 
@@ -247,13 +304,14 @@ export default function Transaction() {
                 </View>
 
                 <Text style={styles.receiptHeader}>CREATE YOUR STYLE</Text>
+                <Text style={styles.locationText}>KM 7 Pasonanca, Zamboanga City</Text>
                 <Text style={styles.receiptDate}>
                   {selectedTransaction.date}
                 </Text>
                 <Text style={styles.receiptStatus}>
                   Status: {selectedTransaction.status}
                 </Text>
-                <Text style={styles.cashierLabel}>Cashier: {cashierName}</Text>
+                <Text style={styles.cashierLabel}>Cashier: {getCashierName(selectedTransaction.id)}</Text>
 
                 <ScrollView style={{ marginVertical: 10, maxHeight: 250 }}>
                   {(transactionDetails[selectedTransaction.id] || []).map(
@@ -431,7 +489,15 @@ const styles = StyleSheet.create({
   },
   transactionDate: {
     fontSize: 12,
-    color: '#7f8c8d',
+    color: "#666",
+    textAlign: 'right',
+  },
+  dateTimeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 5,
   },
   modalOverlay: {
     flex: 1,

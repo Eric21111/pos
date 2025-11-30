@@ -5,18 +5,19 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 function AddItem({ onBack }) {
@@ -39,11 +40,14 @@ function AddItem({ onBack }) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [essentialExpirationDate, setEssentialExpirationDate] = useState("");
   const [showEssentialDatePicker, setShowEssentialDatePicker] = useState(false);
+  const [foodType, setFoodType] = useState("");
+  const [customFoodType, setCustomFoodType] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isForPOS, setIsForPOS] = useState(false);
   
   // Animation refs
   const toastTranslate = useRef(new Animated.Value(-60)).current;
@@ -89,10 +93,60 @@ function AddItem({ onBack }) {
     }
   }, [showSuccess]);
 
-  // Ensure onBack is always a function to prevent errors
+  // Check if there are any unsaved changes
+  const hasUnsavedChanges = () => {
+    return (
+      itemImage ||
+      itemName ||
+      itemCategory ||
+      itemSize ||
+      waistSize ||
+      accessoryType ||
+      makeupBrand ||
+      makeupShade ||
+      shoeSize ||
+      essentialType ||
+      customEssentialType ||
+      itemPrice ||
+      itemStock ||
+      brand ||
+      expirationDate ||
+      essentialExpirationDate ||
+      foodType ||
+      customFoodType ||
+      isForPOS
+    );
+  };
+
+  // Handle back navigation with confirmation if there are unsaved changes
   const handleBack = () => {
-    if (typeof onBack === 'function') {
-      onBack();
+    if (hasUnsavedChanges()) {
+      // Show confirmation dialog
+      Alert.alert(
+        'Discard Changes?',
+        'You have unsaved changes. Are you sure you want to leave?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => {
+              if (typeof onBack === 'function') {
+                onBack();
+              }
+            },
+          },
+        ],
+        { cancelable: true }
+      );
+    } else {
+      // No unsaved changes, proceed with back navigation
+      if (typeof onBack === 'function') {
+        onBack();
+      }
     }
   };
   
@@ -114,6 +168,9 @@ function AddItem({ onBack }) {
     setBrand('');
     setExpirationDate('');
     setEssentialExpirationDate('');
+    setFoodType('');
+    setCustomFoodType('');
+    setIsForPOS(false);
   };
   
   // Initialize form on component mount
@@ -241,15 +298,20 @@ function AddItem({ onBack }) {
     const isAccessory = itemCategory === 'accessories';
     const isMakeup = itemCategory === 'makeup';
     const isShoes = itemCategory === 'shoes';
-    const isEssentials = itemCategory === 'essentials';
+    const isFood = itemCategory === 'food';
+    const isHeadwear = itemCategory === 'headwear';
     
-    if (isEssentials) {
-      if (!essentialType) {
-        Alert.alert("Error", "Please select an essential type");
+    if (isFood) {
+      if (!foodType) {
+        Alert.alert("Error", "Please select a food type");
         return;
       }
-      if (essentialType === 'Other' && !customEssentialType.trim()) {
-        Alert.alert("Error", "Please specify the essential type");
+      if (foodType === 'other' && !customFoodType.trim()) {
+        Alert.alert("Error", "Please specify the food type");
+        return;
+      }
+      if (!expirationDate) {
+        Alert.alert("Error", "Please select an expiration date for the food item");
         return;
       }
     }
@@ -460,10 +522,11 @@ function AddItem({ onBack }) {
             <Picker.Item label="Tops" value="tops" />
             <Picker.Item label="Bottoms" value="bottoms" />
             <Picker.Item label="Dresses" value="dresses" />
+            <Picker.Item label="Headwear" value="headwear" />
             <Picker.Item label="Makeup" value="makeup" />
             <Picker.Item label="Accessories" value="accessories" />
             <Picker.Item label="Shoes" value="shoes" />
-            <Picker.Item label="Essentials" value="essentials" />
+            <Picker.Item label="Food" value="food" />
           </Picker>
         </View>
       </View>
@@ -541,6 +604,72 @@ function AddItem({ onBack }) {
             value={shoeSize}
             onChangeText={setShoeSize}
           />
+        </View>
+      )}
+
+      {/* Food Type - For food */}
+      {itemCategory === 'food' && (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Food Type *</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={foodType}
+              onValueChange={(itemValue) => setFoodType(itemValue)}
+              style={styles.picker}
+              dropdownIconColor="#6b7280"
+              mode="dropdown"
+            >
+              <Picker.Item label="Select food type" value="" />
+              <Picker.Item label="Meals" value="meals" />
+              <Picker.Item label="Desserts" value="desserts" />
+              <Picker.Item label="Beverages" value="beverages" />
+              <Picker.Item label="Snacks" value="snacks" />
+              <Picker.Item label="Others: Please specify" value="other" />
+            </Picker>
+          </View>
+          {foodType === 'other' && (
+            <View style={[styles.inputContainer, {marginTop: 10}]}>
+              <Text style={styles.label}>Please specify *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter food type"
+                value={customFoodType}
+                onChangeText={setCustomFoodType}
+              />
+            </View>
+          )}
+          <View style={[styles.inputContainer, {marginTop: 10}]}>
+            <Text style={styles.label}>Expiration Date *</Text>
+            <TouchableOpacity 
+              style={styles.input} 
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={{color: expirationDate ? '#000' : '#6b7280'}}>
+                {expirationDate ? new Date(expirationDate).toLocaleDateString() : 'Select expiration date'}
+              </Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={expirationDate ? new Date(expirationDate) : new Date()}
+                mode="date"
+                display="default"
+                minimumDate={new Date()}
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) {
+                    setExpirationDate(selectedDate.toISOString().split('T')[0]);
+                  }
+                }}
+              />
+            )}
+            {expirationDate && (
+              <Text style={styles.helperText}>
+                {new Date(expirationDate) > new Date()
+                  ? `Expires in ${Math.ceil((new Date(expirationDate) - new Date()) / (1000 * 60 * 60 * 24))} days`
+                  : 'Expired'}
+              </Text>
+            )}
+          </View>
         </View>
       )}
 
@@ -630,17 +759,29 @@ function AddItem({ onBack }) {
         </View>
       )}
 
-      {/* Waist Size - For bottoms */}
+      {/* Size Selection - For bottoms */}
       {itemCategory === 'bottoms' && (
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Waist Size (inches) *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., 28, 30, 32, etc."
-            keyboardType="numeric"
-            value={waistSize}
-            onChangeText={setWaistSize}
-          />
+          <Text style={styles.label}>Size *</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={itemSize}
+              onValueChange={(itemValue) => setItemSize(itemValue)}
+              style={styles.picker}
+              dropdownIconColor="#6b7280"
+              mode="dropdown"
+            >
+              <Picker.Item label="Select size" value="" />
+              <Picker.Item label="Free Size" value="Free Size" />
+              <Picker.Item label="XS" value="XS" />
+              <Picker.Item label="S" value="S" />
+              <Picker.Item label="M" value="M" />
+              <Picker.Item label="L" value="L" />
+              <Picker.Item label="XL" value="XL" />
+              <Picker.Item label="XXL" value="XXL" />
+              <Picker.Item label="XXXL" value="XXXL" />
+            </Picker>
+          </View>
         </View>
       )}
 
@@ -669,6 +810,19 @@ function AddItem({ onBack }) {
           value={itemStock}
           onChangeText={setItemStock}
         />
+      </View>
+
+      {/* POS Toggle */}
+      <View style={styles.inputContainer}>
+        <View style={styles.switchContainer}>
+          <Text style={styles.switchLabel}>Available in POS</Text>
+          <Switch
+            value={isForPOS}
+            onValueChange={setIsForPOS}
+            trackColor={{ false: "#767577", true: "#4CAF50" }}
+            thumbColor={isForPOS ? "#fff" : "#f4f3f4"}
+          />
+        </View>
       </View>
 
         {/* Add Item Button */}
@@ -939,6 +1093,17 @@ loadingText: {
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  switchLabel: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
   },
 });
 
