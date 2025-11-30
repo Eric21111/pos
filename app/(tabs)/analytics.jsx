@@ -531,17 +531,12 @@ export default function Analytics() {
                       {item.stocks}
                     </Text>
                     <View style={[styles.statusCell, { flex: 1.5 }]}>
-                      <View style={[
-                        styles.statusBadge,
-                        item.status === 'Out of Stock' && styles.statusBadgeCritical,
+                      <Text style={[
+                        styles.statusText,
+                        item.status === 'Out of Stock' ? styles.statusTextCritical : styles.statusTextLow
                       ]}>
-                        <Text style={[
-                          styles.statusText,
-                          item.status === 'Out of Stock' && styles.statusTextCritical
-                        ]}>
-                          {item.status}
-                        </Text>
-                      </View>
+                        {item.status}
+                      </Text>
                     </View>
                   </View>
                 ))}
@@ -643,21 +638,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingRight: 4,
   },
-  statusBadge: {
-    backgroundColor: '#FFF9E6',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    minWidth: 100,
-    alignItems: 'center',
-    marginLeft: 20,
-  },
-  statusBadgeCritical: {
-    backgroundColor: '#FFEBEE',
-  },
   statusText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
+    textAlign: 'right',
+    width: '100%',
+    paddingRight: 8,
+  },
+  statusTextLow: {
     color: '#E6A23C',
   },
   statusTextCritical: {
