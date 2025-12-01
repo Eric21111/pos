@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaTimes, FaSearch, FaTag, FaCalendar, FaBox, FaUsers } from 'react-icons/fa';
 import sortIcon from '../../assets/sort.svg';
 
@@ -6,42 +6,142 @@ const icon20Percent = new URL('../../assets/owner/20.png', import.meta.url).href
 const icon50Percent = new URL('../../assets/owner/50.png', import.meta.url).href;
 const iconSenior = new URL('../../assets/owner/Senior&ani.png', import.meta.url).href;
 
-const DiscountModal = ({ isOpen, onClose, onSelectDiscount }) => {
+const DiscountModal = ({ isOpen, onClose, onSelectDiscount, cart = [], products = [] }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [discounts, setDiscounts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const discounts = [
-    {
-      id: 1,
-      title: '20% OFF',
-      discountValue: '20% OFF',
-      validFrom: '2025-04-01',
-      validTo: '2025-12-31',
-      description: 'Fixed 20% off for purchases above P500',
-      status: 'active',
-      appliesTo: 'All Products',
-      usage: { used: 12, total: 50 },
-      iconColor: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)',
-      icon: icon20Percent
-    },
-    {
-      id: 2,
-      title: 'P50 OFF',
-      discountValue: 'P50 OFF',
-      validFrom: '2025-04-01',
-      validTo: '2025-12-31',
-      description: '',
-      status: 'active',
-      appliesTo: 'All Products',
-      usage: null,
-      iconColor: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-      icon: icon50Percent
+  // Helper function to determine icon and colors based on discount data
+  const getDiscountIcon = (discount) => {
+    const title = discount.title?.toLowerCase() || '';
+    const discountValue = discount.discountValue || '';
+    
+    if (title.includes('senior')) {
+      return {
+        icon: iconSenior,
+        iconColor: 'linear-gradient(135deg, #9B59B6 0%, #E91E63 100%)'
+      };
     }
-  ];
+    
+    // Extract numeric value from discountValue
+    const match = discountValue.match(/(\d+)/);
+    if (match) {
+      const value = parseInt(match[1]);
+      if (value >= 50) {
+        return {
+          icon: icon50Percent,
+          iconColor: 'linear-gradient(135deg, #6B7280 0%, #4B5563 100%)'
+        };
+      }
+    }
+    
+    return {
+      icon: icon20Percent,
+      iconColor: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)'
+    };
+  };
 
-  const filteredDiscounts = discounts.filter(discount =>
-    discount.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    discount.discountValue.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Fetch discounts from API
+  useEffect(() => {
+    if (isOpen) {
+      fetchDiscounts();
+    }
+  }, [isOpen]);
+
+  const fetchDiscounts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/discounts');
+      const data = await response.json();
+      
+      if (data.success) {
+        // Format discounts with icons and colors, filter only active ones
+        const formattedDiscounts = data.data
+          .filter(discount => discount.status === 'active')
+          .map(discount => {
+            const iconData = getDiscountIcon(discount);
+            return {
+              ...discount,
+              ...iconData
+            };
+          });
+        setDiscounts(formattedDiscounts);
+      }
+    } catch (error) {
+      console.error('Error fetching discounts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check if discount applies to cart items
+  const discountAppliesToCart = (discount) => {
+    // Use appliesToType for logic checks (original value: 'all', 'category', 'products')
+    // Use appliesTo for display (formatted text: 'All Products', 'Category: Tops', etc.)
+    const appliesToType = discount.appliesToType || discount.appliesTo;
+    
+    // If cart is empty, only show "all" discounts
+    if (!cart || cart.length === 0) {
+      return appliesToType === 'all';
+    }
+
+    // If discount applies to all products, it's always valid
+    if (appliesToType === 'all') {
+      return true;
+    }
+
+    // If discount applies to a specific category
+    if (appliesToType === 'category' && discount.category) {
+      // Check if all cart items are from the same category as the discount
+      const allItemsMatchCategory = cart.every(item => {
+        // First check if item has category field
+        let itemCategory = item.category;
+        
+        // If not, try to find it from products array
+        if (!itemCategory) {
+          const productId = item._id || item.productId || item.id;
+          const product = products.find(p => {
+            const pId = p._id || p.id;
+            return (pId && productId && (pId.toString() === productId.toString()));
+          });
+          itemCategory = product?.category;
+        }
+        
+        // Check if item's category matches the discount category
+        return itemCategory === discount.category;
+      });
+
+      return allItemsMatchCategory;
+    }
+
+    // If discount applies to specific products
+    if (appliesToType === 'products' && discount.productIds && discount.productIds.length > 0) {
+      // Check if all cart items are in the discount's product list
+      const allItemsInDiscount = cart.every(item => {
+        const itemId = item._id || item.productId || item.id;
+        return discount.productIds.some(pid => {
+          const pidStr = pid.toString ? pid.toString() : pid;
+          const itemIdStr = itemId.toString ? itemId.toString() : itemId;
+          return pidStr === itemIdStr;
+        });
+      });
+
+      return allItemsInDiscount;
+    }
+
+    return false;
+  };
+
+  const filteredDiscounts = discounts.filter(discount => {
+    // First filter by search query
+    const matchesSearch = discount.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      discount.discountValue.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (!matchesSearch) return false;
+
+    // Then filter by whether it applies to cart
+    return discountAppliesToCart(discount);
+  });
 
   if (!isOpen) return null;
 
@@ -83,16 +183,31 @@ const DiscountModal = ({ isOpen, onClose, onSelectDiscount }) => {
         </div>
 
         <div className="flex-1 overflow-auto px-6 py-4">
-          <div className="space-y-4">
-            {filteredDiscounts.map((discount) => (
-              <div
-                key={discount.id}
-                onClick={() => {
-                  onSelectDiscount(discount);
-                  onClose();
-                }}
-                className="rounded-xl overflow-hidden border border-gray-200 shadow-md flex items-stretch bg-white cursor-pointer hover:shadow-lg transition-shadow min-h-[85px]"
-              >
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="text-gray-500">Loading discounts...</div>
+            </div>
+          ) : filteredDiscounts.length === 0 ? (
+            <div className="flex flex-col justify-center items-center py-12">
+              <div className="text-gray-500 text-center">
+                {cart.length === 0 
+                  ? 'Add items to your cart to see applicable discounts'
+                  : searchQuery 
+                    ? 'No discounts match your search'
+                    : 'No discounts available for items in your cart'}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredDiscounts.map((discount) => (
+                <div
+                  key={discount._id}
+                  onClick={() => {
+                    onSelectDiscount(discount);
+                    onClose();
+                  }}
+                  className="rounded-xl overflow-hidden border border-gray-200 shadow-md flex items-stretch bg-white cursor-pointer hover:shadow-lg transition-shadow min-h-[85px]"
+                >
                 <div
                   className="w-16 flex items-center justify-center shrink-0 rounded-l-xl"
                   style={{ background: discount.iconColor }}
@@ -163,8 +278,9 @@ const DiscountModal = ({ isOpen, onClose, onSelectDiscount }) => {
                   )}
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

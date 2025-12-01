@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import Header from '../../components/shared/header';
 import sortIcon from '../../assets/sort.svg';
 import printIcon from '../../assets/inventory-icons/print.png';
@@ -88,5 +88,5 @@ const Reports = () => {
   );
 };
 
-export default Reports;
+export default memo(Reports);
 

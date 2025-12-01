@@ -14,9 +14,78 @@ export default function ProductCard({
   onSelectSize
 }) {
 
+  // Helper function to get quantity from size data (handles both number and object formats)
+  const getSizeQuantity = (sizeData) => {
+    if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+      return sizeData.quantity;
+    }
+    return typeof sizeData === 'number' ? sizeData : 0;
+  };
+
+  // Helper function to get price from size data
+  const getSizePrice = (sizeData) => {
+    if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
+      return sizeData.price;
+    }
+    return null;
+  };
+
+  // Function to get price range for products with sizes
+  const getPriceRange = () => {
+    // If product has sizes with different prices, calculate range
+    if (product.sizes && typeof product.sizes === 'object') {
+      const prices = [];
+      
+      Object.values(product.sizes).forEach(sizeData => {
+        const price = getSizePrice(sizeData);
+        if (price !== null) {
+          prices.push(price);
+        }
+      });
+      
+      // If we have size-specific prices
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        
+        // If prices are different, return range
+        if (minPrice !== maxPrice) {
+          return { min: minPrice, max: maxPrice, isRange: true };
+        }
+        // If all prices are same, return single price
+        return { min: minPrice, max: maxPrice, isRange: false };
+      }
+    }
+    
+    // Default: use product's itemPrice
+    return { min: product.itemPrice || 0, max: product.itemPrice || 0, isRange: false };
+  };
+
+  // Function to get the display price (size-specific if selected, otherwise range)
+  const getDisplayPrice = () => {
+    // If a size is selected and has a specific price, show that price
+    if (selectedSize && product.sizes && typeof product.sizes === 'object' && product.sizes[selectedSize]) {
+      const sizeData = product.sizes[selectedSize];
+      const sizePrice = getSizePrice(sizeData);
+      
+      if (sizePrice !== null) {
+        return { price: sizePrice, isSpecific: true };
+      }
+    }
+    
+    // Otherwise, show the price range or default price
+    const priceRange = getPriceRange();
+    return { 
+      price: priceRange.min, 
+      maxPrice: priceRange.max, 
+      isRange: priceRange.isRange, 
+      isSpecific: false 
+    };
+  };
+
   const availableSizes = product.sizes && typeof product.sizes === 'object' 
     ? Object.keys(product.sizes)
-        .filter((size) => product.sizes[size] > 0)
+        .filter((size) => getSizeQuantity(product.sizes[size]) > 0)
     : ['XS', 'S', 'M', 'L'];
   
  
@@ -26,20 +95,56 @@ export default function ProductCard({
     }
 
     if (product.sizes && typeof product.sizes === 'object') {
-      return Object.values(product.sizes).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0);
+      return Object.values(product.sizes).reduce((sum, sizeData) => sum + getSizeQuantity(sizeData), 0);
     }
     return product.currentStock || 0;
   };
   
   const getStockForSize = () => {
     if (product.sizes && typeof product.sizes === 'object' && selectedSize && product.sizes[selectedSize] !== undefined) {
-      return product.sizes[selectedSize];
+      return getSizeQuantity(product.sizes[selectedSize]);
     }
     return product.currentStock || 0;
   };
   
+  // Get available stock for current selection
+  const getAvailableStock = () => {
+    if (product.sizes && typeof product.sizes === 'object' && selectedSize) {
+      return getSizeQuantity(product.sizes[selectedSize]);
+    }
+    return product.currentStock || 0;
+  };
+
+  // Check if Add button should be disabled
+  const isAddButtonDisabled = () => {
+    // Disable if no size is selected (for products with sizes)
+    if (product.sizes && typeof product.sizes === 'object' && Object.keys(product.sizes).length > 0) {
+      if (!selectedSize) {
+        return true;
+      }
+      // Disable if selected size has no stock or quantity exceeds available stock
+      const sizeStock = getSizeQuantity(product.sizes[selectedSize]);
+      if (sizeStock <= 0 || productQuantity > sizeStock) {
+        return true;
+      }
+    } else {
+      // For products without sizes, check total stock
+      const totalStock = product.currentStock || 0;
+      if (totalStock <= 0 || productQuantity > totalStock) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Check if increment button should be disabled
+  const isIncrementDisabled = () => {
+    const availableStock = getAvailableStock();
+    return productQuantity >= availableStock;
+  };
 
   const displayStock = getTotalStock();
+  const displayPrice = getDisplayPrice();
   
   return (
     <div
@@ -51,7 +156,7 @@ export default function ProductCard({
     >
       <div onClick={onToggleExpand} className="cursor-pointer">
         <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
-          {product.itemImage ? (
+          {product.itemImage && product.itemImage.trim() !== '' ? (
             <img src={product.itemImage} alt={product.itemName} className="w-full h-full object-cover" />
           ) : (
             <MdCategory className="text-4xl text-gray-400" />
@@ -64,7 +169,14 @@ export default function ProductCard({
           {product.itemName}{product.variant ? ` (${product.variant})` : ''}
         </h3>
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">PHP {product.itemPrice.toFixed(2)}</span>
+          <span className="text-sm text-gray-500">
+            {displayPrice.isSpecific
+              ? `PHP ${displayPrice.price.toFixed(2)}`
+              : displayPrice.isRange
+              ? `PHP ${displayPrice.price.toFixed(2)} - ${displayPrice.maxPrice.toFixed(2)}`
+              : `PHP ${displayPrice.price.toFixed(2)}`
+            }
+          </span>
           <span className="text-xs text-gray-500 whitespace-nowrap">{displayStock} stocks left</span>
         </div>
 
@@ -95,7 +207,7 @@ export default function ProductCard({
                         key={size}
                         onClick={() => onSelectSize(size)}
                         className={`flex-1 py-1 rounded text-xs font-medium transition-all duration-300 ease-out transform hover:scale-110 ${
-                          selectedSize === size ? 'bg-[#AD7F65] text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          selectedSize === size ? 'bg-[#a17a62] text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
@@ -108,7 +220,7 @@ export default function ProductCard({
                     <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
                       {Object.keys(product.sizes).map((size) => (
                         <div key={size} className="text-gray-600 text-center">
-                          {size}: {product.sizes[size] || 0}
+                          {size}: {getSizeQuantity(product.sizes[size])}
                         </div>
                       ))}
                     </div>
@@ -120,20 +232,19 @@ export default function ProductCard({
             </div>
 
             <div className="flex gap-2 items-center">
-              <div className="flex items-center gap-2 bg-[#AD7F65] rounded-full px-1 shadow-md">
-                <button onClick={onDecrement} className="w-7 h-7 flex items-center justify-center text-white hover:bg-[#8B5F45] rounded-full transition-all duration-300 transform hover:scale-110 active:scale-95">
-                  <FaMinus className="text-xs" />
-                </button>
-                <span className="text-white font-bold min-w-[20px] text-center text-sm">{productQuantity}</span>
-                <button onClick={onIncrement} className="w-7 h-7 flex items-center justify-center text-white hover:bg-[#8B5F45] rounded-full transition-all duration-300 transform hover:scale-110 active:scale-95">
-                  <FaPlus className="text-xs" />
-                </button>
-              </div>
+              
               <button
                 onClick={onAdd}
-                className="flex-1 py-2 text-white rounded-full text-xs font-semibold hover:opacity-90 transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-md border"
+                disabled={isAddButtonDisabled()}
+                className={`flex-1 py-2 text-white rounded-full text-xs font-semibold transition-all duration-300 transform shadow-md border ${
+                  isAddButtonDisabled() 
+                    ? 'opacity-50 cursor-not-allowed' 
+                    : 'hover:opacity-90 hover:scale-105 active:scale-95'
+                }`}
                 style={{
-                  background: 'rgba(173, 127, 101, 0.5)',
+                  background: isAddButtonDisabled() 
+                    ? 'rgba(173, 127, 101, 0.3)' 
+                    : 'rgba(173, 127, 101, 1)',
                   borderColor: 'rgba(173, 127, 101, 1)',
                   boxShadow: '0 2px 2px rgba(0, 0, 0, 0.25)'
                 }}
@@ -149,7 +260,7 @@ export default function ProductCard({
             onClick={onToggleExpand}
             className="w-full mt-2 py-2 text-xs text-white rounded-lg border hover:opacity-90 transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-sm hover:shadow-md"
             style={{
-              background: 'rgba(173, 127, 101, 0.5)',
+              background: 'rgba(173, 127, 101, 1)',
               borderColor: 'rgba(173, 127, 101, 1)',
               boxShadow: '0 2px 2px rgba(0, 0, 0, 0.25)',
               animation: 'fadeIn 0.3s ease-out'

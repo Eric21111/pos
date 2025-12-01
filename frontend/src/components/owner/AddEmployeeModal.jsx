@@ -30,8 +30,15 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
   });
   const [profilePreview, setProfilePreview] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
+
+  // Email Verification State
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isCodeSent, setIsCodeSent] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [verificationTimer, setVerificationTimer] = useState(0);
 
   // Generate random 6-digit PIN
   const generateRandomPin = () => {
@@ -56,6 +63,10 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
         generateReports: false,
       });
       setProfilePreview('');
+      setVerificationCode('');
+      setIsCodeSent(false);
+      setIsEmailVerified(false);
+      setVerificationTimer(0);
     }
   }, [isOpen]);
   const handleImageSelect = () => {
@@ -89,10 +100,85 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
     }));
   };
 
+  const handleSendCode = async () => {
+    if (!formData.email) {
+      setError('Please enter an email address first');
+      return;
+    }
+
+    setEmailLoading(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/verification/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email })
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setIsCodeSent(true);
+        setVerificationTimer(60); // 60 seconds cooldown
+        setError('');
+        const timer = setInterval(() => {
+          setVerificationTimer((prev) => {
+            if (prev <= 1) {
+              clearInterval(timer);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        setError(data.message || 'Failed to send verification code');
+      }
+    } catch (err) {
+      setError('Failed to send verification code');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!verificationCode) {
+      setError('Please enter the verification code');
+      return;
+    }
+
+    setEmailLoading(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/verification/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          code: verificationCode
+        })
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setIsEmailVerified(true);
+        setIsCodeSent(false);
+        setError('');
+      } else {
+        setError(data.message || 'Invalid verification code');
+      }
+    } catch (err) {
+      setError('Verification failed');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
   const handleAddEmployee = async () => {
     // Validate form
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.contactNo || !formData.dateJoined) {
       setError('Please fill in all required fields');
+      return;
+    }
+
+    if (!isEmailVerified) {
+      setError('Please verify the email address first');
       return;
     }
 
@@ -128,7 +214,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
 
       if (data.success) {
         const employeeName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
-        
+
         // Reset form
         setFormData({
           firstName: '',
@@ -146,15 +232,15 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
           generateReports: false,
         });
         setProfilePreview('');
-        
+
         // Close add modal
         onClose();
-        
+
         // Notify parent to show temporary PIN modal
         if (onEmployeeCreated) {
           onEmployeeCreated(employeeName, tempPin);
         }
-        
+
         // Refresh employee list
         if (onEmployeeAdded) {
           onEmployeeAdded();
@@ -223,6 +309,46 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
                 />
               </button>
             </div>
+
+            <div
+              className="mt-6 p-6 rounded-2xl shadow-md"
+              style={{ borderTop: '5px solid #AD7F65' }}
+            >
+              <h4 className="font-semibold text-[#76462B] mb-4">
+                User Access Control
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  'POS Terminal',
+                  'Inventory',
+                  'View Transactions',
+                  'Generate Reports',
+                ].map((item, idx) => {
+                  const accessKey = item === 'POS Terminal' ? 'posTerminal' :
+                    item === 'Inventory' ? 'inventory' :
+                      item === 'View Transactions' ? 'viewTransactions' :
+                        'generateReports';
+                  return (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-center border rounded-lg px-3 py-2 text-sm"
+                    >
+                      <span>{item}</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={accessControl[accessKey]}
+                          onChange={() => handleAccessControlToggle(accessKey)}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-[#AD7F65] transition-all"></div>
+                        <div className="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition peer-checked:translate-x-5"></div>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-6">
@@ -267,14 +393,13 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
                   />
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Email</p>
+                  <p className="text-gray-500 mb-1">Date Joined</p>
                   <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
+                    type="date"
+                    name="dateJoined"
+                    value={formData.dateJoined}
                     onChange={handleInputChange}
-                    placeholder="user@example.com"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65] bg-white"
                   />
                 </div>
                 <div>
@@ -302,57 +427,64 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
                   />
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Date Joined</p>
+                  <p className="text-gray-500 mb-1">Email</p>
                   <input
-                    type="date"
-                    name="dateJoined"
-                    value={formData.dateJoined}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65] bg-white"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={(e) => {
+                      handleInputChange(e);
+                      if (isEmailVerified) setIsEmailVerified(false);
+                    }}
+                    placeholder="user@example.com"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-[#AD7F65] ${isEmailVerified ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                      }`}
+                    readOnly={isEmailVerified}
                   />
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1 invisible">Verification</p>
+                  {!isEmailVerified && !isCodeSent && (
+                    <button
+                      type="button"
+                      onClick={handleSendCode}
+                      disabled={emailLoading || !formData.email || verificationTimer > 0}
+                      className="w-full px-3 py-2 bg-[#AD7F65] text-white rounded-lg text-sm disabled:opacity-50"
+                    >
+                      {verificationTimer > 0 ? `Resend in ${verificationTimer}s` : 'Send Code'}
+                    </button>
+                  )}
+
+                  {isCodeSent && !isEmailVerified && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value)}
+                        placeholder="6-digit code"
+                        maxLength={6}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyCode}
+                        disabled={emailLoading || !verificationCode}
+                        className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm whitespace-nowrap disabled:opacity-50"
+                      >
+                        Verify
+                      </button>
+                    </div>
+                  )}
+                  {isEmailVerified && (
+                    <div className="w-full px-3 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm text-center font-medium">
+                      ✓ Verified
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div
-              className="p-6 rounded-2xl shadow-md"
-              style={{ borderTop: '5px solid #AD7F65' }}
-            >
-              <h4 className="font-semibold text-[#76462B] mb-4">
-                User Access Control
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  'POS Terminal',
-                  'Inventory',
-                  'View Transactions',
-                  'Generate Reports',
-                ].map((item, idx) => {
-                  const accessKey = item === 'POS Terminal' ? 'posTerminal' :
-                                   item === 'Inventory' ? 'inventory' :
-                                   item === 'View Transactions' ? 'viewTransactions' :
-                                   'generateReports';
-                  return (
-                    <div
-                      key={idx}
-                      className="flex justify-between items-center border rounded-lg px-3 py-2 text-sm"
-                    >
-                      <span>{item}</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={accessControl[accessKey]}
-                          onChange={() => handleAccessControlToggle(accessKey)}
-                        />
-                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-[#AD7F65] transition-all"></div>
-                        <div className="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition peer-checked:translate-x-5"></div>
-                      </label>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+
 
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -363,7 +495,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
             <div className="flex justify-end gap-3">
               <button
                 onClick={handleAddEmployee}
-                disabled={loading}
+                disabled={loading || emailLoading || !isEmailVerified}
                 className="px-6 py-2 rounded-lg text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background:

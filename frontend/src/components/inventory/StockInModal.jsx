@@ -9,16 +9,28 @@ const StockInModal = ({
 }) => {
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [sizeQuantities, setSizeQuantities] = useState({});
+  const [reason, setReason] = useState('Restock');
 
   const allSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Free Size'];
+  const reasons = ['Restock', 'Returned Item', 'Exchange', 'Other'];
 
-  const availableSizes = allSizes;
-  const hasSizes = true;
+  // Always show all sizes - user can add any size to the product
+  const hasSizes = product.sizes && typeof product.sizes === 'object' && Object.keys(product.sizes).length > 0;
+  
+  // Helper function to get quantity from size data (handles both number and object formats)
+  const getSizeQuantity = (sizeData) => {
+    if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+      return sizeData.quantity;
+    }
+    return typeof sizeData === 'number' ? sizeData : 0;
+  };
+  const availableSizes = allSizes; // Always show all sizes
 
   useEffect(() => {
     if (isOpen && product) {
       setSelectedSizes([]);
       setSizeQuantities({});
+      setReason('Restock');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, product?._id]);
@@ -28,6 +40,7 @@ const StockInModal = ({
   const handleClose = () => {
     setSelectedSizes([]);
     setSizeQuantities({});
+    setReason('Restock');
     onClose();
   };
 
@@ -44,7 +57,7 @@ const StockInModal = ({
       setSelectedSizes(prev => [...prev, size]);
       setSizeQuantities(prev => ({
         ...prev,
-        [size]: 0
+        [size]: ''
       }));
     }
   };
@@ -76,7 +89,8 @@ const StockInModal = ({
 
     onConfirm({
       sizes: sizeQuantities,
-      selectedSizes: selectedSizes
+      selectedSizes: selectedSizes,
+      reason: reason
     });
   };
 
@@ -110,7 +124,7 @@ const StockInModal = ({
         <form onSubmit={handleSubmit}>
           <div className="flex">
             <div className="w-1/2 p-6 bg-gray-50 flex items-center justify-center" style={{ minHeight: '500px' }}>
-              {product.itemImage ? (
+              {product.itemImage && product.itemImage.trim() !== '' ? (
                 <img 
                   src={product.itemImage} 
                   alt={product.itemName} 
@@ -146,13 +160,14 @@ const StockInModal = ({
                   </div>
                 </div>
 
-                {hasSizes && (
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-2">
-                      Sizes Optional - Select multiple sizes
-                    </label>
-                    <div className="grid grid-cols-4 gap-2 mb-3">
-                      {availableSizes.map((size) => (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-2">
+                    Sizes Optional - Select multiple sizes
+                  </label>
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    {availableSizes.map((size) => {
+                      const currentQty = hasSizes && product.sizes[size] ? getSizeQuantity(product.sizes[size]) : 0;
+                      return (
                         <label key={size} className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -163,39 +178,68 @@ const StockInModal = ({
                               accentColor: '#AD7F65'
                             }}
                           />
-                          <span className="text-sm text-gray-900">{size}</span>
+                          <span className="text-sm text-gray-900">
+                            {size} <span className="text-xs text-gray-500">({currentQty})</span>
+                          </span>
                         </label>
-                    ))}
+                      );
+                    })}
                   </div>
-                    
-                    <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
-                      <label className="block text-xs font-semibold text-gray-700 mb-2">
-                        Quantity per Size:
-                      </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {selectedSizes.length > 0 ? (
-                          selectedSizes.map((size) => (
+                  
+                  <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
+                    <label className="block text-xs font-semibold text-gray-700 mb-2">
+                      Quantity per Size:
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {selectedSizes.length > 0 ? (
+                        selectedSizes.map((size) => {
+                          const currentQty = hasSizes && product.sizes[size] ? getSizeQuantity(product.sizes[size]) : 0;
+                          return (
                             <div key={size}>
-                              <label className="block text-xs text-gray-600 mb-1">{size}</label>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                {size} <span className="text-gray-500">(Current: {currentQty})</span>
+                              </label>
                               <input
                                 type="number"
                                 min="0"
-                                value={sizeQuantities[size] || 0}
+                                value={sizeQuantities[size] || ''}
                                 onChange={(e) => handleSizeQuantityChange(size, e.target.value)}
-                                placeholder="0"
+                                placeholder="Enter quantity"
                                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
                               />
                             </div>
-                          ))
-                        ) : (
-                          <div className="col-span-2 text-xs text-gray-400 italic">
-                            Select sizes above to add quantities
-                          </div>
-                        )}
-                      </div>
+                          );
+                        })
+                      ) : (
+                        <div className="col-span-2 text-xs text-gray-400 italic">
+                          Select sizes above to add quantities
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Reason
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent appearance-none cursor-pointer"
+                    >
+                      {reasons.map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 mt-8 pt-6 border-t">

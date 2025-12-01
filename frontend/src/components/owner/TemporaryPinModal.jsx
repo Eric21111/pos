@@ -10,21 +10,21 @@ const TemporaryPinModal = ({ isOpen, onClose, employeeName, temporaryPin }) => {
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 flex items-center backdrop-blur-sm justify-center z-[10003] bg-opacity-50"
-     
+
     >
-      <div 
+      <div
         className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div 
+        <div
           className="h-2"
           style={{
             background: 'linear-gradient(to right, #C2A68C, #AD7F65, #76462B)'
           }}
         />
-        
+
         <div className="p-8">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
@@ -59,7 +59,7 @@ const TemporaryPinModal = ({ isOpen, onClose, employeeName, temporaryPin }) => {
                 Temporary PIN
               </h3>
             </div>
-            
+
             <div className="flex items-center justify-center gap-3 mb-4">
               {temporaryPin.split('').map((digit, index) => (
                 <div

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import Header from '../components/shared/header';
+import { useDataCache } from '../context/DataCacheContext';
 import { 
   FaPlus,
   FaSearch
@@ -15,7 +16,6 @@ import makeupIcon from '../assets/inventory-icons/make up.svg';
 import accessoriesIcon from '../assets/inventory-icons/accesories.svg';
 import shoesIcon from '../assets/inventory-icons/shoe.svg';
 import headWearIcon from '../assets/inventory-icons/head wear.svg';
-import othersIcon from '../assets/inventory-icons/Others.svg';
 import printIcon from '../assets/inventory-icons/print.png';
 import exportIcon from '../assets/inventory-icons/Export.svg';
 import sortIcon from '../assets/sort.svg';
@@ -32,13 +32,12 @@ import StockInModal from '../components/inventory/StockInModal';
 import StockOutModal from '../components/inventory/StockOutModal';
 
 const Inventory = () => {
-  const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
+  const { getCachedData, setCachedData, isCacheValid, invalidateCache } = useDataCache();
+  const [products, setProducts] = useState(() => getCachedData('products') || []);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [stockStats, setStockStats] = useState({ totalItems: 0, lowStockItems: 0, outOfStockItems: 0, inStockItems: 0 });
   const [editingProduct, setEditingProduct] = useState(null);
   const [showStockModal, setShowStockModal] = useState(false);
   const [stockModalType, setStockModalType] = useState('in'); 
@@ -56,7 +55,7 @@ const Inventory = () => {
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterBrand, setFilterBrand] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
-  const [sortBy, setSortBy] = useState('name');
+  const [sortBy, setSortBy] = useState('sku-new');
   const [showImportResultModal, setShowImportResultModal] = useState(false);
   const [importResult, setImportResult] = useState({ successCount: 0, errorCount: 0, errors: [] });
   const itemsPerPage = 6;
@@ -65,7 +64,7 @@ const Inventory = () => {
     sku: '',
     itemName: '',
     category: 'Tops',
-    brandName: '',
+    brandName: 'Brandless',
     variant: '',
     size: '',
     itemPrice: '',
@@ -76,20 +75,77 @@ const Inventory = () => {
     supplierContact: '',
     itemImage: '',
     selectedSizes: [], 
-    sizeQuantities: {} 
+    sizeQuantities: {},
+    sizePrices: {},
+    differentPricesPerSize: false,
+    foodSubtype: '', // Subtype for Foods category
+    displayInTerminal: true // Display in POS/terminal by default
   });
 
-  const categories = [
-    { name: 'All', icon: allIcon },
-    { name: 'Tops', icon: topIcon },
-    { name: 'Bottoms', icon: bottomsIcon },
-    { name: 'Dresses', icon: dressesIcon },
-    { name: 'Makeup', icon: makeupIcon },
-    { name: 'Accessories', icon: accessoriesIcon },
-    { name: 'Shoes', icon: shoesIcon },
-    { name: 'Head Wear', icon: headWearIcon },
-    { name: 'Others', icon: othersIcon }
-  ];
+  const [categories, setCategories] = useState([
+    { name: 'All', icon: allIcon }
+  ]);
+  const [brandPartners, setBrandPartners] = useState([]);
+
+  // Icon mapping for categories
+  const categoryIconMap = {
+    'Tops': topIcon,
+    'Bottoms': bottomsIcon,
+    'Dresses': dressesIcon,
+    'Makeup': makeupIcon,
+    'Accessories': accessoriesIcon,
+    'Shoes': shoesIcon,
+    'Head Wear': headWearIcon
+  };
+
+  // Fetch active categories from API
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/categories');
+      const data = await response.json();
+      
+      if (data.success && Array.isArray(data.data)) {
+        // Filter only active categories, exclude "Others", and map with icons
+        const activeCategories = data.data
+          .filter(cat => cat.status === 'active' && cat.name !== 'Others')
+          .map(cat => ({
+            name: cat.name,
+            icon: categoryIconMap[cat.name] || allIcon
+          }));
+        
+        // Add 'All' at the beginning
+        setCategories([
+          { name: 'All', icon: allIcon },
+          ...activeCategories
+        ]);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      // Fallback to default categories if API fails
+      setCategories([
+        { name: 'All', icon: allIcon },
+        { name: 'Tops', icon: topIcon },
+        { name: 'Bottoms', icon: bottomsIcon },
+        { name: 'Dresses', icon: dressesIcon },
+        { name: 'Makeup', icon: makeupIcon },
+        { name: 'Accessories', icon: accessoriesIcon },
+        { name: 'Shoes', icon: shoesIcon },
+        { name: 'Head Wear', icon: headWearIcon }
+      ]);
+    }
+  };
+
+  const fetchBrandPartners = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/brand-partners');
+      const data = await response.json();
+      if (data.success) {
+        setBrandPartners(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching brand partners:', error);
+    }
+  };
 
   const categoryCodeMap = {
     'Tops': 'TOP',
@@ -99,7 +155,7 @@ const Inventory = () => {
     'Accessories': 'MUA',
     'Shoes': 'SHO',
     'Head Wear': 'HDW',
-    'Others': 'OTH'
+    'Foods': 'FOD'
   };
 
   const getNextIncrementalCode = () => {
@@ -141,35 +197,25 @@ const Inventory = () => {
     return `${categoryCode}-${incrementalCode}-${colorCode}`;
   };
 
-  
+  // Only fetch if cache is empty or invalid
   useEffect(() => {
-    fetchProducts();
+    const cachedProducts = getCachedData('products');
+    if (!cachedProducts || !isCacheValid('products')) {
+      fetchProducts();
+    } else {
+      setProducts(cachedProducts);
+    }
+    fetchCategories();
+    fetchBrandPartners();
   }, []);
 
-  useEffect(() => {
-    filterProducts();
-    setCurrentPage(1); 
-  }, [filterCategory, filterBrand, filterStatus, searchQuery, sortBy, products]);
-
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('http://localhost:5000/api/products');
-      const data = await response.json();
-      
-      if (data.success) {
-        setProducts(data.data);
-        calculateStockStats(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      alert('Failed to fetch products. Make sure the backend server is running.');
-    } finally {
-      setLoading(false);
-    }
+  const getSkuNumber = (sku = '') => {
+    const matches = sku.match(/\d+/g);
+    if (!matches || matches.length === 0) return -Infinity;
+    return parseInt(matches[matches.length - 1], 10);
   };
 
-  const filterProducts = () => {
+  const filteredProducts = useMemo(() => {
     let filtered = products;
 
     // Filter by category
@@ -210,6 +256,10 @@ const Inventory = () => {
     // Sort products
     filtered = [...filtered].sort((a, b) => {
       switch (sortBy) {
+        case 'sku-new':
+          return getSkuNumber(b.sku) - getSkuNumber(a.sku);
+        case 'sku-old':
+          return getSkuNumber(a.sku) - getSkuNumber(b.sku);
         case 'name':
           return a.itemName.localeCompare(b.itemName);
         case 'price-low':
@@ -233,36 +283,77 @@ const Inventory = () => {
       index === self.findIndex((p) => p._id === product._id)
     );
 
-    setFilteredProducts(uniqueProducts);
-  };
+    return uniqueProducts;
+  }, [products, filterCategory, filterBrand, filterStatus, searchQuery, sortBy]);
 
-  const calculateStockStats = (productList) => {
-    const totalItems = productList.length;
-    const outOfStockItems = productList.filter(p => p.currentStock === 0).length;
-    const lowStockItems = productList.filter(p => {
+  const stockStats = useMemo(() => {
+    const totalItems = products.length;
+    const outOfStockItems = products.filter(p => p.currentStock === 0).length;
+    const lowStockItems = products.filter(p => {
       const reorderLevel = p.reorderNumber || 10;
       return p.currentStock > 0 && p.currentStock <= reorderLevel;
     }).length;
     
-    const inStockItems = productList.filter(p => {
+    const inStockItems = products.filter(p => {
       const reorderLevel = p.reorderNumber || 10;
       return p.currentStock > reorderLevel;
     }).length;
-    setStockStats({ totalItems, lowStockItems, outOfStockItems, inStockItems });
+    return { totalItems, lowStockItems, outOfStockItems, inStockItems };
+  }, [products]);
+
+  const uniqueBrands = useMemo(() => {
+    return [...new Set(products.map(p => p.brandName).filter(Boolean))].sort();
+  }, [products]);
+
+  const paginatedProducts = useMemo(() => {
+    return filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredProducts, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1); 
+  }, [filterCategory, filterBrand, filterStatus, searchQuery, sortBy]);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/products');
+      const data = await response.json();
+      
+      if (data.success) {
+        setProducts(data.data);
+        setCachedData('products', data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      alert('Failed to fetch products. Make sure the backend server is running.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    const inputValue = type === 'checkbox' ? checked : value;
+    
+    // Explicitly handle displayInTerminal checkbox
+    if (name === 'displayInTerminal' && type === 'checkbox') {
+      setNewProduct(prev => ({
+        ...prev,
+        displayInTerminal: checked
+      }));
+      return;
+    }
+    
     setNewProduct(prev => {
       const updatedProduct = {
         ...prev,
-        [name]: value
+        [name]: inputValue
       };
       
 
       if (!editingProduct && (name === 'category' || name === 'variant')) {
-        const category = name === 'category' ? value : prev.category;
-        const variant = name === 'variant' ? value : prev.variant;
+        const category = name === 'category' ? inputValue : prev.category;
+        const variant = name === 'variant' ? inputValue : prev.variant;
         updatedProduct.sku = generateSKU(category, variant);
       }
       
@@ -278,16 +369,23 @@ const Inventory = () => {
         : [...prev.selectedSizes, size];
       
       const newSizeQuantities = { ...prev.sizeQuantities };
+      const newSizePrices = { ...prev.sizePrices };
       if (isSelected) {
         delete newSizeQuantities[size];
+        delete newSizePrices[size];
       } else {
         newSizeQuantities[size] = '';
+        if (prev.differentPricesPerSize) {
+          // Initialize with default price when adding a new size
+          newSizePrices[size] = prev.itemPrice || '';
+        }
       }
       
       return {
         ...prev,
         selectedSizes: newSelectedSizes,
-        sizeQuantities: newSizeQuantities
+        sizeQuantities: newSizeQuantities,
+        sizePrices: newSizePrices
       };
     });
   };
@@ -302,6 +400,16 @@ const Inventory = () => {
     }));
   };
 
+  const handleSizePriceChange = (size, price) => {
+    setNewProduct(prev => ({
+      ...prev,
+      sizePrices: {
+        ...prev.sizePrices,
+        [size]: price
+      }
+    }));
+  };
+
   const resetProductForm = () => {
     const defaultCategory = 'Tops';
     const defaultVariant = '';
@@ -309,7 +417,7 @@ const Inventory = () => {
       sku: generateSKU(defaultCategory, defaultVariant),
       itemName: '',
       category: defaultCategory,
-      brandName: '',
+      brandName: 'Brandless',
       variant: defaultVariant,
       size: '',
       itemPrice: '',
@@ -320,7 +428,11 @@ const Inventory = () => {
       supplierContact: '',
       itemImage: '',
       selectedSizes: [],
-      sizeQuantities: {}
+      sizeQuantities: {},
+      sizePrices: {},
+      differentPricesPerSize: false,
+      foodSubtype: '',
+      displayInTerminal: true
     });
     setEditingProduct(null);
   };
@@ -337,6 +449,25 @@ const Inventory = () => {
       if (!hasSizeQuantities && !hasStock) {
         alert('Please either select sizes with quantities or provide a stock value.');
         return;
+      }
+
+      // Validate size prices if different prices per size is enabled
+      if (newProduct.differentPricesPerSize && newProduct.selectedSizes?.length > 0) {
+        const missingPrices = newProduct.selectedSizes.filter(size => {
+          const price = newProduct.sizePrices?.[size];
+          return !price || price === '' || parseFloat(price) <= 0;
+        });
+        
+        if (missingPrices.length > 0) {
+          alert(`Please enter prices for all selected sizes: ${missingPrices.join(', ')}`);
+          return;
+        }
+      } else if (!newProduct.differentPricesPerSize) {
+        // Only require itemPrice if different prices per size is not enabled
+        if (!newProduct.itemPrice || parseFloat(newProduct.itemPrice) <= 0) {
+          alert('Please enter a selling price.');
+          return;
+        }
       }
       
       setShowConfirmModal(true);
@@ -362,17 +493,44 @@ const Inventory = () => {
       const method = editingProduct ? 'PUT' : 'POST';
       
       // Prepare payload - exclude sizes and stock when editing
+      // If differentPricesPerSize is enabled, use first size price as default itemPrice if itemPrice is not set
+      let defaultItemPrice = parseFloat(newProduct.itemPrice) || 0;
+      if (newProduct.differentPricesPerSize && newProduct.selectedSizes?.length > 0 && !defaultItemPrice) {
+        const firstSizePrice = newProduct.sizePrices?.[newProduct.selectedSizes[0]];
+        if (firstSizePrice) {
+          defaultItemPrice = parseFloat(firstSizePrice) || 0;
+        }
+      }
+      
       const payload = {
         ...newProduct,
-        itemPrice: parseFloat(newProduct.itemPrice) || 0,
+        itemPrice: defaultItemPrice,
         costPrice: parseFloat(newProduct.costPrice) || 0,
-        reorderNumber: parseInt(newProduct.reorderNumber) || 0
+        reorderNumber: parseInt(newProduct.reorderNumber) || 0,
+        displayInTerminal: newProduct.displayInTerminal !== false
       };
       
       // Only include stock and sizes when adding new product
       if (!editingProduct) {
         payload.currentStock = totalStock;
-        payload.sizes = newProduct.selectedSizes.length > 0 ? newProduct.sizeQuantities : null;
+        if (newProduct.selectedSizes.length > 0) {
+          // If different prices per size, include size prices in sizes object
+          if (newProduct.differentPricesPerSize && Object.keys(newProduct.sizePrices).length > 0) {
+            const sizesWithPrices = {};
+            newProduct.selectedSizes.forEach(size => {
+              const sizePrice = parseFloat(newProduct.sizePrices[size]);
+              sizesWithPrices[size] = {
+                quantity: newProduct.sizeQuantities[size] || 0,
+                price: sizePrice || defaultItemPrice || 0
+              };
+            });
+            payload.sizes = sizesWithPrices;
+          } else {
+            payload.sizes = newProduct.sizeQuantities;
+          }
+        } else {
+          payload.sizes = null;
+        }
       }
       
       const response = await fetch(url, {
@@ -424,13 +582,30 @@ const Inventory = () => {
     setEditingProduct(product);
     
     const existingSizes = product.sizes ? Object.keys(product.sizes) : [];
-    const existingSizeQuantities = product.sizes || {};
+    let existingSizeQuantities = {};
+    let existingSizePrices = {};
+    let hasDifferentPrices = false;
+    
+    // Check if sizes contain price information (object with quantity and price)
+    if (product.sizes) {
+      existingSizes.forEach(size => {
+        if (typeof product.sizes[size] === 'object' && product.sizes[size] !== null) {
+          existingSizeQuantities[size] = product.sizes[size].quantity || 0;
+          if (product.sizes[size].price !== undefined) {
+            existingSizePrices[size] = product.sizes[size].price;
+            hasDifferentPrices = true;
+          }
+        } else {
+          existingSizeQuantities[size] = product.sizes[size] || 0;
+        }
+      });
+    }
     
     setNewProduct({
       sku: product.sku || '',
       itemName: product.itemName || '',
       category: product.category || 'Tops',
-      brandName: product.brandName || '',
+      brandName: product.brandName || 'Brandless',
       variant: product.variant || '',
       size: product.size || '',
       itemPrice: product.itemPrice || '',
@@ -441,7 +616,11 @@ const Inventory = () => {
       supplierContact: product.supplierContact || '',
       itemImage: product.itemImage || '',
       selectedSizes: existingSizes,
-      sizeQuantities: existingSizeQuantities
+      sizeQuantities: existingSizeQuantities,
+      sizePrices: existingSizePrices,
+      differentPricesPerSize: hasDifferentPrices,
+      foodSubtype: product.foodSubtype || '',
+      displayInTerminal: product.displayInTerminal !== undefined ? product.displayInTerminal : true
     });
     
     setShowAddModal(true);
@@ -457,18 +636,28 @@ const Inventory = () => {
       const url = `http://localhost:5000/api/products/${editingProduct._id}`;
       
       // Prepare payload - exclude sizes and stock when editing
+      // Ensure displayInTerminal is explicitly set: true = show in terminal, false = don't show
+      // Explicitly handle the boolean value - if it's explicitly false, use false, otherwise default to true
+      const displayInTerminalValue = newProduct.displayInTerminal === false ? false : true;
+      
       const payload = {
         ...newProduct,
         itemPrice: parseFloat(newProduct.itemPrice) || 0,
         costPrice: parseFloat(newProduct.costPrice) || 0,
-        reorderNumber: parseInt(newProduct.reorderNumber) || 0
+        reorderNumber: parseInt(newProduct.reorderNumber) || 0,
+        displayInTerminal: displayInTerminalValue
       };
+      
+      console.log('[confirmEditProduct] newProduct.displayInTerminal:', newProduct.displayInTerminal);
+      console.log('[confirmEditProduct] Sending displayInTerminal:', payload.displayInTerminal);
       
       // Remove stock and size-related fields from payload
       delete payload.currentStock;
       delete payload.sizes;
       delete payload.selectedSizes;
       delete payload.sizeQuantities;
+      delete payload.sizePrices;
+      delete payload.differentPricesPerSize;
       
       const response = await fetch(url, {
         method: 'PUT',
@@ -487,10 +676,15 @@ const Inventory = () => {
         let errorMessage = 'Failed to update product';
         try {
           const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || errorMessage;
+          errorMessage = errorData.message || errorData.error || errorMessage;
+          // Include detailed error if available
+          if (errorData.error && errorData.error !== errorData.message) {
+            errorMessage += `: ${errorData.error}`;
+          }
         } catch (e) {
           errorMessage = `Server error (${response.status}): ${errorText.substring(0, 100)}`;
         }
+        console.error('Product update error:', errorMessage);
         alert(errorMessage);
         return;
       }
@@ -500,6 +694,7 @@ const Inventory = () => {
       if (data.success) {
         setShowAddModal(false);
         resetProductForm();
+        invalidateCache('products');
         fetchProducts();
         setSuccessMessage('The item was edited successfully!');
         setShowSuccessModal(true);
@@ -541,6 +736,7 @@ const Inventory = () => {
       if (data.success) {
         setShowSuccessModal(true);
         setSuccessMessage('The item was deleted successfully!');
+        invalidateCache('products');
         fetchProducts();
       } else {
         alert(data.message || 'Failed to delete product');
@@ -576,6 +772,8 @@ const Inventory = () => {
         ? editingProduct.currentStock + amount
         : Math.max(0, editingProduct.currentStock - amount);
 
+      // Don't explicitly set displayInTerminal - let backend auto-update it based on stock
+      // Backend will set it to false if stock reaches 0
       const response = await fetch(`http://localhost:5000/api/products/${editingProduct._id}`, {
         method: 'PUT',
         headers: {
@@ -593,6 +791,7 @@ const Inventory = () => {
         setShowStockModal(false);
         setEditingProduct(null);
         setStockAmount('');
+        invalidateCache('products');
         fetchProducts();
       } else {
         alert(data.message || 'Failed to update stock');
@@ -613,14 +812,60 @@ const Inventory = () => {
       
       const updatedSizes = { ...(editingProduct.sizes || {}) };
       
+      // Helper to get quantity from size data
+      const getSizeQty = (sizeData) => {
+        if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+          return sizeData.quantity;
+        }
+        return typeof sizeData === 'number' ? sizeData : 0;
+      };
+      
+      // Helper to get price from size data
+      const getSizePrice = (sizeData) => {
+        if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
+          return sizeData.price;
+        }
+        return null;
+      };
+      
       stockData.selectedSizes.forEach(size => {
-        const currentQty = updatedSizes[size] || 0;
+        const currentSizeData = updatedSizes[size];
+        const currentQty = getSizeQty(currentSizeData);
+        const currentPrice = getSizePrice(currentSizeData);
         const addQty = stockData.sizes[size] || 0;
-        updatedSizes[size] = currentQty + addQty;
+        const newQty = currentQty + addQty;
+        
+        // Preserve price structure if it exists
+        if (currentPrice !== null || (typeof currentSizeData === 'object' && currentSizeData !== null)) {
+          updatedSizes[size] = {
+            quantity: newQty,
+            price: currentPrice !== null ? currentPrice : (editingProduct.itemPrice || 0)
+          };
+        } else {
+          updatedSizes[size] = newQty;
+        }
       });
       
-      const totalStock = Object.values(updatedSizes).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0);
+      const totalStock = Object.values(updatedSizes).reduce((sum, sizeData) => sum + getSizeQty(sizeData), 0);
+      const stockBefore = editingProduct.currentStock || 0;
+      const addedQuantity = totalStock - stockBefore;
 
+      // Get current user info
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const handledBy = currentUser.name || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'System';
+      const handledById = currentUser._id || currentUser.id || '';
+
+      // Calculate size quantities that were added
+      const sizeQuantitiesAdded = {};
+      stockData.selectedSizes.forEach(size => {
+        const addQty = stockData.sizes[size] || 0;
+        if (addQty > 0) {
+          sizeQuantitiesAdded[size] = addQty;
+        }
+      });
+
+      // Don't explicitly set displayInTerminal - let backend auto-update it based on stock
+      // Backend will set it to false if stock reaches 0, otherwise preserve existing value
       const response = await fetch(`http://localhost:5000/api/products/${editingProduct._id}`, {
         method: 'PUT',
         headers: {
@@ -628,7 +873,12 @@ const Inventory = () => {
         },
         body: JSON.stringify({
           currentStock: totalStock,
-          sizes: updatedSizes
+          sizes: updatedSizes,
+          stockMovementType: 'Stock-In',
+          stockMovementReason: stockData.reason || 'Restock',
+          handledBy: handledBy,
+          handledById: handledById,
+          stockMovementSizeQuantities: Object.keys(sizeQuantitiesAdded).length > 0 ? sizeQuantitiesAdded : null
         })
       });
 
@@ -640,6 +890,7 @@ const Inventory = () => {
         setStockAmount('');
         setSuccessMessage('Stock added successfully!');
         setShowSuccessModal(true);
+        invalidateCache('products');
         fetchProducts();
       } else {
         alert(data.message || 'Failed to update stock');
@@ -660,14 +911,63 @@ const Inventory = () => {
       
       const updatedSizes = { ...(editingProduct.sizes || {}) };
       
+      // Helper to get quantity from size data
+      const getSizeQty = (sizeData) => {
+        if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+          return sizeData.quantity;
+        }
+        return typeof sizeData === 'number' ? sizeData : 0;
+      };
+      
+      // Helper to get price from size data
+      const getSizePrice = (sizeData) => {
+        if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
+          return sizeData.price;
+        }
+        return null;
+      };
+      
       stockData.selectedSizes.forEach(size => {
-        const currentQty = updatedSizes[size] || 0;
+        const currentSizeData = updatedSizes[size];
+        const currentQty = getSizeQty(currentSizeData);
+        const currentPrice = getSizePrice(currentSizeData);
         const removeQty = stockData.sizes[size] || 0;
-        updatedSizes[size] = Math.max(0, currentQty - removeQty);
+        const newQty = Math.max(0, currentQty - removeQty);
+        
+        // Preserve price structure if it exists
+        if (currentPrice !== null || (typeof currentSizeData === 'object' && currentSizeData !== null)) {
+          updatedSizes[size] = {
+            quantity: newQty,
+            price: currentPrice !== null ? currentPrice : (editingProduct.itemPrice || 0)
+          };
+        } else {
+          updatedSizes[size] = newQty;
+        }
       });
       
-      const totalStock = Object.values(updatedSizes).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0);
+      const totalStock = Object.values(updatedSizes).reduce((sum, sizeData) => sum + getSizeQty(sizeData), 0);
 
+      // Get current user info
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const handledBy = currentUser.name || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'System';
+      const handledById = currentUser._id || currentUser.id || '';
+
+      // Determine type based on reason
+      const movementType = stockData.reason === 'Damaged' || stockData.reason === 'Lost' || stockData.reason === 'Expired' 
+        ? 'Pull-Out' 
+        : 'Stock-Out';
+
+      // Calculate size quantities that were removed
+      const sizeQuantitiesRemoved = {};
+      stockData.selectedSizes.forEach(size => {
+        const removeQty = stockData.sizes[size] || 0;
+        if (removeQty > 0) {
+          sizeQuantitiesRemoved[size] = removeQty;
+        }
+      });
+
+      // Don't explicitly set displayInTerminal - let backend auto-update it based on stock
+      // Backend will set it to false if stock reaches 0, otherwise preserve existing value
       const response = await fetch(`http://localhost:5000/api/products/${editingProduct._id}`, {
         method: 'PUT',
         headers: {
@@ -675,7 +975,12 @@ const Inventory = () => {
         },
         body: JSON.stringify({
           currentStock: totalStock,
-          sizes: updatedSizes
+          sizes: updatedSizes,
+          stockMovementType: movementType,
+          stockMovementReason: stockData.reason || 'Sold',
+          handledBy: handledBy,
+          handledById: handledById,
+          stockMovementSizeQuantities: Object.keys(sizeQuantitiesRemoved).length > 0 ? sizeQuantitiesRemoved : null
         })
       });
 
@@ -687,6 +992,7 @@ const Inventory = () => {
         setStockAmount('');
         setSuccessMessage('Stock removed successfully!');
         setShowSuccessModal(true);
+        invalidateCache('products');
         fetchProducts();
       } else {
         alert(data.message || 'Failed to update stock');
@@ -858,10 +1164,10 @@ const Inventory = () => {
           }
           
           const product = {
-            sku: values[headers.indexOf('SKU')] || generateSKU('Others', ''),
+            sku: values[headers.indexOf('SKU')] || generateSKU('Foods', ''),
             itemName: values[headers.indexOf('Item Name')] || '',
-            category: values[headers.indexOf('Category')] || 'Others',
-            brandName: values[headers.indexOf('Brand')] || '',
+            category: values[headers.indexOf('Category')] || 'Foods',
+            brandName: values[headers.indexOf('Brand')] || 'Brandless',
             variant: values[headers.indexOf('Variant')] || '',
             itemPrice: parseFloat(values[headers.indexOf('Item Price')]) || 0,
             costPrice: parseFloat(values[headers.indexOf('Cost Price')]) || 0,
@@ -909,6 +1215,7 @@ const Inventory = () => {
       
       // Refresh products list
       if (successCount > 0) {
+        invalidateCache('products');
         fetchProducts();
       }
       
@@ -1054,7 +1361,7 @@ const Inventory = () => {
               className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
             >
               <option value="All">By Brand</option>
-              {[...new Set(products.map(p => p.brandName).filter(Boolean))].sort().map(brand => (
+              {uniqueBrands.map(brand => (
                 <option key={brand} value={brand}>{brand}</option>
               ))}
             </select>
@@ -1075,6 +1382,8 @@ const Inventory = () => {
               onChange={(e) => setSortBy(e.target.value)}
               className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
             >
+              <option value="sku-new">SKU: Newest First</option>
+              <option value="sku-old">SKU: Oldest First</option>
               <option value="name">Sort By Name</option>
               <option value="price-low">Price: Low to High</option>
               <option value="price-high">Price: High to Low</option>
@@ -1100,7 +1409,7 @@ const Inventory = () => {
 
         <ProductTable
           loading={loading}
-          filteredProducts={filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+          filteredProducts={paginatedProducts}
           handleEditProduct={handleEditClick}
           handleDeleteProduct={handleDeleteClick}
           handleViewProduct={handleViewProduct}
@@ -1127,8 +1436,11 @@ const Inventory = () => {
           handleInputChange={handleInputChange}
           handleSizeToggle={handleSizeToggle}
           handleSizeQuantityChange={handleSizeQuantityChange}
+          handleSizePriceChange={handleSizePriceChange}
           resetProductForm={resetProductForm}
           loading={loading}
+          categories={categories}
+          brandPartners={brandPartners}
         />
 
         <ConfirmAddProductModal
@@ -1235,5 +1547,5 @@ const Inventory = () => {
   );
 };
 
-export default Inventory;
+export default memo(Inventory);
 

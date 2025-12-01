@@ -62,12 +62,26 @@ const ViewProductModal = ({ showViewModal, setShowViewModal, viewingProduct, for
                       <span className="text-sm font-semibold text-gray-800">Size:</span>
                       {viewingProduct.sizes && typeof viewingProduct.sizes === 'object' && Object.keys(viewingProduct.sizes).length > 0 ? (
                         <div className="mt-2 space-y-2">
-                          {Object.entries(viewingProduct.sizes).map(([size, stock]) => (
+                          {Object.entries(viewingProduct.sizes).map(([size, sizeData]) => {
+                            // Handle both formats: number or object with quantity
+                            const stock = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
+                              ? sizeData.quantity
+                              : (typeof sizeData === 'number' ? sizeData : 0);
+                            const price = typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined
+                              ? sizeData.price
+                              : null;
+                            return (
                             <div key={size} className="flex justify-between items-center py-1 px-3 bg-gray-50 rounded-lg">
                               <span className="text-sm text-gray-700 font-medium">{size}:</span>
+                                <div className="flex flex-col items-end">
                               <span className="text-sm text-gray-600">{stock || 0} pcs</span>
+                                  {price !== null && (
+                                    <span className="text-xs text-gray-500">PHP {parseFloat(price).toFixed(2)}</span>
+                                  )}
+                                </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-sm text-gray-600 mt-1">{viewingProduct.size || 'N/A'}</p>
@@ -81,7 +95,12 @@ const ViewProductModal = ({ showViewModal, setShowViewModal, viewingProduct, for
                       <span className="text-sm font-semibold text-gray-800">Stock:</span>
                       <p className="text-sm text-gray-600 mt-1">
                         {viewingProduct.sizes && typeof viewingProduct.sizes === 'object' && Object.keys(viewingProduct.sizes).length > 0
-                          ? Object.values(viewingProduct.sizes).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0)
+                          ? Object.values(viewingProduct.sizes).reduce((sum, sizeData) => {
+                              const qty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
+                                ? sizeData.quantity
+                                : (typeof sizeData === 'number' ? sizeData : 0);
+                              return sum + qty;
+                            }, 0)
                           : (viewingProduct.currentStock || 0)
                         } pcs
                       </p>
@@ -97,7 +116,40 @@ const ViewProductModal = ({ showViewModal, setShowViewModal, viewingProduct, for
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <span className="text-sm font-semibold text-gray-800">Selling Price:</span>
-                      <p className="text-sm text-gray-600 mt-1">PHP {viewingProduct.itemPrice?.toFixed(2) || '0.00'}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {(() => {
+                          // Helper to get price from size data
+                          const getSizePrice = (sizeData) => {
+                            if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
+                              return sizeData.price;
+                            }
+                            return null;
+                          };
+
+                          // Check if product has sizes with different prices
+                          if (viewingProduct.sizes && typeof viewingProduct.sizes === 'object') {
+                            const prices = [];
+                            Object.values(viewingProduct.sizes).forEach(sizeData => {
+                              const price = getSizePrice(sizeData);
+                              if (price !== null) {
+                                prices.push(price);
+                              }
+                            });
+
+                            if (prices.length > 0) {
+                              const minPrice = Math.min(...prices);
+                              const maxPrice = Math.max(...prices);
+                              
+                              if (minPrice !== maxPrice) {
+                                return `PHP ${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}`;
+                              }
+                              return `PHP ${minPrice.toFixed(2)}`;
+                            }
+                          }
+                          
+                          return `PHP ${viewingProduct.itemPrice?.toFixed(2) || '0.00'}`;
+                        })()}
+                      </p>
                     </div>
                     <div>
                       <span className="text-sm font-semibold text-gray-800">Cost Price:</span>
@@ -128,7 +180,7 @@ const ViewProductModal = ({ showViewModal, setShowViewModal, viewingProduct, for
         
             <div className="flex items-center justify-center">
               <div className="w-full h-full flex items-center justify-center bg-gray-50 rounded-2xl p-6" style={{ minHeight: '500px' }}>
-                {viewingProduct.itemImage ? (
+                {viewingProduct.itemImage && viewingProduct.itemImage.trim() !== '' ? (
                   <img 
                     src={viewingProduct.itemImage} 
                     alt={viewingProduct.itemName} 

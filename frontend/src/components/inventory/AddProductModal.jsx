@@ -11,10 +11,28 @@ const AddProductModal = ({
   handleInputChange,
   handleSizeToggle,
   handleSizeQuantityChange,
+  handleSizePriceChange,
   resetProductForm,
-  loading
+  loading,
+  categories = [],
+  brandPartners = []
 }) => {
+  // Built-in categories that have specific size options
+  const builtInCategories = ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods'];
   if (!showAddModal) return null;
+
+  const partnerNames = Array.from(
+    new Set(
+      brandPartners
+        .map((partner) => partner.brandName)
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  const legacyBrandSelected =
+    newProduct.brandName &&
+    newProduct.brandName !== 'Brandless' &&
+    !partnerNames.includes(newProduct.brandName);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm pointer-events-none">
@@ -57,32 +75,63 @@ const AddProductModal = ({
                         <select
                           name="category"
                           value={newProduct.category}
+                          onChange={(e) => {
+                            handleInputChange(e);
+                            // Reset foodSubtype when category changes
+                            if (e.target.value !== 'Foods') {
+                              setNewProduct(prev => ({ ...prev, foodSubtype: '' }));
+                            }
+                          }}
+                          required
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                        >
+                          {categories.filter(cat => cat.name !== 'All' && cat.name !== 'Others').map(category => (
+                            <option key={category.name} value={category.name}>
+                              {category.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Brand</label>
+                        <select
+                          name="brandName"
+                          value={newProduct.brandName || 'Brandless'}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                        >
+                          <option value="Brandless">Brandless</option>
+                          {partnerNames.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                          {legacyBrandSelected && (
+                            <option value={newProduct.brandName}>{newProduct.brandName} (Inactive)</option>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+                    {newProduct.category === 'Foods' && (
+                      <div className="mt-3">
+                        <label className="block text-xs text-gray-600 mb-1">Food Type</label>
+                        <select
+                          name="foodSubtype"
+                          value={newProduct.foodSubtype || ''}
                           onChange={handleInputChange}
                           required
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
                         >
-                          <option value="Tops">Tops</option>
-                          <option value="Bottoms">Bottoms</option>
-                          <option value="Dresses">Dresses</option>
-                          <option value="Makeup">Makeup</option>
-                          <option value="Accessories">Accessories</option>
-                          <option value="Shoes">Shoes</option>
-                          <option value="Head Wear">Head Wear</option>
-                          <option value="Others">Others</option>
+                          <option value="">Select Food Type</option>
+                          <option value="Beverages">Beverages</option>
+                          <option value="Snacks">Snacks</option>
+                          <option value="Meals">Meals</option>
+                          <option value="Desserts">Desserts</option>
+                          <option value="Ingredients">Ingredients</option>
+                          <option value="Other">Other</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Brand Name</label>
-                        <input
-                          type="text"
-                          name="brandName"
-                          value={newProduct.brandName}
-                          onChange={handleInputChange}
-                          placeholder="Brand Name"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                        />
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
@@ -114,10 +163,44 @@ const AddProductModal = ({
                           <div className="grid grid-cols-4 gap-2 mb-3">
                             {(() => {
                               const category = newProduct.category;
+                              const foodSubtype = newProduct.foodSubtype || '';
                               let sizes = [];
                               
+                              // Check if category is built-in
+                              const isBuiltIn = builtInCategories.includes(category);
+                              
+                              if (!isBuiltIn) {
+                                // All custom/added categories should have Free Size only
+                                sizes = ['Free Size'];
+                              }
+                              // Foods - size depends on subtype
+                              else if (category === 'Foods') {
+                                switch (foodSubtype) {
+                                  case 'Beverages':
+                                    sizes = ['Small', 'Medium', 'Large', 'Extra Large', 'Free Size'];
+                                    break;
+                                  case 'Snacks':
+                                    sizes = ['Small', 'Medium', 'Large', 'Family Size', 'Free Size'];
+                                    break;
+                                  case 'Meals':
+                                    sizes = ['Regular', 'Large', 'Family Size', 'Free Size'];
+                                    break;
+                                  case 'Desserts':
+                                    sizes = ['Small', 'Medium', 'Large', 'Free Size'];
+                                    break;
+                                  case 'Ingredients':
+                                    sizes = ['100g', '250g', '500g', '1kg', 'Free Size'];
+                                    break;
+                                  case 'Other':
+                                    sizes = ['Small', 'Medium', 'Large', 'Free Size'];
+                                    break;
+                                  default:
+                                    // Default sizes when no subtype selected
+                                    sizes = ['Small', 'Medium', 'Large', 'Free Size'];
+                                }
+                              }
                               // Clothing categories (Tops, Bottoms, Dresses)
-                              if (['Tops', 'Bottoms', 'Dresses'].includes(category)) {
+                              else if (['Tops', 'Bottoms', 'Dresses'].includes(category)) {
                                 sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Free Size'];
                               }
                               // Shoes
@@ -127,10 +210,6 @@ const AddProductModal = ({
                               // Accessories, Head Wear, Makeup
                               else if (['Accessories', 'Head Wear', 'Makeup'].includes(category)) {
                                 sizes = ['Free Size'];
-                              }
-                              // Others - show all options
-                              else {
-                                sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
                               }
                               
                               return sizes.map((size) => (
@@ -148,6 +227,34 @@ const AddProductModal = ({
                           </div>
                         
                           {newProduct.selectedSizes?.length > 0 && (
+                            <>
+                              <div className="mt-3 mb-3">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={newProduct.differentPricesPerSize || false}
+                                    onChange={(e) => {
+                                      setNewProduct(prev => {
+                                        const newSizePrices = {};
+                                        if (e.target.checked) {
+                                          // Initialize prices for all selected sizes with default price
+                                          prev.selectedSizes.forEach(size => {
+                                            newSizePrices[size] = prev.itemPrice || '';
+                                          });
+                                        }
+                                        return {
+                                          ...prev,
+                                          differentPricesPerSize: e.target.checked,
+                                          sizePrices: e.target.checked ? newSizePrices : {}
+                                        };
+                                      });
+                                    }}
+                                    className="w-4 h-4 text-[#AD7F65] border-gray-300 rounded focus:ring-[#AD7F65]"
+                                  />
+                                  <span className="text-sm text-gray-700">Different prices each size?</span>
+                                </label>
+                              </div>
+                              
                             <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
                               <label className="block text-xs font-semibold text-gray-700 mb-2">
                                 Quantity per Size:
@@ -168,6 +275,31 @@ const AddProductModal = ({
                                 ))}
                               </div>
                             </div>
+
+                              {newProduct.differentPricesPerSize && (
+                                <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
+                                  <label className="block text-xs font-semibold text-gray-700 mb-2">
+                                    Price per Size:
+                                  </label>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {newProduct.selectedSizes.map((size) => (
+                                      <div key={size}>
+                                        <label className="block text-xs text-gray-600 mb-1">{size} Price</label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={newProduct.sizePrices?.[size] || ''}
+                                          onChange={(e) => handleSizePriceChange(size, e.target.value)}
+                                          placeholder="Enter price"
+                                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                      
@@ -204,6 +336,7 @@ const AddProductModal = ({
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
                       />
                     </div>
+                    {!newProduct.differentPricesPerSize && (
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Selling Price</label>
                       <input
@@ -217,6 +350,7 @@ const AddProductModal = ({
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
                       />
                     </div>
+                    )}
                   </div>
                 </div>
 
@@ -245,6 +379,80 @@ const AddProductModal = ({
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
                       />
                     </div> */}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-semibold mb-3">Display Settings</h3>
+                  <div className="space-y-3">
+                    {(() => {
+                      // Check if product has zero stock
+                      // When editing, use the actual product's current stock and sizes
+                      const hasZeroStock = () => {
+                        if (editingProduct) {
+                          // When editing, check the actual product's stock
+                          if (editingProduct.sizes && typeof editingProduct.sizes === 'object' && Object.keys(editingProduct.sizes).length > 0) {
+                            // For products with sizes, check if all sizes have 0 stock
+                            const allSizesZero = Object.values(editingProduct.sizes).every(sizeData => {
+                              if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+                                return (sizeData.quantity || 0) === 0;
+                              }
+                              return (typeof sizeData === 'number' ? sizeData : 0) === 0;
+                            });
+                            return allSizesZero;
+                          }
+                          // For products without sizes, check currentStock
+                          return (editingProduct.currentStock || 0) === 0;
+                        } else {
+                          // When adding new product, check newProduct
+                          if (newProduct.selectedSizes && newProduct.selectedSizes.length > 0 && newProduct.sizeQuantities) {
+                            // For products with sizes, check if all sizes have 0 stock
+                            const allSizesZero = newProduct.selectedSizes.every(size => {
+                              const qty = newProduct.sizeQuantities[size] || 0;
+                              return parseInt(qty) === 0;
+                            });
+                            return allSizesZero;
+                          }
+                          // For products without sizes, check currentStock
+                          return parseInt(newProduct.currentStock || 0) === 0;
+                        }
+                      };
+                      
+                      const isStockZero = hasZeroStock();
+                      const isDisabled = editingProduct && isStockZero;
+                      
+                      return (
+                        <label className={`flex items-center gap-3 ${isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                          <div className="relative">
+                            <input
+                              type="checkbox"
+                              name="displayInTerminal"
+                              checked={newProduct.displayInTerminal !== false}
+                              onChange={handleInputChange}
+                              disabled={isDisabled}
+                              className="sr-only"
+                            />
+                            <div className={`w-14 h-7 rounded-full transition-colors duration-200 ${
+                              newProduct.displayInTerminal !== false ? 'bg-[#AD7F65]' : 'bg-gray-300'
+                            } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                              <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
+                                newProduct.displayInTerminal !== false ? 'translate-x-7' : 'translate-x-1'
+                              } mt-0.5`}></div>
+                            </div>
+                          </div>
+                          <div>
+                            <span className={`text-sm font-medium ${isDisabled ? 'text-gray-400' : 'text-gray-700'}`}>
+                              Display in Terminal
+                            </span>
+                            <p className={`text-xs ${isDisabled ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {isDisabled 
+                                ? 'Add stock to enable this option' 
+                                : 'Show this product in POS/terminal'}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

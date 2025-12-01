@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, memo } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import terminalIcon from '../../assets/icons/terminal.svg';
 import inventoryIcon from '../../assets/icons/invenory.svg';
@@ -14,10 +14,10 @@ import LogoutConfirmationModal from './LogoutConfirmationModal';
 import logo from '../../assets/logo.png';
 
 const Sidebar = ({ isExpanded, setIsExpanded }) => {
-  const navigate = useNavigate();
   const location = useLocation();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
+  const [posExpanded, setPosExpanded] = useState(false);
   const { logout, isOwner, hasPermission } = useAuth();
 
   // Define all menu items in the correct order
@@ -109,7 +109,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
     console.log('Logging out...');
     setShowLogoutModal(false);
     logout();
-    navigate('/');
+    // Navigation will be handled by the logout redirect in AuthContext
   };
 
   const isActive = (path) => {
@@ -122,12 +122,25 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
     return inventoryPaths.some(path => location.pathname === path);
   };
 
+  // Check if any POS/Transaction sub-route is active
+  const isPosActive = () => {
+    const posPaths = ['/terminal', '/discount-management'];
+    return posPaths.some(path => location.pathname === path);
+  };
+
   // Inventory sub-menu items
   const inventorySubItems = [
     { name: 'Products', path: '/inventory' },
-    { name: 'Stock Movement', path: '/stock-movement' },
+    { name: 'Logs', path: '/stock-movement' },
     { name: 'Brand Partners', path: '/brand-partners' },
     { name: 'Categories', path: '/categories' }
+  ];
+
+  // POS/Transaction sub-menu items
+  const posSubItems = [
+    { name: 'Terminal', path: '/terminal' },
+   
+    { name: 'Discount Management', path: '/discount-management' }
   ];
 
   // Auto-expand inventory if on any inventory sub-route
@@ -135,6 +148,14 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
     const inventoryPaths = ['/inventory', '/stock-movement', '/brand-partners', '/categories'];
     if (inventoryPaths.some(path => location.pathname === path)) {
       setInventoryExpanded(true);
+    }
+  }, [location.pathname]);
+
+  // Auto-expand POS if on any POS sub-route
+  useEffect(() => {
+    const posPaths = ['/terminal', '/discount-management'];
+    if (posPaths.some(path => location.pathname === path)) {
+      setPosExpanded(true);
     }
   }, [location.pathname]);
 
@@ -188,6 +209,158 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
         }`}>
           <div className="space-y-3">
             {menuItems.map((item) => {
+              // Special handling for POS / Terminal dropdown
+              if (item.name === 'POS / Terminal') {
+                const posActive = isPosActive();
+                const hasPosPermission = isOwner() || hasPermission('posTerminal');
+                
+                if (!hasPosPermission) return null;
+
+                return (
+                  <div key={item.path} className="space-y-1">
+                    {isExpanded ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPosExpanded(!posExpanded);
+                        }}
+                        className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
+                          posActive 
+                            ? 'shadow-lg' 
+                            : 'hover:bg-gray-50'
+                        }`}
+                        style={posActive ? {
+                          background: item.gradient,
+                          boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
+                        } : {}}
+                      >
+                      <div className="flex items-center flex-1">
+                        <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
+                          <img 
+                            src={item.icon} 
+                            alt={item.name}
+                            className={`w-6 h-6 transition-all duration-300 ${
+                              posActive ? 'brightness-0 invert' : 'opacity-80 group-hover:opacity-100'
+                            }`}
+                          />
+                        </div>
+                        
+                        {isExpanded && (
+                          <span
+                            className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
+                              posActive ? 'text-white' : 'text-gray-800 group-hover:text-[#76462B]'
+                            }`}
+                            style={{
+                              fontSize: '16px'
+                            }}
+                          >
+                            {item.name}
+                          </span>
+                        )}
+                      </div>
+
+                      {isExpanded && (
+                        <svg
+                          className={`w-5 h-5 mr-4 transition-transform duration-300 ${
+                            posExpanded ? 'rotate-180' : ''
+                          } ${posActive ? 'text-white' : 'text-gray-600'}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      )}
+
+                      {posActive && (
+                        <div 
+                          className="absolute inset-0 rounded-2xl"
+                          style={{
+                            background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)',
+                            pointerEvents: 'none'
+                          }}
+                        />
+                      )}
+                    </button>
+                    ) : (
+                      <Link
+                        to="/terminal"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                        className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
+                          posActive 
+                            ? 'shadow-lg' 
+                            : 'hover:bg-gray-50'
+                        }`}
+                        style={posActive ? {
+                          background: item.gradient,
+                          boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
+                        } : {}}
+                      >
+                        <div className="flex items-center flex-1">
+                          <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
+                            <img 
+                              src={item.icon} 
+                              alt={item.name}
+                              className={`w-6 h-6 transition-all duration-300 ${
+                                posActive ? 'brightness-0 invert' : 'opacity-80 group-hover:opacity-100'
+                              }`}
+                            />
+                          </div>
+                        </div>
+                        {posActive && (
+                          <div 
+                            className="absolute inset-0 rounded-2xl"
+                            style={{
+                              background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)',
+                              pointerEvents: 'none'
+                            }}
+                          />
+                        )}
+                      </Link>
+                    )}
+
+                    {/* Sub-menu items */}
+                    {isExpanded && posExpanded && (
+                      <div className="ml-4 space-y-1">
+                        {posSubItems.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <Link
+                              key={subItem.path}
+                              to={subItem.path}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                              className={`w-full flex items-center rounded-lg transition-all duration-300 group relative overflow-hidden py-2.5 ${
+                                subActive
+                                  ? 'bg-[#F5E6D3]'
+                                  : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              {subActive && (
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#8B7355] rounded-r"></div>
+                              )}
+                              <span
+                                className={`font-medium transition-all duration-300 whitespace-nowrap ml-6 ${
+                                  subActive ? 'text-[#76462B] font-semibold' : 'text-gray-700 group-hover:text-[#76462B]'
+                                }`}
+                                style={{
+                                  fontSize: '15px'
+                                }}
+                              >
+                                {subItem.name}
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               // Special handling for Inventory dropdown
               if (item.name === 'Inventory') {
                 const inventoryActive = isInventoryActive();
@@ -197,25 +370,22 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
 
                 return (
                   <div key={item.path} className="space-y-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isExpanded) {
-                          navigate('/inventory');
-                          return;
-                        }
-                        setInventoryExpanded(!inventoryExpanded);
-                      }}
-                      className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
-                        inventoryActive 
-                          ? 'shadow-lg' 
-                          : 'hover:bg-gray-50'
-                      }`}
-                      style={inventoryActive ? {
-                        background: item.gradient,
-                        boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
-                      } : {}}
-                    >
+                    {isExpanded ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInventoryExpanded(!inventoryExpanded);
+                        }}
+                        className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
+                          inventoryActive 
+                            ? 'shadow-lg' 
+                            : 'hover:bg-gray-50'
+                        }`}
+                        style={inventoryActive ? {
+                          background: item.gradient,
+                          boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
+                        } : {}}
+                      >
                       <div className="flex items-center flex-1">
                         <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
                           <img 
@@ -264,6 +434,44 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         />
                       )}
                     </button>
+                    ) : (
+                      <Link
+                        to="/inventory"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                        className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
+                          inventoryActive 
+                            ? 'shadow-lg' 
+                            : 'hover:bg-gray-50'
+                        }`}
+                        style={inventoryActive ? {
+                          background: item.gradient,
+                          boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
+                        } : {}}
+                      >
+                        <div className="flex items-center flex-1">
+                          <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
+                            <img 
+                              src={item.icon} 
+                              alt={item.name}
+                              className={`w-6 h-6 transition-all duration-300 ${
+                                inventoryActive ? 'brightness-0 invert' : 'opacity-80 group-hover:opacity-100'
+                              }`}
+                            />
+                          </div>
+                        </div>
+                        {inventoryActive && (
+                          <div 
+                            className="absolute inset-0 rounded-2xl"
+                            style={{
+                              background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)',
+                              pointerEvents: 'none'
+                            }}
+                          />
+                        )}
+                      </Link>
+                    )}
 
                     {/* Sub-menu items */}
                     {isExpanded && inventoryExpanded && (
@@ -271,11 +479,11 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         {inventorySubItems.map((subItem) => {
                           const subActive = isActive(subItem.path);
                           return (
-                            <button
+                            <Link
                               key={subItem.path}
+                              to={subItem.path}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(subItem.path);
                               }}
                               className={`w-full flex items-center rounded-lg transition-all duration-300 group relative overflow-hidden py-2.5 ${
                                 subActive
@@ -296,7 +504,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               >
                                 {subItem.name}
                               </span>
-                            </button>
+                            </Link>
                           );
                         })}
                       </div>
@@ -309,11 +517,11 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
               const active = isActive(item.path);
               
               return (
-                <button
+                <Link
                   key={item.path}
+                  to={item.path}
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(item.path);
                   }}
                   className={`w-full flex items-center rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
                     active 
@@ -360,7 +568,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                       }}
                     />
                   )}
-                </button>
+                </Link>
               );
             })}
           </div>
@@ -405,5 +613,5 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
   );
 };
 
-export default Sidebar;
+export default memo(Sidebar);
 

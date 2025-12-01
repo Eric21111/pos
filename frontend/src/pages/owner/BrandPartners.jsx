@@ -1,87 +1,57 @@
-import { useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import Header from '../../components/shared/header';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaPlus } from 'react-icons/fa';
 import sortIcon from '../../assets/sort.svg';
 import ViewBrandProductsModal from '../../components/owner/ViewBrandProductsModal';
+import AddBrandPartnerModal from '../../components/owner/AddBrandPartnerModal';
 
 const BrandPartners = () => {
-  const { currentUser, isOwner } = useAuth();
+  const { isOwner } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
-  
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [brandPartners, setBrandPartners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
 
-  const [brandPartners, setBrandPartners] = useState([
-    {
-      id: 1,
-      brandName: 'Brand A',
-      email: 'branda@example.com',
-      contactPerson: 'John Doe',
-      contactNumber: '+63 123456789',
-      logo: null
-    },
-    {
-      id: 2,
-      brandName: 'Brand B',
-      email: 'brandb@example.com',
-      contactPerson: 'Jane Smith',
-      contactNumber: '+63 987654321',
-      logo: null
-    },
-    {
-      id: 3,
-      brandName: 'Brand C',
-      email: 'brandc@example.com',
-      contactPerson: 'Mike Johnson',
-      contactNumber: '+63 555555555',
-      logo: null
-    },
-    {
-      id: 4,
-      brandName: 'Brand D',
-      email: 'brandd@example.com',
-      contactPerson: 'Sarah Williams',
-      contactNumber: '+63 444444444',
-      logo: null
+  const fetchBrandPartners = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/brand-partners');
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to load brand partners.');
+      }
+
+      setBrandPartners(data.data || []);
+      setFetchError('');
+    } catch (error) {
+      console.error('Error fetching brand partners:', error);
+      setFetchError(error.message || 'Failed to load brand partners.');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchBrandPartners();
+  }, []);
 
   const filteredBrandPartners = brandPartners.filter(brand =>
-    brand.brandName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    brand.contactPerson.toLowerCase().includes(searchQuery.toLowerCase())
+    brand.brandName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    brand.contactPerson?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <div className="p-8 min-h-screen">
       <Header pageName="Brand Partners" showBorder={false} />
 
-      {isOwner() && (
-        <div className="flex gap-3 mb-6">
-          <button
-            onClick={() => navigate('/settings')}
-            className="px-6 py-3 font-medium transition-all bg-white text-gray-800 border border-gray-200 hover:border-gray-300 rounded-lg"
-          >
-            Personal Information
-          </button>
-          <button
-            onClick={() => navigate('/discount-management')}
-            className="px-6 py-3 font-medium transition-all bg-white text-gray-800 border border-gray-200 hover:border-gray-300 rounded-lg"
-          >
-            Discount Management
-          </button>
-          <button
-            className="px-6 py-3 font-medium transition-all text-white shadow-md rounded-xl"
-            style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
-          >
-            Brand Partners
-          </button>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 mt-10">
         <div className="flex items-center gap-4">
           <div className="relative" style={{ width: '400px' }}>
             <div className="absolute left-1 top-1/2 transform -translate-y-1/2 w-12 h-9 flex items-center justify-center text-white rounded-lg" style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}>
@@ -101,7 +71,7 @@ const BrandPartners = () => {
         </div>
 
         <button
-          onClick={() => {}}
+          onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all"
           style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
         >
@@ -110,10 +80,30 @@ const BrandPartners = () => {
         </button>
       </div>
 
+      {fetchError && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-100 text-sm">
+          {fetchError}
+        </div>
+      )}
+
+      {loading && (
+        <div className="mb-6 px-4 py-3 rounded-lg bg-white shadow text-gray-500">
+          Loading brand partners...
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-6">
+        {!loading && filteredBrandPartners.length === 0 && (
+          <div className="col-span-3">
+            <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-10 text-center text-gray-500">
+              No brand partners found. Add your first brand partner to get started.
+            </div>
+          </div>
+        )}
+
         {filteredBrandPartners.map((brand) => (
           <div
-            key={brand.id}
+            key={brand._id || brand.id}
             className="bg-white rounded-xl shadow-lg overflow-hidden border-t-2"
             style={{ borderTopColor: '#AD7F65' }}
           >
@@ -144,10 +134,10 @@ const BrandPartners = () => {
                       <span className="font-medium">Email:</span> {brand.email}
                     </div>
                     <div>
-                      <span className="font-medium">Contact Person:</span> {brand.contactPerson}
+                      <span className="font-medium">Contact Person:</span> {brand.contactPerson || '—'}
                     </div>
                     <div>
-                      <span className="font-medium">Contact Number:</span> {brand.contactNumber}
+                      <span className="font-medium">Contact Number:</span> {brand.contactNumber || '—'}
                     </div>
                   </div>
                 </div>
@@ -178,9 +168,16 @@ const BrandPartners = () => {
         }}
         brandPartner={selectedBrand}
       />
+      <AddBrandPartnerModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={(newBrand) => {
+          setBrandPartners((prev) => [newBrand, ...prev]);
+        }}
+      />
     </div>
   );
 };
 
-export default BrandPartners;
+export default memo(BrandPartners);
 

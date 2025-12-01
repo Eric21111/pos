@@ -9,6 +9,44 @@ const ProductTable = ({
   handleViewProduct,
   handleStockUpdate
 }) => {
+  // Helper function to get price from size data
+  const getSizePrice = (sizeData) => {
+    if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
+      return sizeData.price;
+    }
+    return null;
+  };
+
+  // Function to get price range for products with sizes
+  const getPriceRange = (product) => {
+    // If product has sizes with different prices, calculate range
+    if (product.sizes && typeof product.sizes === 'object') {
+      const prices = [];
+      
+      Object.values(product.sizes).forEach(sizeData => {
+        const price = getSizePrice(sizeData);
+        if (price !== null) {
+          prices.push(price);
+        }
+      });
+      
+      // If we have size-specific prices
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        
+        // If prices are different, return range
+        if (minPrice !== maxPrice) {
+          return { min: minPrice, max: maxPrice, isRange: true };
+        }
+        // If all prices are same, return single price
+        return { min: minPrice, max: maxPrice, isRange: false };
+      }
+    }
+    
+    // Default: use product's itemPrice
+    return { min: product.itemPrice || 0, max: product.itemPrice || 0, isRange: false };
+  };
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="overflow-x-auto p-6">
@@ -29,6 +67,7 @@ const ProductTable = ({
                 <th className="pb-3 px-4">Variant</th>
                 <th className="pb-3 px-4">Item Price</th>
                 <th className="pb-3 px-4 text-center">Current Stock</th>
+                <th className="pb-3 px-4 text-center">Terminal</th>
                 <th className="pb-3 pl-4">Actions</th>
               </tr>
             </thead>
@@ -40,7 +79,7 @@ const ProductTable = ({
                   onClick={() => handleViewProduct(product)}
                 >
                   <td className="py-3 pr-4">
-                    {product.itemImage ? (
+                    {product.itemImage && product.itemImage.trim() !== '' ? (
                       <img src={product.itemImage} alt={product.itemName} className="w-12 h-12 object-cover rounded" />
                     ) : (
                       <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-gray-400">
@@ -52,7 +91,14 @@ const ProductTable = ({
                   <td className="py-3 px-4">{product.itemName}</td>
                   <td className="py-3 px-4">{product.category}</td>
                   <td className="py-3 px-4">{product.variant || '-'}</td>
-                  <td className="py-3 px-4">PHP {product.itemPrice.toFixed(2)}</td>
+                  <td className="py-3 px-4">
+                    {(() => {
+                      const priceRange = getPriceRange(product);
+                      return priceRange.isRange 
+                        ? `PHP ${priceRange.min.toFixed(2)} - ${priceRange.max.toFixed(2)}`
+                        : `PHP ${priceRange.min.toFixed(2)}`;
+                    })()}
+                  </td>
                   <td className="py-3 px-4 text-center">
                     <span className={`px-2 py-1 rounded font-semibold ${
                       product.currentStock === 0 
@@ -62,6 +108,15 @@ const ProductTable = ({
                         : 'bg-green-100 text-green-700'
                     }`}>
                       {product.currentStock}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                    <span className={`px-2 py-1 rounded text-sm font-medium ${
+                      product.displayInTerminal !== false
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {product.terminalStatus || (product.displayInTerminal !== false ? 'shown' : 'not shown')}
                     </span>
                   </td>
                   <td className="py-3 pl-4" onClick={(e) => e.stopPropagation()}>

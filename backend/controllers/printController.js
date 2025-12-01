@@ -6,12 +6,42 @@ let UsbAdapter = null;
 try {
   // eslint-disable-next-line global-require
   windowsPrinterDriver = require('printer');
+  // Verify the module actually works by checking if it has required methods
+  if (windowsPrinterDriver && typeof windowsPrinterDriver.getPrinters === 'function') {
+    console.log('Windows printer driver module loaded successfully');
+  } else {
+    console.warn('Windows printer driver module loaded but appears to be invalid');
+    windowsPrinterDriver = null;
+  }
 } catch (err) {
-  console.warn('Windows printer driver module "printer" is not installed. Install it with "npm install printer" to enable direct printing to Windows printers.');
+  console.warn('Windows printer driver module "printer" failed to load:', err.message);
+  console.warn('Install it with "npm install printer" or use TCP/IP printing instead.');
+  windowsPrinterDriver = null;
 }
 
 try {
   // eslint-disable-next-line global-require
+  const usb = require('usb');
+  // Workaround: escpos-usb expects usb.on() method which doesn't exist in usb@2.x
+  // Add EventEmitter methods to usb module for compatibility
+  if (usb && typeof usb.on === 'undefined') {
+    const EventEmitter = require('events');
+    const usbEmitter = new EventEmitter();
+    // Add EventEmitter methods to usb module
+    usb.on = function(event, callback) {
+      usbEmitter.on(event, callback);
+    };
+    usb.emit = function(event, ...args) {
+      usbEmitter.emit(event, ...args);
+    };
+    usb.removeListener = function(event, callback) {
+      usbEmitter.removeListener(event, callback);
+    };
+    usb.removeAllListeners = function(event) {
+      usbEmitter.removeAllListeners(event);
+    };
+  }
+  
   UsbAdapter = require('escpos-usb');
   escpos.USB = UsbAdapter;
 } catch (err) {
@@ -21,6 +51,14 @@ try {
 // 58mm thermal paper standard: 32 characters per line (8 dots/mm × 58mm = 464 dots / 14.5 dots per char ≈ 32 chars)
 // For 80mm paper, use RECEIPT_CHAR_WIDTH=48
 const RECEIPT_CHAR_WIDTH = parseInt(process.env.RECEIPT_CHAR_WIDTH || '32', 10);
+
+// Validate and ensure 58mm paper width (32 chars)
+if (RECEIPT_CHAR_WIDTH !== 32) {
+  console.warn(`⚠️  WARNING: RECEIPT_CHAR_WIDTH is set to ${RECEIPT_CHAR_WIDTH}, but 58mm paper requires 32 characters per line.`);
+  console.warn(`   Current setting will work for ${RECEIPT_CHAR_WIDTH === 48 ? '80mm' : 'custom'} paper width.`);
+} else {
+  console.log('✅ Receipt configured for 58mm thermal paper (32 characters per line)');
+}
 const DEFAULT_STORE_NAME = process.env.STORE_NAME || 'Create Your Style';
 const DEFAULT_ADDRESS_LINES = (process.env.STORE_ADDRESS || 'TC USHS - #831100254488|Pasoanca, Zambonaga City').split('|');
 const CURRENCY_SYMBOL = process.env.PRINTER_CURRENCY_SYMBOL || '₱';
@@ -53,11 +91,39 @@ const printViaEscposUsb = (receiptData = {}) => new Promise((resolve, reject) =>
   const vendorId = parseUsbId(process.env.PRINTER_VENDOR_ID);
   const productId = parseUsbId(process.env.PRINTER_PRODUCT_ID);
 
+  // Log the IDs for debugging
+  console.log('USB Printer Configuration:');
+  console.log(`  Vendor ID: ${process.env.PRINTER_VENDOR_ID} -> ${vendorId} (${vendorId ? '0x' + vendorId.toString(16) : 'not set'})`);
+  console.log(`  Product ID: ${process.env.PRINTER_PRODUCT_ID} -> ${productId} (${productId ? '0x' + productId.toString(16) : 'not set'})`);
+
   let device;
   try {
-    device = vendorId && productId ? new escpos.USB(vendorId, productId) : new escpos.USB();
+    if (vendorId && productId) {
+      console.log(`Attempting to connect to USB printer with VID: 0x${vendorId.toString(16)}, PID: 0x${productId.toString(16)}`);
+      device = new escpos.USB(vendorId, productId);
+    } else {
+      console.log('No vendor/product ID specified, attempting auto-detect...');
+      device = new escpos.USB();
+    }
   } catch (usbError) {
-    reject(usbError);
+    const errorMsg = usbError.message || 'Unknown USB error';
+    console.error('USB Error Details:', errorMsg);
+    console.error('\n⚠️  IMPORTANT: USB printing requires WinUSB driver to be installed.');
+    console.error('   Steps to fix:');
+    console.error('   1. Download Zadig: https://zadig.akeo.ie/');
+    console.error('   2. Open Zadig → Options → List All Devices');
+    console.error(`   3. Select your printer (VID: 0x${vendorId ? vendorId.toString(16).padStart(4, '0') : 'XXXX'}, PID: 0x${productId ? productId.toString(16).padStart(4, '0') : 'YYYY'})`);
+    console.error('   4. Select "WinUSB" as the driver');
+    console.error('   5. Click "Install Driver" or "Replace Driver"');
+    console.error('   6. Restart your computer if prompted');
+    console.error('\n   The system will automatically fall back to file printing until the driver is installed.\n');
+    reject(new Error(`USB device initialization failed: ${errorMsg}. WinUSB driver required. See console for installation instructions.`));
+    return;
+  }
+
+  // Additional check: verify device has required methods
+  if (!device || typeof device.open !== 'function') {
+    reject(new Error('USB device object is invalid. The escpos-usb library may be incompatible. Try using the thermal printer interface instead.'));
     return;
   }
 
@@ -80,38 +146,64 @@ const printViaEscposUsb = (receiptData = {}) => new Promise((resolve, reject) =>
     };
 
     const storeName = receiptData.storeName || DEFAULT_STORE_NAME;
-    const addressLines = receiptData.addressLines || DEFAULT_ADDRESS_LINES;
+    const contactNumber = receiptData.contactNumber || '+631112224444';
+    const location = receiptData.location || 'Pasonanca, Zamboanga City';
     const receiptNo = receiptData.receiptNo || '000000';
     const paymentMethod = receiptData.paymentMethod || 'CASH';
-    const footerMessage = receiptData.footerMessage || 'Thank you for your purchase!';
+    const referenceNo = receiptData.referenceNo || receiptData.reference || '';
     const issueDate = receiptData.date || new Date().toLocaleDateString();
     const issueTime = receiptData.time || new Date().toLocaleTimeString();
 
     try {
+      // Header: Business name (centered, slightly larger)
       printer
         .align('ct')
-        .size(1, 1)
+        .size(1, 0)
         .text(storeName)
-        .size(0, 0);
+        .size(0, 0)
+        .feed(1);
 
-      addressLines.forEach((line) => printer.text(line));
-      printer.feed();
+      // Time (left) and Contact (right)
+      printer.align('lt');
+      const timeLine = padLine(issueTime, contactNumber);
+      printer.text(timeLine);
+      
+      // Location (centered)
+      printer.align('ct');
+      printer.text(location);
+      printer.feed(1);
       printer.text(lineBreak());
-      printer.text('Receipt No.');
+
+      // Receipt No in box format
+      printer.align('ct');
+      printer.text('Receipt No:');
       printer.style('B');
       printer.text(`#${receiptNo}`);
       printer.style('NORMAL');
       printer.text(lineBreak());
 
+      // Item table headers
       printer.align('lt');
+      // Format: Item (14 chars) | Qty (5 chars) | Price (13 chars) = 32 chars
+      // Tighter spacing - items closer to qty
+      const itemCol = 'Item'.padEnd(14);
+      const qtyCol = 'Qty'.padStart(5);
+      const priceCol = 'Price'.padStart(13);
+      printer.text(`${itemCol}${qtyCol}${priceCol}`);
+      printer.text(lineBreak());
+
+      // Items
       (receiptData.items || []).forEach((item) => {
         const itemName = (item.name || item.itemName || 'Item').toString();
         const qty = item.qty || item.quantity || 1;
         const price = item.price || item.itemPrice || 0;
-        const total = item.total || price * qty;
 
-        printer.text(itemName.substring(0, RECEIPT_CHAR_WIDTH));
-        printer.text(padLine(`${qty} x ${formatCurrency(price)}`, formatCurrency(total)));
+        // Format: Item name (truncated to 14 chars), Qty (5 chars right-aligned), Price (13 chars right-aligned)
+        const itemNameLine = itemName.substring(0, 14).padEnd(14);
+        const qtyStr = qty.toString().padStart(5);
+        // Use PHP format to match image
+        const priceStr = `PHP ${price.toFixed(2)}`.padStart(13);
+        printer.text(`${itemNameLine}${qtyStr}${priceStr}`);
       });
 
       if ((receiptData.items || []).length === 0) {
@@ -119,26 +211,32 @@ const printViaEscposUsb = (receiptData = {}) => new Promise((resolve, reject) =>
       }
 
       printer.text(lineBreak());
-      printer.text(padLine('Subtotal', formatCurrency(receiptData.subtotal)));
-      printer.text(padLine('Discount', formatCurrency(receiptData.discount)));
+
+      // Payment summary
+      printer.align('lt');
+      printer.text(padLine('Transaction/Reference', referenceNo || '-'));
+      printer.text(padLine('Payment Method', paymentMethod));
+      printer.text(padLine('Subtotal', `PHP ${(receiptData.subtotal || 0).toFixed(2)}`));
+      printer.text(lineBreak());
+      printer.text(padLine('Discount', `PHP ${(receiptData.discount || 0).toFixed(2)}`));
+      printer.text(lineBreak());
       printer.style('B');
-      printer.text(padLine('Total', formatCurrency(receiptData.total)));
+      printer.text(padLine('Total', `PHP ${(receiptData.total || 0).toFixed(2)}`));
       printer.style('NORMAL');
 
       if (receiptData.cash !== undefined) {
-        printer.text(padLine('Cash', formatCurrency(receiptData.cash)));
+        printer.text(padLine('Cash', `PHP ${receiptData.cash.toFixed(2)}`));
       }
 
       if (receiptData.change !== undefined) {
-        printer.text(padLine('Change', formatCurrency(receiptData.change)));
+        printer.text(padLine('Change', `PHP ${receiptData.change.toFixed(2)}`));
       }
 
-      printer.text(padLine('Payment', paymentMethod));
       printer.text(lineBreak());
-
       printer.align('ct');
-      printer.text(`${issueDate} ${issueTime}`);
-      printer.text(footerMessage);
+      printer.style('B');
+      printer.text('This is not an official receipt');
+      printer.style('NORMAL');
       printer.feed(2);
       printer.cut('full');
       closePrinter();
@@ -160,8 +258,10 @@ const printReceipt = async (req, res) => {
 
     // Initialize printer configuration from environment variables or defaults
     const printerType = process.env.PRINTER_TYPE || 'EPSON'; // EPSON, STAR, or other
-    const printerInterface = process.env.PRINTER_INTERFACE || 'printer'; // 'printer', 'tcp', 'usb', or 'bluetooth'
-    const printerName = process.env.PRINTER_NAME || ''; // Windows printer name
+    // Default to 'file' if Windows printer driver is not available, otherwise use 'printer'
+    const defaultInterface = (!windowsPrinterDriver) ? 'file' : 'printer';
+    let printerInterface = process.env.PRINTER_INTERFACE || defaultInterface; // 'printer', 'tcp', 'usb', 'file', or 'bluetooth'
+    let printerName = process.env.PRINTER_NAME || (defaultInterface === 'file' ? './receipt.txt' : ''); // Windows printer name or file path
     const printerIP = process.env.PRINTER_IP || '192.168.1.100'; // Network printer IP
     const printerPort = process.env.PRINTER_PORT || '9100'; // Network printer port
     const printerTransport = (process.env.PRINTER_TRANSPORT || '').toLowerCase();
@@ -175,10 +275,12 @@ const printReceipt = async (req, res) => {
         });
       } catch (usbError) {
         console.error('USB print error:', usbError);
-        return res.status(500).json({
-          success: false,
-          message: usbError.message || 'Failed to print via USB thermal printer'
-        });
+        // Fall back to file printing if USB fails (more reliable than Windows printer driver)
+        console.log('USB printing failed. Falling back to file printing...');
+        // Override interface to file printing for fallback
+        printerInterface = 'file';
+        printerName = process.env.PRINTER_NAME || './receipt.txt';
+        // Continue to thermal printer code below with file interface
       }
     }
 
@@ -199,20 +301,20 @@ const printReceipt = async (req, res) => {
       interfaceString = `tcp://${printerIP}:${printerPort}`;
     } else if (printerInterface === 'usb') {
       interfaceString = 'usb';
+    } else if (printerInterface === 'file') {
+      // File printing - writes to a file instead of physical printer
+      interfaceString = `file:${printerName || './receipt.txt'}`;
     } else {
       // Windows printer name
       interfaceString = printerName ? `printer:${printerName}` : 'printer';
     }
 
     // Extra safety: if we're using a Windows printer interface but the
-    // optional "printer" driver is not installed, fail loudly instead of
-    // silently "succeeding" without actually printing anything.
+    // optional "printer" driver is not installed, fall back to file printing
     if ((interfaceString.startsWith('printer:') || interfaceString === 'printer') && !windowsPrinterDriver) {
-      console.error('Print error: Windows printer driver module "printer" is not installed but PRINTER_INTERFACE is set to "printer".');
-      return res.status(500).json({
-        success: false,
-        message: 'Windows printer driver is not installed. Install it with "npm install printer" and verify PRINTER_NAME in your .env (see README_PRINTER_SETUP.md).'
-      });
+      console.warn('Windows printer driver module "printer" is not available. Falling back to file printing...');
+      interfaceString = `file:${printerName || './receipt.txt'}`;
+      console.log(`Receipt will be saved to: ${interfaceString.replace('file:', '')}`);
     }
 
     const printerConfig = {
@@ -223,7 +325,7 @@ const printReceipt = async (req, res) => {
       lineCharacter: '-',
       breakLine: BreakLine.WORD,
       options: {
-        timeout: 5000,
+        timeout: 30000, // Increased to 30 seconds for slower printers
       }
     };
 
@@ -233,6 +335,11 @@ const printReceipt = async (req, res) => {
     }
 
     printer = new ThermalPrinter(printerConfig);
+    
+    // Verify printer object was created
+    if (!printer) {
+      throw new Error('Failed to initialize printer. Please check printer configuration.');
+    }
 
     // Check if printer is connected (with error handling)
     // For Windows "printer:" interface we skip the connectivity check because
@@ -262,75 +369,147 @@ const printReceipt = async (req, res) => {
     }
 
     // Build receipt content
+    const storeName = receiptData.storeName || DEFAULT_STORE_NAME;
+    const contactNumber = receiptData.contactNumber || '+631112224444';
+    const location = receiptData.location || 'Pasonanca, Zamboanga City';
+    const referenceNo = receiptData.referenceNo || receiptData.reference || '';
+    const issueTime = receiptData.time || new Date().toLocaleTimeString();
+
+    // Header: Business name (centered, slightly larger)
     printer.alignCenter();
-    printer.setTextSize(1, 1);
+    printer.setTextSize(1, 0);
     printer.bold(true);
-    printer.println('Create Your Style');
+    printer.println(storeName);
     printer.bold(false);
     printer.setTextSize(0, 0);
-    printer.println('TC USHS - #831100254488');
-    printer.println('Pasoanca, Zambonaga City');
+    
+    // Time (left) and Contact (right) - need to manually align (58mm = 32 chars)
+    printer.alignLeft();
+    const timeContactLine = `${issueTime}${' '.repeat(Math.max(0, RECEIPT_CHAR_WIDTH - issueTime.length - contactNumber.length))}${contactNumber}`;
+    printer.println(timeContactLine.substring(0, RECEIPT_CHAR_WIDTH));
+    
+    // Location (centered)
+    printer.alignCenter();
+    printer.println(location);
     printer.drawLine();
     
+    // Receipt No in box format
     printer.alignCenter();
-    printer.println('Receipt No.');
+    printer.println('Receipt No:');
     printer.bold(true);
-    printer.println(`#${receiptData.receiptNo}`);
+    printer.println(`#${receiptData.receiptNo || '000000'}`);
     printer.bold(false);
     printer.drawLine();
 
-    // Items table
+    // Items table headers
     printer.alignLeft();
     printer.tableCustom([
-      { text: 'Item', align: 'LEFT', width: 0.4 },
+      { text: 'Item', align: 'LEFT', width: 0.55 },
       { text: 'Qty', align: 'CENTER', width: 0.15 },
-      { text: 'Price', align: 'RIGHT', width: 0.2 },
-      { text: 'Total', align: 'RIGHT', width: 0.25 }
+      { text: 'Price', align: 'RIGHT', width: 0.3 }
     ]);
+    printer.drawLine();
 
+    // Items
     if (receiptData.items && receiptData.items.length > 0) {
       receiptData.items.forEach(item => {
         const itemName = item.name || item.itemName || 'Item';
         const qty = item.qty || item.quantity || 1;
         const price = item.price || item.itemPrice || 0;
-        const total = item.total || (price * qty);
 
         printer.tableCustom([
-          { text: itemName.substring(0, 20), align: 'LEFT', width: 0.4 },
+          { text: itemName.substring(0, 20), align: 'LEFT', width: 0.55 },
           { text: qty.toString(), align: 'CENTER', width: 0.15 },
-          { text: `₱${price.toFixed(2)}`, align: 'RIGHT', width: 0.2 },
-          { text: `₱${total.toFixed(2)}`, align: 'RIGHT', width: 0.25 }
+          { text: `PHP${price.toFixed(2)}`, align: 'RIGHT', width: 0.3 }
         ]);
       });
     }
 
     printer.drawLine();
 
-    // Totals
+    // Payment summary
     printer.alignLeft();
+    printer.println(`Transaction/Reference: ${referenceNo || '-'}`);
     printer.println(`Payment Method: ${receiptData.paymentMethod || 'CASH'}`);
-    printer.println(`Subtotal: ₱${(receiptData.subtotal || 0).toFixed(2)}`);
-    printer.println(`Discount: ₱${(receiptData.discount || 0).toFixed(2)}`);
+    printer.println(`Subtotal: PHP ${(receiptData.subtotal || 0).toFixed(2)}`);
+    printer.drawLine();
+    printer.println(`Discount: PHP ${(receiptData.discount || 0).toFixed(2)}`);
+    printer.drawLine();
     printer.bold(true);
-    printer.println(`Total: ₱${(receiptData.total || 0).toFixed(2)}`);
+    printer.println(`Total: PHP ${(receiptData.total || 0).toFixed(2)}`);
     printer.bold(false);
     
     if (receiptData.cash) {
-      printer.println(`Cash: ₱${receiptData.cash.toFixed(2)}`);
-      printer.println(`Change: ₱${(receiptData.change || 0).toFixed(2)}`);
+      printer.println(`Cash: PHP ${receiptData.cash.toFixed(2)}`);
+      printer.println(`Change: PHP ${(receiptData.change || 0).toFixed(2)}`);
     }
 
     printer.drawLine();
     printer.alignCenter();
-    printer.println('Thank you for your purchase!');
-    printer.println(`${receiptData.date || new Date().toLocaleDateString()} ${receiptData.time || new Date().toLocaleTimeString()}`);
+    printer.bold(true);
     printer.println('This is not an official receipt');
+    printer.bold(false);
     printer.newLine();
     printer.cut();
 
-    // Execute print
-    await printer.execute();
+    // Check if we're using file printing (not actual printer)
+    const isFilePrinting = interfaceString.startsWith('file:');
+    
+    if (isFilePrinting) {
+      console.warn('WARNING: Using file printing mode. Receipt will be saved to file, not printed to physical printer.');
+      console.warn(`File location: ${printerName || './receipt.txt'}`);
+    } else {
+      console.log(`Attempting to print to: ${interfaceString}`);
+    }
 
+    // Execute print with proper error handling and logging
+    let printSuccess = false;
+    try {
+      console.log('Sending print job to printer...');
+      await printer.execute();
+      printSuccess = true;
+      console.log('Print job sent successfully');
+    } catch (executeError) {
+      // printer.execute() failed - this is the actual print error
+      console.error('Printer execute error:', executeError);
+      console.error('Error details:', {
+        message: executeError.message,
+        stack: executeError.stack,
+        interface: interfaceString,
+        printerType: printerType
+      });
+      
+      // Don't return immediately - check if it's a timeout or connection issue
+      const errorMessage = executeError.message || 'Unknown printer error';
+      const isTimeout = errorMessage.toLowerCase().includes('timeout') || errorMessage.toLowerCase().includes('timed out');
+      const isConnection = errorMessage.toLowerCase().includes('connect') || errorMessage.toLowerCase().includes('connection');
+      
+      return res.status(500).json({ 
+        success: false, 
+        message: `Print execution failed: ${errorMessage}. ${isTimeout ? 'Printer may be slow or unresponsive.' : isConnection ? 'Please check printer connection.' : 'Please check printer configuration and connection.'}`
+      });
+    }
+    
+    // Verify print was successful
+    if (!printSuccess) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Print job did not complete successfully'
+      });
+    }
+    
+    // If file printing, return a warning message (not success)
+    if (isFilePrinting) {
+      return res.json({ 
+        success: false, 
+        message: `Receipt saved to file (${printerName || './receipt.txt'}) but not printed. Please configure a physical printer. See PRINTER_SETUP.md for instructions.`,
+        fileSaved: true,
+        filePath: printerName || './receipt.txt'
+      });
+    }
+    
+    // For actual printers, return success
+    console.log('Print completed successfully');
     res.json({ 
       success: true, 
       message: 'Receipt printed successfully' 

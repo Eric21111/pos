@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 import bgImage from '../assets/bg.png';
+import { validatePinSecurity } from '../utils/pinValidation';
 
 const PIN_LENGTH = 6;
 const EMPTY_PIN = Array(PIN_LENGTH).fill('');
@@ -70,8 +71,14 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
     email: false,
     contactNo: false,
     pin: false,
-    confirmPin: false
+    confirmPin: false,
+    verificationCode: false
   });
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isCodeSent, setIsCodeSent] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [verificationTimer, setVerificationTimer] = useState(0);
+  const [showPinModal, setShowPinModal] = useState(false);
 
   const pinRefs = useRef([]);
   const confirmPinRefs = useRef([]);
@@ -86,7 +93,7 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
       localStorage.setItem('ownerOnboardingForm', JSON.stringify(updated));
       return updated;
     });
-    
+
     // Real-time validation
     if (touched[field]) {
       validateField(field, value);
@@ -95,11 +102,17 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
 
   const handleBlur = (field) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
-    
+
     if (field === 'contactNo') {
       validateField(field, formValues[field]);
     } else if (field === 'email') {
       validateField(field, formValues[field]);
+      // Reset verification if email changes
+      if (isEmailVerified) {
+        setIsEmailVerified(false);
+        setIsCodeSent(false);
+        setVerificationCode('');
+      }
     } else if (field === 'firstName' || field === 'lastName') {
       validateField(field, formValues[field]);
     }
@@ -107,7 +120,7 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
 
   const validateField = (field, value) => {
     let errorMsg = '';
-    
+
     switch (field) {
       case 'firstName':
         if (!value.trim()) {
@@ -137,10 +150,14 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
         const pin = typeof value === 'string' ? value : pinDigits.join('');
         if (pin.length > 0 && pin.length < PIN_LENGTH) {
           errorMsg = 'PIN must be exactly 6 digits';
-        }
-        // Clear error if PIN is complete
-        if (pin.length === PIN_LENGTH) {
-          errorMsg = '';
+        } else if (pin.length === PIN_LENGTH) {
+          // Validate PIN security rules when complete
+          const pinValidation = validatePinSecurity(pin);
+          if (!pinValidation.isValid) {
+            errorMsg = pinValidation.error;
+          } else {
+            errorMsg = '';
+          }
         }
         break;
       case 'confirmPin':
@@ -159,7 +176,7 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
       default:
         break;
     }
-    
+
     setFieldErrors((prev) => ({ ...prev, [field]: errorMsg }));
   };
 
@@ -175,24 +192,37 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
     setter((prev) => {
       const updated = [...prev];
       updated[index] = value;
-      
+
       // Save to localStorage
       localStorage.setItem(storageKey, JSON.stringify(updated));
-      
+
+      // Real-time PIN security validation when PIN is complete
+      if (field === 'pin') {
+        const pinString = updated.join('');
+        if (pinString.length === PIN_LENGTH) {
+          const pinValidation = validatePinSecurity(pinString);
+          if (!pinValidation.isValid) {
+            setFieldErrors((prev) => ({ ...prev, pin: pinValidation.error }));
+          } else {
+            setFieldErrors((prev) => ({ ...prev, pin: '' }));
+          }
+        }
+      }
+
       // Validate after update
       if (touched[field]) {
         setTimeout(() => {
           validateField(field, updated.join(''));
         }, 0);
       }
-      
+
       return updated;
     });
 
     if (value && index < PIN_LENGTH - 1) {
       refs.current[index + 1]?.focus();
     }
-    
+
     // Mark as touched
     if (!touched[field]) {
       setTouched((prev) => ({ ...prev, [field]: true }));
@@ -239,7 +269,7 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
   const validatePhilippineNumber = (number) => {
     // Remove all spaces, dashes, and parentheses
     const cleaned = number.replace(/[\s\-()]/g, '');
-    
+
     // Check for valid Philippine number formats:
     // 09XXXXXXXXX (11 digits starting with 09)
     // +639XXXXXXXXX (13 characters starting with +639)
@@ -247,7 +277,7 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
     const pattern09 = /^09\d{9}$/;
     const patternPlus63 = /^\+639\d{9}$/;
     const pattern63 = /^639\d{9}$/;
-    
+
     return pattern09.test(cleaned) || patternPlus63.test(cleaned) || pattern63.test(cleaned);
   };
 
@@ -271,7 +301,7 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
     validateField('confirmPin', confirmPinDigits.join(''));
 
     // Check if any errors exist
-    const hasErrors = 
+    const hasErrors =
       !formValues.firstName.trim() ||
       !formValues.lastName.trim() ||
       !formValues.email.trim() ||
@@ -282,12 +312,94 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
       confirmPinDigits.join('').length !== PIN_LENGTH ||
       pinDigits.join('') !== confirmPinDigits.join('');
 
+    pinDigits.join('') !== confirmPinDigits.join('') ||
+      !isEmailVerified;
+
     return !hasErrors;
+  };
+
+  const handleSendCode = async () => {
+    if (!formValues.email || fieldErrors.email) {
+      setTouched(prev => ({ ...prev, email: true }));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/verification/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formValues.email })
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setIsCodeSent(true);
+        setVerificationTimer(60); // 60 seconds cooldown
+        const timer = setInterval(() => {
+          setVerificationTimer((prev) => {
+            if (prev <= 1) {
+              clearInterval(timer);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        setError(data.message || 'Failed to send verification code');
+      }
+    } catch (err) {
+      setError('Failed to send verification code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!verificationCode) {
+      setFieldErrors(prev => ({ ...prev, verificationCode: 'Please enter the code' }));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/verification/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formValues.email,
+          code: verificationCode
+        })
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setIsEmailVerified(true);
+        setFieldErrors(prev => ({ ...prev, verificationCode: '' }));
+        setShowPinModal(true); // Open modal on success
+      } else {
+        setFieldErrors(prev => ({ ...prev, verificationCode: data.message || 'Invalid code' }));
+      }
+    } catch (err) {
+      setFieldErrors(prev => ({ ...prev, verificationCode: 'Verification failed' }));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validateForm()) return;
+
+    const pin = pinDigits.join('');
+    // Validate PIN security rules before submission
+    const pinValidation = validatePinSecurity(pin);
+    if (!pinValidation.isValid) {
+      setFieldErrors(prev => ({ ...prev, pin: pinValidation.error }));
+      setTouched(prev => ({ ...prev, pin: true }));
+      setError(pinValidation.error);
+      return;
+    }
 
     setLoading(true);
 
@@ -333,12 +445,12 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
       };
 
       login(ownerProfile);
-      
+
       // Clear localStorage after successful account creation
       localStorage.removeItem('ownerOnboardingForm');
       localStorage.removeItem('ownerOnboardingPin');
       localStorage.removeItem('ownerOnboardingConfirmPin');
-      
+
       onSetupComplete?.();
       navigate('/dashboard');
     } catch (submissionError) {
@@ -352,7 +464,7 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
   const renderPinRow = (label, digits, type, refs) => {
     const field = type === 'pin' ? 'pin' : 'confirmPin';
     const hasError = fieldErrors[field];
-    
+
     return (
       <div>
         <label className="block text-base font-medium text-gray-700 mb-4">{label}</label>
@@ -370,9 +482,8 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
               onChange={(event) => handleDigitChange(type, index, event.target.value)}
               onKeyDown={(event) => handleKeyDown(type, index, event)}
               onPaste={(event) => handlePaste(type, event)}
-              className={`w-16 h-16 rounded-xl border-2 ${
-                hasError ? 'border-red-500' : 'border-gray-300'
-              } bg-white text-center text-2xl font-semibold text-[#2D2D2D] focus:border-[#8B7355] focus:outline-none`}
+              className={`w-16 h-16 rounded-xl border-2 ${hasError ? 'border-red-500' : 'border-gray-300'
+                } bg-white text-center text-2xl font-semibold text-[#2D2D2D] focus:border-[#8B7355] focus:outline-none`}
               aria-label={`${label} digit ${index + 1}`}
             />
           ))}
@@ -402,9 +513,8 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
                 <label className="block text-sm font-medium text-gray-600 mb-2">First Name</label>
                 <input
                   type="text"
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    fieldErrors.firstName ? 'border-red-500' : 'border-gray-200'
-                  } focus:outline-none focus:border-[#8B7355] bg-white`}
+                  className={`w-full px-4 py-3 rounded-xl border ${fieldErrors.firstName ? 'border-red-500' : 'border-gray-200'
+                    } focus:outline-none focus:border-[#8B7355] bg-white`}
                   placeholder="John"
                   value={formValues.firstName}
                   onChange={(event) => handleInputChange('firstName', event.target.value)}
@@ -418,9 +528,8 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
                 <label className="block text-sm font-medium text-gray-600 mb-2">Last Name</label>
                 <input
                   type="text"
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    fieldErrors.lastName ? 'border-red-500' : 'border-gray-200'
-                  } focus:outline-none focus:border-[#8B7355] bg-white`}
+                  className={`w-full px-4 py-3 rounded-xl border ${fieldErrors.lastName ? 'border-red-500' : 'border-gray-200'
+                    } focus:outline-none focus:border-[#8B7355] bg-white`}
                   placeholder="Doe"
                   value={formValues.lastName}
                   onChange={(event) => handleInputChange('lastName', event.target.value)}
@@ -436,9 +545,8 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
               <label className="block text-sm font-medium text-gray-600 mb-2">Contact Number</label>
               <input
                 type="tel"
-                className={`w-full px-4 py-3 rounded-xl border ${
-                  fieldErrors.contactNo ? 'border-red-500' : 'border-gray-200'
-                } focus:outline-none focus:border-[#8B7355] bg-white`}
+                className={`w-full px-4 py-3 rounded-xl border ${fieldErrors.contactNo ? 'border-red-500' : 'border-gray-200'
+                  } focus:outline-none focus:border-[#8B7355] bg-white`}
                 placeholder="+63 900 000 0000"
                 value={formValues.contactNo}
                 onChange={(event) => handleInputChange('contactNo', event.target.value)}
@@ -450,7 +558,7 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Username</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Email</label>
               <div className="flex gap-0">
                 <div className="flex items-center justify-center bg-[#8B7355] rounded-l-xl px-4">
                   <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -459,10 +567,9 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
                 </div>
                 <input
                   type="email"
-                  className={`flex-1 px-4 py-3 rounded-r-xl border-l-0 border ${
-                    fieldErrors.email ? 'border-red-500' : 'border-gray-200'
-                  } focus:outline-none focus:border-[#8B7355] bg-white`}
-                  placeholder="Enter your username..."
+                  className={`flex-1 px-4 py-3 rounded-r-xl border-l-0 border ${fieldErrors.email ? 'border-red-500' : 'border-gray-200'
+                    } focus:outline-none focus:border-[#8B7355] bg-white`}
+                  placeholder="Enter your Email..."
                   value={formValues.email}
                   onChange={(event) => handleInputChange('email', event.target.value)}
                   onBlur={() => handleBlur('email')}
@@ -473,23 +580,103 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
               )}
             </div>
 
-            <div className="text-center">
-              {renderPinRow('PIN Code', pinDigits, 'pin', pinRefs)}
-            </div>
-            <div className="text-center">
-              {renderPinRow('Confirm your PIN code', confirmPinDigits, 'confirm', confirmPinRefs)}
-            </div>
+            {/* Verification Code Section */}
+            {!isEmailVerified && (
+              <div className="space-y-3">
+                {!isCodeSent ? (
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={loading || !formValues.email || !!fieldErrors.email || verificationTimer > 0}
+                    className="w-full py-3 rounded-xl border border-[#8B7355] text-[#8B7355] font-medium hover:bg-[#8B7355] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {verificationTimer > 0 ? `Resend in ${verificationTimer}s` : 'Send Verification Code'}
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        className={`w-full px-4 py-3 rounded-xl border ${fieldErrors.verificationCode ? 'border-red-500' : 'border-gray-200'
+                          } focus:outline-none focus:border-[#8B7355] bg-white`}
+                        placeholder="Enter 6-digit code"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value)}
+                        maxLength={6}
+                      />
+                      {fieldErrors.verificationCode && (
+                        <p className="text-red-500 text-xs mt-1">{fieldErrors.verificationCode}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleVerifyCode}
+                      disabled={loading}
+                      className="px-6 py-3 rounded-xl bg-[#8B7355] text-white font-medium hover:bg-[#6d5a43] transition-colors disabled:opacity-50"
+                    >
+                      Verify
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
-            <div className="flex flex-col gap-3 items-center mt-8">
+            {isEmailVerified && (
+              <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-xl border border-green-200">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="font-medium">Email Verified Successfully</span>
+              </div>
+            )}
+
+            {isEmailVerified && !showPinModal && (
               <button
-                type="submit"
-                disabled={loading}
-                className="bg-[#8B7355] text-white rounded-2xl px-20 py-4 text-lg font-semibold transition-all duration-300 hover:bg-[#6d5a43] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                onClick={() => setShowPinModal(true)}
+                className="w-full bg-[#8B7355] text-white rounded-2xl px-8 py-4 text-lg font-semibold transition-all duration-300 hover:bg-[#6d5a43] hover:shadow-lg mt-4"
               >
-                {loading ? 'Creating...' : 'Create an account'}
+                Continue to PIN Setup
               </button>
-             
-            </div>
+            )}
+
+            {/* PIN Modal */}
+            {showPinModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl relative animate-in fade-in zoom-in duration-300">
+                  <button
+                    type="button"
+                    onClick={() => setShowPinModal(false)}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+
+                  <h2 className="text-2xl font-bold text-[#2D2D2D] mb-6 text-center">Secure your Account</h2>
+
+                  <div className="space-y-8">
+                    <div className="text-center">
+                      {renderPinRow('Create PIN Code', pinDigits, 'pin', pinRefs)}
+                    </div>
+                    <div className="text-center">
+                      {renderPinRow('Confirm PIN Code', confirmPinDigits, 'confirm', confirmPinRefs)}
+                    </div>
+
+                    <div className="flex flex-col gap-3 items-center">
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-[#8B7355] text-white rounded-2xl px-8 py-4 text-lg font-semibold transition-all duration-300 hover:bg-[#6d5a43] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? 'Creating Account...' : 'Complete Setup'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </form>
         </div>
       </div>
@@ -514,5 +701,5 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
   );
 };
 
-export default OwnerOnboarding;
+export default memo(OwnerOnboarding);
 

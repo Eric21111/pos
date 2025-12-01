@@ -1,26 +1,41 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, lazy, Suspense, memo } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import './App.css'
-import StaffSelection from './pages/StaffSelection'
-import PinEntry from './pages/PinEntry'
 import Sidebar from './components/shared/Sidebar'
 import { SidebarContext } from './context/SidebarContext'
 import { AuthProvider } from './context/AuthContext'
+import { DataCacheProvider } from './context/DataCacheContext'
 import ProtectedRoute from './components/shared/ProtectedRoute'
+import PageTitle from './components/shared/PageTitle'
 
-import Inventory from './pages/Inventory'
-import Terminal from './pages/terminal'
-import Transaction from './pages/transaction'
-import Settings from './pages/Settings'
-import Dashboard from './pages/owner/Dashboard'
-import Reports from './pages/owner/Reports'
-import ManageEmployees from './pages/owner/ManageEmployees'
-import DiscountManagement from './pages/owner/DiscountManagement'
-import BrandPartners from './pages/owner/BrandPartners'
-import SetNewPin from './pages/SetNewPin'
-import OwnerOnboarding from './pages/OwnerOnboarding'
+// Lazy load all pages for better performance
+const StaffSelection = lazy(() => import('./pages/StaffSelection'))
+const PinEntry = lazy(() => import('./pages/PinEntry'))
+const Inventory = lazy(() => import('./pages/Inventory'))
+const Logs = lazy(() => import('./pages/logs'))
+const Terminal = lazy(() => import('./pages/terminal'))
+const Transaction = lazy(() => import('./pages/transaction'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Dashboard = lazy(() => import('./pages/owner/Dashboard'))
+const Reports = lazy(() => import('./pages/owner/Reports'))
+const ManageEmployees = lazy(() => import('./pages/owner/ManageEmployees'))
+const DiscountManagement = lazy(() => import('./pages/owner/DiscountManagement'))
+const BrandPartners = lazy(() => import('./pages/owner/BrandPartners'))
+const Categories = lazy(() => import('./pages/owner/Categories'))
+const SetNewPin = lazy(() => import('./pages/SetNewPin'))
+const OwnerOnboarding = lazy(() => import('./pages/OwnerOnboarding'))
 
-const MainLayout = ({ children }) => {
+// Loading fallback component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
+    <div className="text-center">
+      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#8B7355] mb-4"></div>
+      <p className="text-gray-600">Loading...</p>
+    </div>
+  </div>
+)
+
+const MainLayout = memo(({ children }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -33,7 +48,7 @@ const MainLayout = ({ children }) => {
       </SidebarContext.Provider>
     </div>
   );
-};
+});
 
 const LandingGate = () => {
   const [status, setStatus] = useState({
@@ -101,10 +116,18 @@ const LandingGate = () => {
   }
 
   if (!status.hasAccounts) {
-    return <OwnerOnboarding onSetupComplete={checkEmployees} />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <OwnerOnboarding onSetupComplete={checkEmployees} />
+      </Suspense>
+    );
   }
 
-  return <StaffSelection />;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <PinEntry />
+    </Suspense>
+  );
 };
 
 function App() {
@@ -136,66 +159,136 @@ function App() {
 
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<LandingGate />} />
-          <Route path="/pin" element={<PinEntry />} />
-          <Route path="/set-pin" element={
-            <ProtectedRoute>
-              <SetNewPin />
-            </ProtectedRoute>
-          } />
-          
-          {/* Owner-only routes */}
-          <Route path="/dashboard" element={
-            <ProtectedRoute ownerOnly={true}>
-              <MainLayout><Dashboard /></MainLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/reports" element={
-            <ProtectedRoute requiredPermission="generateReports">
-              <MainLayout><Reports /></MainLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/manage-employees" element={
-            <ProtectedRoute ownerOnly={true}>
-              <MainLayout><ManageEmployees /></MainLayout>
-            </ProtectedRoute>
-          } />
-          
-          {/* Permission-based routes */}
-          <Route path="/inventory" element={
-            <ProtectedRoute requiredPermission="inventory">
-              <MainLayout><Inventory /></MainLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/terminal" element={
-            <ProtectedRoute requiredPermission="posTerminal">
-              <MainLayout><Terminal /></MainLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/transactions" element={
-            <ProtectedRoute requiredPermission="viewTransactions">
-              <MainLayout><Transaction /></MainLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/settings" element={
-            <ProtectedRoute requiredPermission={null}>
-              <MainLayout><Settings /></MainLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/discount-management" element={
-            <ProtectedRoute requiredPermission={null}>
-              <MainLayout><DiscountManagement /></MainLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/brand-partners" element={
-            <ProtectedRoute requiredPermission={null}>
-              <MainLayout><BrandPartners /></MainLayout>
-            </ProtectedRoute>
-          } />
-        </Routes>
-      </Router>
+      <DataCacheProvider>
+        <Router>
+          <PageTitle />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<LandingGate />} />
+              <Route path="/pin" element={
+                <Suspense fallback={<PageLoader />}>
+                  <PinEntry />
+                </Suspense>
+              } />
+              <Route path="/staff" element={
+                <Suspense fallback={<PageLoader />}>
+                  <StaffSelection />
+                </Suspense>
+              } />
+              <Route path="/set-pin" element={
+                <ProtectedRoute>
+                  <Suspense fallback={<PageLoader />}>
+                    <SetNewPin />
+                  </Suspense>
+                </ProtectedRoute>
+              } />
+
+              {/* Owner-only routes */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute ownerOnly={true}>
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <Dashboard />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/reports" element={
+                <ProtectedRoute requiredPermission="generateReports">
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <Reports />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/manage-employees" element={
+                <ProtectedRoute ownerOnly={true}>
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <ManageEmployees />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+
+              {/* Permission-based routes */}
+              <Route path="/inventory" element={
+                <ProtectedRoute requiredPermission="inventory">
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <Inventory />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/stock-movement" element={
+                <ProtectedRoute requiredPermission="inventory">
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <Logs />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/terminal" element={
+                <ProtectedRoute requiredPermission="posTerminal">
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <Terminal />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/transactions" element={
+                <ProtectedRoute requiredPermission="viewTransactions">
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <Transaction />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute requiredPermission={null}>
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <Settings />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/discount-management" element={
+                <ProtectedRoute requiredPermission={null}>
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <DiscountManagement />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/brand-partners" element={
+                <ProtectedRoute requiredPermission={null}>
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <BrandPartners />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/categories" element={
+                <ProtectedRoute requiredPermission={null}>
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <Categories />
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+            </Routes>
+          </Suspense>
+        </Router>
+      </DataCacheProvider>
     </AuthProvider>
   )
 }

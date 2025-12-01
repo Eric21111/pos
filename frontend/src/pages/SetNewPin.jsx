@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import defaultAvatar from '../assets/default.jpeg';
 import logo from '../assets/logo.png';
 import bgImage from '../assets/bg.png';
+import { validatePinSecurity } from '../utils/pinValidation';
 
 const PIN_LENGTH = 6;
 const EMPTY_PIN = Array(PIN_LENGTH).fill('');
@@ -104,6 +105,23 @@ const SetNewPin = () => {
     setter((prev) => {
       const updated = [...prev];
       updated[index] = value;
+      
+      // Real-time validation for new PIN when complete
+      if (type === 'new') {
+        const pinString = updated.join('');
+        if (pinString.length === PIN_LENGTH) {
+          const pinValidation = validatePinSecurity(pinString);
+          if (!pinValidation.isValid) {
+            setError(pinValidation.error);
+          } else {
+            setError('');
+          }
+        } else if (updated.join('').length < PIN_LENGTH) {
+          // Clear error if PIN is incomplete
+          setError('');
+        }
+      }
+      
       return updated;
     });
 
@@ -171,6 +189,13 @@ const SetNewPin = () => {
 
     if (!/^\d{6}$/.test(newPin)) {
       setError('PIN should contain numbers only.');
+      return;
+    }
+
+    // Validate PIN security rules
+    const pinValidation = validatePinSecurity(newPin);
+    if (!pinValidation.isValid) {
+      setError(pinValidation.error);
       return;
     }
 
@@ -350,5 +375,5 @@ const SetNewPin = () => {
   );
 };
 
-export default SetNewPin;
+export default memo(SetNewPin);
 

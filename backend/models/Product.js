@@ -15,7 +15,7 @@ const productSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
-    enum: ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Others']
+    enum: ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods']
   },
   brandName: {
     type: String,
@@ -23,6 +23,11 @@ const productSchema = new mongoose.Schema({
     trim: true
   },
   variant: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  foodSubtype: {
     type: String,
     default: '',
     trim: true
@@ -82,6 +87,15 @@ const productSchema = new mongoose.Schema({
   itemImage: {
     type: String,
     default: ''
+  },
+  displayInTerminal: {
+    type: Boolean,
+    default: true
+  },
+  discountIds: {
+    type: [mongoose.Schema.Types.ObjectId],
+    default: [],
+    ref: 'Discount'
   }
 }, {
   timestamps: true
@@ -93,5 +107,26 @@ productSchema.pre('save', function(next) {
   next();
 });
 
+// Virtual for terminal status (shown/not shown)
+productSchema.virtual('terminalStatus').get(function() {
+  return this.displayInTerminal !== false ? 'shown' : 'not shown';
+});
+
+// Ensure virtuals are included in JSON output
+productSchema.set('toJSON', { virtuals: true });
+productSchema.set('toObject', { virtuals: true });
+
+// Indexes for faster queries
+productSchema.index({ category: 1 });
+productSchema.index({ itemName: 'text', sku: 'text', brandName: 'text' }); // Text search index
+productSchema.index({ dateAdded: -1 });
+productSchema.index({ currentStock: 1 });
+productSchema.index({ lastUpdated: -1 });
+productSchema.index({ sku: 1 }); // Already unique, but explicit index helps
+
+// Export schema for dynamic connection
+module.exports.schema = productSchema;
+
+// Export default model for backward compatibility
 module.exports = mongoose.model('Product', productSchema);
 

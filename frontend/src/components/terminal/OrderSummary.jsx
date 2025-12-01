@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { FaEdit, FaMinus, FaPlus, FaTag } from 'react-icons/fa';
+import { FaEdit, FaMinus, FaPlus, FaTag, FaTimes } from 'react-icons/fa';
 import { MdCategory } from 'react-icons/md';
 import cashIcon from '../../assets/cash.svg';
 import qrIcon from '../../assets/qr.png';
+import RemoveItemPinModal from './RemoveItemPinModal';
+import { useAuth } from '../../context/AuthContext';
 
 const OrderSummary = ({
   cart,
@@ -10,16 +12,24 @@ const OrderSummary = ({
   updateQuantity,
   discountAmount,
   setDiscountAmount,
+  selectedDiscount,
+  onRemoveDiscount,
   calculateSubtotal,
   calculateDiscount,
   calculateTotal,
   handleCheckout,
   onCashPayment,
   onQRPayment,
-  onOpenDiscountModal
+  onOpenDiscountModal,
+  onSelectDiscount
 }) => {
+  const { currentUser } = useAuth();
+  const userId = currentUser?._id || currentUser?.id || currentUser?.email || 'guest';
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [discountCode, setDiscountCode] = useState('');
+  const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
+  const [itemToRemove, setItemToRemove] = useState(null);
+  const [applyingDiscount, setApplyingDiscount] = useState(false);
   
   const handleProceed = () => {
     if (selectedPaymentMethod === 'cash' && onCashPayment) {
@@ -28,6 +38,134 @@ const OrderSummary = ({
       onQRPayment();
     } else {
       handleCheckout();
+    }
+  };
+
+  const handleMinusClick = (item) => {
+    setItemToRemove(item);
+    setIsRemoveModalOpen(true);
+  };
+
+  const handleRemoveConfirm = async (reason) => {
+    if (!itemToRemove) {
+      setIsRemoveModalOpen(false);
+      setItemToRemove(null);
+      return;
+    }
+
+    try {
+      // Calculate the quantity to void (always 1 when clicking minus)
+      const voidQuantity = 1;
+      const voidAmount = itemToRemove.itemPrice * voidQuantity;
+
+      // Prepare the voided item with voidReason
+      const voidedItem = {
+        productId: itemToRemove.productId || itemToRemove._id || itemToRemove.id,
+        itemName: itemToRemove.itemName,
+        sku: itemToRemove.sku,
+        variant: itemToRemove.variant || itemToRemove.selectedVariation,
+        selectedSize: itemToRemove.selectedSize || itemToRemove.size,
+        quantity: voidQuantity,
+        price: itemToRemove.itemPrice,
+        itemImage: itemToRemove.itemImage || '',
+        voidReason: reason
+      };
+
+      // Record void transaction
+      const response = await fetch('http://localhost:5000/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId,
+          items: [voidedItem],
+          paymentMethod: 'void',
+          totalAmount: voidAmount,
+          performedById: currentUser?._id || currentUser?.id || '',
+          performedByName: currentUser?.name || `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || 'System',
+          status: 'Voided',
+          voidReason: reason
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        console.error('Failed to record void transaction:', data.message);
+        // Still proceed with removing the item even if logging fails
+      }
+
+      // Remove or decrease quantity after successful void logging
+      if (itemToRemove.quantity === 1) {
+        // If quantity is 1, remove the item completely
+        removeFromCart(itemToRemove);
+      } else {
+        // If quantity > 1, decrease the quantity
+        updateQuantity(itemToRemove, itemToRemove.quantity - 1);
+      }
+    } catch (error) {
+      console.error('Error recording void transaction:', error);
+      // Still proceed with removing the item even if logging fails
+      if (itemToRemove.quantity === 1) {
+        removeFromCart(itemToRemove);
+      } else {
+        updateQuantity(itemToRemove, itemToRemove.quantity - 1);
+      }
+    } finally {
+      setIsRemoveModalOpen(false);
+      setItemToRemove(null);
+    }
+  };
+
+  const handleRemoveModalClose = () => {
+    setIsRemoveModalOpen(false);
+    setItemToRemove(null);
+  };
+
+  const applyDiscountCode = async () => {
+    if (!discountCode || !discountCode.trim()) {
+      alert('Please enter a discount code');
+      return;
+    }
+
+    try {
+      setApplyingDiscount(true);
+      
+      // Fetch all discounts
+      const response = await fetch('http://localhost:5000/api/discounts');
+      const data = await response.json();
+      
+      if (!data.success || !Array.isArray(data.data)) {
+        alert('Failed to fetch discounts. Please try again.');
+        return;
+      }
+
+      // Find discount by code (case-insensitive)
+      const codeToFind = discountCode.trim().toLowerCase();
+      const matchingDiscount = data.data.find(discount => {
+        const discountCodeStr = (discount.discountCode || '').trim().toLowerCase();
+        return discountCodeStr === codeToFind && discount.status === 'active';
+      });
+
+      if (!matchingDiscount) {
+        alert('Discount code not found or inactive. Please check the code and try again.');
+        setDiscountCode('');
+        return;
+      }
+
+      // Apply the discount using the onSelectDiscount function
+      if (onSelectDiscount) {
+        onSelectDiscount(matchingDiscount);
+        setDiscountCode('');
+      } else {
+        alert('Unable to apply discount. Please try selecting from the discount list.');
+      }
+    } catch (error) {
+      console.error('Error applying discount code:', error);
+      alert('An error occurred while applying the discount code. Please try again.');
+    } finally {
+      setApplyingDiscount(false);
     }
   };
   return (
@@ -49,7 +187,7 @@ const OrderSummary = ({
             {cart.map((item) => (
               <div key={item._id} className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-[0_3px_8px_rgba(0,0,0,0.04)] p-3">
                 <div className="w-16 h-16 bg-gray-100 rounded-lg shrink-0 overflow-hidden">
-                  {item.itemImage ? (
+                  {item.itemImage && item.itemImage.trim() !== '' ? (
                     <img 
                       src={item.itemImage} 
                       alt={item.itemName}
@@ -89,7 +227,7 @@ const OrderSummary = ({
                   </button> */}
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => updateQuantity(item, item.quantity - 1)}
+                      onClick={() => handleMinusClick(item)}
                       className="w-6 h-6 flex items-center justify-center bg-[#AD7F65] text-white rounded-full shadow-sm hover:bg-[#8B5F45] transition-all"
                     >
                       <FaMinus className="text-[10px]" />
@@ -99,23 +237,42 @@ const OrderSummary = ({
                     </span>
                     <button
                       onClick={() => {
-                        const maxQty = item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined
-                          ? item.sizes[item.selectedSize]
-                          : item.currentStock;
+                        let maxQty = item.currentStock;
+                        if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
+                          const sizeData = item.sizes[item.selectedSize];
+                          maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
+                            ? sizeData.quantity
+                            : (typeof sizeData === 'number' ? sizeData : 0);
+                        }
                         if (!maxQty || item.quantity < maxQty) {
                           updateQuantity(item, item.quantity + 1);
                         }
                       }}
                       className={`w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-all ${
-                        item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined && item.quantity >= item.sizes[item.selectedSize]
+                        (() => {
+                          if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
+                            const sizeData = item.sizes[item.selectedSize];
+                            const maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
+                              ? sizeData.quantity
+                              : (typeof sizeData === 'number' ? sizeData : 0);
+                            return item.quantity >= maxQty;
+                          }
+                          return false;
+                        })()
                           ? 'bg-gray-300 text-white cursor-not-allowed'
                           : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
                       }`}
                       disabled={
-                        item.selectedSize &&
-                        item.sizes &&
-                        item.sizes[item.selectedSize] !== undefined &&
-                        item.quantity >= item.sizes[item.selectedSize]
+                        (() => {
+                          if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
+                            const sizeData = item.sizes[item.selectedSize];
+                            const maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
+                              ? sizeData.quantity
+                              : (typeof sizeData === 'number' ? sizeData : 0);
+                            return item.quantity >= maxQty;
+                          }
+                          return false;
+                        })()
                       }
                     >
                       <FaPlus className="text-[10px]" />
@@ -131,33 +288,56 @@ const OrderSummary = ({
       <div className="px-6 py-6  bg-white">
         <div className="mb-6">
           <label className="block text-xs font-semibold text-[#8B7355] mb-2">Discount</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Enter discount code"
-              value={discountCode}
-              onChange={(e) => setDiscountCode(e.target.value)}
-              className="flex-1 px-4 py-2 rounded-lg border border-[#d6c1b5] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-            />
-            <button
-              onClick={onOpenDiscountModal}
-              className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-all"
-            >
-              <FaTag className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => {
-                if (discountCode) {
-                  setDiscountAmount(discountCode);
-                  setDiscountCode('');
-                }
-              }}
-              className="px-4 py-2 text-white rounded-lg font-medium hover:opacity-90 transition-all shadow-md"
-              style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
-            >
-              Apply
-            </button>
-          </div>
+          {selectedDiscount ? (
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-[#d6c1b5]">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <FaTag className="text-[#AD7F65] text-sm" />
+                  <span className="text-sm font-medium text-gray-800">{selectedDiscount.title}</span>
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  {selectedDiscount.discountValue}
+                </div>
+              </div>
+              <button
+                onClick={onRemoveDiscount}
+                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-all"
+                title="Remove discount"
+              >
+                <FaTimes className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Enter discount code"
+                value={discountCode}
+                onChange={(e) => setDiscountCode(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !applyingDiscount) {
+                    applyDiscountCode();
+                  }
+                }}
+                className="flex-1 px-4 py-2 rounded-lg border border-[#d6c1b5] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+              />
+              <button
+                onClick={onOpenDiscountModal}
+                className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-all"
+                title="Browse discounts"
+              >
+                <FaTag className="w-4 h-4" />
+              </button>
+              <button
+                onClick={applyDiscountCode}
+                disabled={applyingDiscount || !discountCode || !discountCode.trim()}
+                className="px-4 py-2 text-white rounded-lg font-medium hover:opacity-90 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+              >
+                {applyingDiscount ? 'Applying...' : 'Apply'}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="space-y-2 mb-6 text-xs">
@@ -189,7 +369,7 @@ const OrderSummary = ({
               <img src={cashIcon} alt="Cash" className="w-7 h-7 mb-1" />
               <span className="text-xs font-medium text-gray-700">Cash</span>
             </button>
-            <button
+            {/* <button
               onClick={() => setSelectedPaymentMethod('qr')}
               className={`w-24 flex flex-col items-center justify-center py-0 rounded-lg border-2 transition-all ${
                 selectedPaymentMethod === 'qr'
@@ -199,7 +379,7 @@ const OrderSummary = ({
             >
               <img src={qrIcon} alt="QR Code" className="w-12 h-12 mb-4 " />
               <span className=" absolute text-xs font-medium text-gray-700 translate-y-4">Gcash</span>
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -212,6 +392,13 @@ const OrderSummary = ({
           Proceed
         </button>
       </div>
+
+      <RemoveItemPinModal
+        isOpen={isRemoveModalOpen}
+        onClose={handleRemoveModalClose}
+        onConfirm={handleRemoveConfirm}
+        item={itemToRemove}
+      />
     </div>
   );
 };

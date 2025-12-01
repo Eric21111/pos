@@ -13,9 +13,18 @@ const StockOutModal = ({
   const [reason, setReason] = useState('Sold');
 
   const allSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Free Size'];
-  const reasons = ['Sold', 'Damaged', 'Returned', 'Lost', 'Expired', 'Other'];
+  const reasons = ['Sold', 'Damaged', 'Returned Item', 'Lost', 'Expired', 'Other'];
 
-  const availableSizes = allSizes;
+  const getSizeQuantity = (sizeData) => {
+    if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+      return sizeData.quantity;
+    }
+    return typeof sizeData === 'number' ? sizeData : 0;
+  };
+
+  const availableSizes = product.sizes && typeof product.sizes === 'object' 
+    ? Object.keys(product.sizes).filter(size => getSizeQuantity(product.sizes[size]) > 0)
+    : [];
 
   useEffect(() => {
     if (isOpen && product) {
@@ -50,7 +59,7 @@ const StockOutModal = ({
       setSelectedSizes(prev => [...prev, size]);
       setSizeQuantities(prev => ({
         ...prev,
-        [size]: 0
+        [size]: ''
       }));
     }
   };
@@ -65,6 +74,11 @@ const StockOutModal = ({
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    if (availableSizes.length === 0) {
+      alert('This product has no sizes available');
+      return;
+    }
+
     if (selectedSizes.length === 0) {
       alert('Please select at least one size');
       return;
@@ -77,6 +91,18 @@ const StockOutModal = ({
 
     if (!hasValidQuantities) {
       alert('Please enter quantities for at least one selected size');
+      return;
+    }
+
+    // Validate quantities don't exceed available stock
+    const invalidSizes = selectedSizes.filter(size => {
+      const requestedQty = sizeQuantities[size] || 0;
+      const availableQty = product.sizes && product.sizes[size] ? getSizeQuantity(product.sizes[size]) : 0;
+      return requestedQty > availableQty;
+    });
+
+    if (invalidSizes.length > 0) {
+      alert(`Cannot remove more than available stock for: ${invalidSizes.join(', ')}`);
       return;
     }
 
@@ -117,7 +143,7 @@ const StockOutModal = ({
         <form onSubmit={handleSubmit}>
           <div className="flex">
             <div className="w-1/2 p-6 bg-gray-50 flex items-center justify-center" style={{ minHeight: '500px' }}>
-              {product.itemImage ? (
+              {product.itemImage && product.itemImage.trim() !== '' ? (
                 <img 
                   src={product.itemImage} 
                   alt={product.itemName} 
@@ -157,42 +183,63 @@ const StockOutModal = ({
                   <label className="block text-xs text-gray-600 mb-2">
                     Sizes Optional - Select multiple sizes
                   </label>
-                  <div className="grid grid-cols-4 gap-2 mb-3">
-                    {availableSizes.map((size) => (
-                      <label key={size} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedSizes.includes(size)}
-                          onChange={() => handleSizeToggle(size)}
-                          className="w-4 h-4 border-gray-300 rounded focus:ring-[#AD7F65] cursor-pointer"
-                          style={{
-                            accentColor: '#AD7F65'
-                          }}
-                        />
-                        <span className="text-sm text-gray-900">{size}</span>
-                      </label>
-                    ))}
-                  </div>
+                  {availableSizes.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      {availableSizes.map((size) => {
+                        const currentQty = product.sizes && product.sizes[size] ? getSizeQuantity(product.sizes[size]) : 0;
+                        return (
+                          <label key={size} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedSizes.includes(size)}
+                              onChange={() => handleSizeToggle(size)}
+                              className="w-4 h-4 border-gray-300 rounded focus:ring-[#AD7F65] cursor-pointer"
+                              style={{
+                                accentColor: '#AD7F65'
+                              }}
+                            />
+                            <span className="text-sm text-gray-900">
+                              {size} <span className="text-xs text-gray-500">({currentQty})</span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 italic mb-3">
+                      No sizes available for this product
+                    </div>
+                  )}
                   
-                  <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
                     <label className="block text-xs font-semibold text-gray-700 mb-2">
                       Quantity per Size:
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                       {selectedSizes.length > 0 ? (
-                        selectedSizes.map((size) => (
-                          <div key={size}>
-                            <label className="block text-xs text-gray-600 mb-1">{size}</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={sizeQuantities[size] || 0}
-                              onChange={(e) => handleSizeQuantityChange(size, e.target.value)}
-                              placeholder="0"
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                            />
-                          </div>
-                        ))
+                        selectedSizes.map((size) => {
+                          const currentQty = product.sizes && product.sizes[size] ? getSizeQuantity(product.sizes[size]) : 0;
+                          const maxQty = currentQty;
+                          return (
+                            <div key={size}>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                {size} <span className="text-gray-500">(Current: {currentQty})</span>
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                max={maxQty}
+                                value={sizeQuantities[size] || ''}
+                                onChange={(e) => handleSizeQuantityChange(size, e.target.value)}
+                                placeholder="Enter quantity"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                              />
+                              {sizeQuantities[size] > maxQty && (
+                                <p className="text-xs text-red-500 mt-1">Cannot exceed {maxQty}</p>
+                              )}
+                            </div>
+                          );
+                        })
                       ) : (
                         <div className="col-span-2 text-xs text-gray-400 italic">
                           Select sizes above to add quantities

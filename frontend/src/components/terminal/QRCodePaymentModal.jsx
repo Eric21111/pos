@@ -66,12 +66,21 @@ const QRCodePaymentModal = ({ isOpen, onClose, totalAmount, onProceed, cartItems
     setShowConfirmation(true);
   };
 
-  const handleConfirmCheckout = () => {
+  const handleConfirmCheckout = async () => {
     setShowConfirmation(false);
+    setShowSuccess(true);
     
-    // Generate receipt data
+    try {
+      // First, save the transaction and get the actual receipt number
+      const generatedReceiptNo = generateReceiptNumber();
+      const savedTransaction = await onProceed(referenceNo || 'QR-PAYMENT', screenshot, generatedReceiptNo);
+      
+      // Use the receipt number from the saved transaction (which is the actual one in the database)
+      const actualReceiptNo = savedTransaction?.receiptNo || generatedReceiptNo;
+    
+      // Generate receipt data with the actual receipt number
     const receipt = {
-      receiptNo: generateReceiptNumber(),
+        receiptNo: actualReceiptNo,
       items: cartItems.map(item => ({
         name: item.itemName || item.name || 'Item',
         qty: item.quantity || 1,
@@ -89,17 +98,24 @@ const QRCodePaymentModal = ({ isOpen, onClose, totalAmount, onProceed, cartItems
     };
     
     setReceiptData(receipt);
-    setShowSuccess(true);
 
-    setTimeout(() => {
-      setShowSuccess(false);
+    // Start printing immediately - no delay needed
+    setShowSuccess(false);
+    // Use requestAnimationFrame to ensure UI updates before printing
+    requestAnimationFrame(() => {
       attemptAutoPrint(receipt);
-    }, 800);
+    });
+    } catch (error) {
+      setShowSuccess(false);
+      setShowReceipt(false);
+      console.error('Error saving transaction:', error);
+      alert('Failed to save transaction. Please try again.');
+    }
   };
 
   const handleNewTransaction = () => {
     setShowReceipt(false);
-    onProceed(referenceNo || 'QR-PAYMENT', screenshot);
+    // Transaction already saved, just close
   };
 
   const attemptAutoPrint = async (receipt) => {

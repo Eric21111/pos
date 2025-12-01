@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useContext, useRef } from 'react';
+import { useState, useEffect, useMemo, useContext, useRef, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../../components/shared/header';
 import { useAuth } from '../../context/AuthContext';
@@ -37,12 +37,40 @@ const Dashboard = () => {
   const skuChartRef = useRef(null);
   const [salesChartWidth, setSalesChartWidth] = useState(null);
   const [skuChartWidth, setSkuChartWidth] = useState(null);
+  const [metrics, setMetrics] = useState({
+    totalSalesToday: 0,
+    totalTransactions: 0,
+    profit: 0,
+    lowStockItems: 0
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setIsMounted(true);
-    // TODO: Fetch dashboard summary data
-    // fetchDashboardSummary();
+    fetchDashboardStats();
   }, []);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/transactions/dashboard/stats');
+      const data = await response.json();
+      
+      if (data.success) {
+        setMetrics({
+          totalSalesToday: data.data.totalSalesToday || 0,
+          totalTransactions: data.data.totalTransactions || 0,
+          profit: data.data.profit || 0,
+          lowStockItems: data.data.lowStockItems || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      // Keep default values on error
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const measureWidths = () => {
@@ -64,14 +92,6 @@ const Dashboard = () => {
     window.addEventListener('resize', measureWidths);
     return () => window.removeEventListener('resize', measureWidths);
   }, [isExpanded]);
-
-  // Mock data - Replace with actual API calls
-  const metrics = useMemo(() => ({
-    totalSalesToday: 25430,
-    totalTransactions: 42,
-    averageTransactionValue: 300,
-    lowStockItems: 6
-  }), []);
 
   // Sales over time data
   const salesData = useMemo(() => ([
@@ -250,26 +270,26 @@ const Dashboard = () => {
         >
           {/* Total Sales Today */}
           <article 
-            className="bg-purple-600 rounded-xl shadow-lg p-2 lg:p-3 text-white focus-within:ring-2 focus-within:ring-purple-300 focus-within:ring-offset-2 transition-shadow relative"
+            className="relative overflow-hidden rounded-2xl bg-white shadow-lg border border-gray-100 p-4 lg:p-5 text-gray-800 focus-within:ring-2 focus-within:ring-blue-200 focus-within:ring-offset-2 transition-shadow"
             aria-label={`Total Sales Today: ${formatCurrency(metrics.totalSalesToday)}`}
             tabIndex={0}
           >
+            <div className="absolute inset-y-0 left-0 w-2 bg-linear-to-b from-blue-600 to-sky-400" aria-hidden="true" />
             {/* Icon in top-right corner */}
-            <div className="absolute translate-y-[-10px] translate-x-[-10px] right-3 pt-2">
-              <div className="bg-purple-400/30 rounded-full p-5">
-                <FaShoppingBag className="text-lg lg:text-xl text-white w-8 h-8" aria-hidden="true" />
+            <div className="absolute translate-y-[-10px] translate-x-[-10px] right-4 pt-2">
+              <div className="bg-blue-50 rounded-full p-5 shadow-inner">
+                <FaShoppingBag className="text-lg lg:text-xl text-blue-500 w-8 h-8" aria-hidden="true" />
               </div>
             </div>
             
-            <div className="pt-10">
-              <div className="text-2xl lg:text-3xl font-bold mb-1 pr-20" aria-label={formatCurrency(metrics.totalSalesToday)}>
-                {formatCurrency(metrics.totalSalesToday)}
+            <div className="pt-8">
+              <div className="text-2xl lg:text-3xl font-bold mb-1 pr-20 text-blue-600" aria-label={formatCurrency(metrics.totalSalesToday)}>
+                {loading ? '...' : formatCurrency(metrics.totalSalesToday)}
               </div>
-              {/* --- MODIFIED: Font size reduced --- */}
-              <div className="text-xs lg:text-sm font-semibold mb-0.5">
+              <div className="text-xs lg:text-sm font-semibold mb-0.5 text-gray-700">
                 Total Sales Today
               </div>
-              <div className="text-xs text-white/70">
+              <div className="text-xs text-gray-500">
                 Total revenue from all transactions today.
               </div>
             </div>
@@ -277,80 +297,80 @@ const Dashboard = () => {
 
           {/* Total Transactions */}
           <article 
-            className="bg-blue-600 rounded-xl shadow-lg p-2 lg:p-3 text-white focus-within:ring-2 focus-within:ring-blue-300 focus-within:ring-offset-2 transition-shadow relative"
+            className="relative overflow-hidden rounded-2xl bg-white shadow-lg border border-gray-100 p-4 lg:p-5 text-gray-800 focus-within:ring-2 focus-within:ring-purple-200 focus-within:ring-offset-2 transition-shadow"
             aria-label={`Total Transactions: ${metrics.totalTransactions}`}
             tabIndex={0}
           >
+            <div className="absolute inset-y-0 left-0 w-2 bg-linear-to-b from-purple-600 to-fuchsia-400" aria-hidden="true" />
             {/* Icon in top-right corner */}
-            <div className="absolute translate-y-[-10px] translate-x-[-10px] right-3 pt-2">
-              <div className="bg-blue-400/30 rounded-full p-5">
-                <FaHandshake className="text-lg lg:text-xl text-white w-8 h-8" aria-hidden="true" />
+            <div className="absolute translate-y-[-10px] translate-x-[-10px] right-4 pt-2">
+              <div className="bg-purple-50 rounded-full p-5 shadow-inner">
+                <FaHandshake className="text-lg lg:text-xl text-purple-500 w-8 h-8" aria-hidden="true" />
               </div>
             </div>
             
-            <div className="pt-10">
-              <div className="text-2xl lg:text-3xl font-bold mb-1 pr-20" aria-label={metrics.totalTransactions.toString()}>
-                {metrics.totalTransactions}
+            <div className="pt-8">
+              <div className="text-2xl lg:text-3xl font-bold mb-1 pr-20 text-purple-600" aria-label={metrics.totalTransactions.toString()}>
+                {loading ? '...' : metrics.totalTransactions}
               </div>
-              {/* --- MODIFIED: Font size reduced --- */}
-              <div className="text-xs lg:text-sm font-semibold mb-0.5">
+              <div className="text-xs lg:text-sm font-semibold mb-0.5 text-gray-700">
                 Total Transactions
               </div>
-              <div className="text-xs text-white/70">
+              <div className="text-xs text-gray-500">
                 Number of sales made today.
               </div>
             </div>
           </article>
 
-          {/* Average Transaction Value */}
+          {/* Profit */}
           <article 
-            className="bg-green-600 rounded-xl shadow-lg p-2 lg:p-3 text-white focus-within:ring-2 focus-within:ring-green-300 focus-within:ring-offset-2 transition-shadow relative"
-            aria-label={`Average Transaction Value: ${formatCurrency(metrics.averageTransactionValue)}`}
+            className="relative overflow-hidden rounded-2xl bg-white shadow-lg border border-gray-100 p-4 lg:p-5 text-gray-800 focus-within:ring-2 focus-within:ring-green-200 focus-within:ring-offset-2 transition-shadow"
+            aria-label={`Profit: ${formatCurrency(metrics.profit)}`}
             tabIndex={0}
           >
+            <div className="absolute inset-y-0 left-0 w-2 bg-linear-to-b from-green-600 to-emerald-400" aria-hidden="true" />
             {/* Icon in top-right corner */}
-            <div className="absolute translate-y-[-10px] translate-x-[-10px] right-3 pt-2">
-              <div className="bg-green-400/30 rounded-full p-5">
-                <FaChartLine className="text-lg lg:text-xl text-white w-8 h-8" aria-hidden="true" />
+            <div className="absolute translate-y-[-10px] translate-x-[-10px] right-4 pt-2">
+              <div className="bg-green-50 rounded-full p-5 shadow-inner">
+                <FaChartLine className="text-lg lg:text-xl text-green-600 w-8 h-8" aria-hidden="true" />
               </div>
             </div>
 
-            <div className="pt-10">
-              <div className="text-2xl lg:text-3xl font-bold mb-1 pr-20" aria-label={formatCurrency(metrics.averageTransactionValue)}>
-                {formatCurrency(metrics.averageTransactionValue)}
+            <div className="pt-8">
+              <div className="text-2xl lg:text-3xl font-bold mb-1 pr-20 text-green-600" aria-label={formatCurrency(metrics.profit)}>
+                {loading ? '...' : formatCurrency(metrics.profit)}
               </div>
-              {/* --- MODIFIED: Font size reduced --- */}
-              <div className="text-xs lg:text-sm font-semibold mb-0.5">
-                Average Transaction Value
+              <div className="text-xs lg:text-sm font-semibold mb-0.5 text-gray-700">
+                Profit
               </div>
-              <div className="text-xs text-white/70">
-                Average amount of money spent per transaction.
+              <div className="text-xs text-gray-500">
+                Total profit from sales today (revenue minus cost).
               </div>
             </div>
           </article>
 
           {/* Low Stock Items */}
           <article 
-            className="bg-red-600 rounded-xl shadow-lg p-2 lg:p-3 text-white focus-within:ring-2 focus-within:ring-red-300 focus-within:ring-offset-2 transition-shadow relative"
+            className="relative overflow-hidden rounded-2xl bg-white shadow-lg border border-gray-100 p-4 lg:p-5 text-gray-800 focus-within:ring-2 focus-within:ring-rose-200 focus-within:ring-offset-2 transition-shadow"
             aria-label={`Low Stock Items: ${metrics.lowStockItems} products below stock threshold`}
             tabIndex={0}
           >
+            <div className="absolute inset-y-0 left-0 w-2 bg-linear-to-b from-rose-600 to-red-400" aria-hidden="true" />
             {/* Icon in top-right corner */}
-            <div className="absolute translate-y-[-10px] translate-x-[-10px] right-3 pt-2">
-              <div className="bg-red-400/30 rounded-full p-5">
-                <FaExclamationTriangle className="text-lg lg:text-xl text-white w-8 h-8" aria-hidden="true" />
+            <div className="absolute translate-y-[-10px] translate-x-[-10px] right-4 pt-2">
+              <div className="bg-rose-50 rounded-full p-5 shadow-inner">
+                <FaExclamationTriangle className="text-lg lg:text-xl text-rose-600 w-8 h-8" aria-hidden="true" />
               </div>
             </div>
             
-            <div className="pt-10">
-              <div className="text-2xl lg:text-3xl font-bold mb-1 pr-20" aria-label={metrics.lowStockItems.toString()}>
-                {metrics.lowStockItems}
+            <div className="pt-8">
+              <div className="text-2xl lg:text-3xl font-bold mb-1 pr-20 text-rose-600" aria-label={metrics.lowStockItems.toString()}>
+                {loading ? '...' : metrics.lowStockItems}
               </div>
-              {/* --- MODIFIED: Font size reduced --- */}
-              <div className="text-xs lg:text-sm font-semibold mb-0.5">
+              <div className="text-xs lg:text-sm font-semibold mb-0.5 text-gray-700">
                 Low Stock Items
               </div>
-              <div className="text-xs text-white/70">
+              <div className="text-xs text-gray-500">
                 Number of products below stock threshold.
               </div>
             </div>
@@ -557,4 +577,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default memo(Dashboard);

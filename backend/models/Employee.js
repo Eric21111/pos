@@ -84,18 +84,18 @@ const employeeSchema = new mongoose.Schema({
 });
 
 // Hash PIN before saving
-employeeSchema.pre('save', async function(next) {
+employeeSchema.pre('save', async function (next) {
   if (!this.isModified('pin')) {
     return next();
   }
-  
+
   try {
     // Validate PIN length before hashing (must be exactly 6 digits)
     if (!/^\d{6}$/.test(this.pin)) {
       const error = new Error('PIN must be exactly 6 digits');
       return next(error);
     }
-    
+
     const salt = await bcrypt.genSalt(10);
     this.pin = await bcrypt.hash(this.pin, salt);
     next();
@@ -105,7 +105,7 @@ employeeSchema.pre('save', async function(next) {
 });
 
 // Ensure name/first/last stay in sync
-employeeSchema.pre('validate', function(next) {
+employeeSchema.pre('validate', function (next) {
   if ((!this.firstName || !this.lastName || this.isModified('name')) && this.name) {
     const parts = this.name.trim().split(/\s+/);
     if (!this.firstName || this.isModified('name')) {
@@ -124,9 +124,35 @@ employeeSchema.pre('validate', function(next) {
 });
 
 // Method to compare PIN
-employeeSchema.methods.comparePin = async function(candidatePin) {
-  return await bcrypt.compare(candidatePin, this.pin);
+employeeSchema.methods.comparePin = async function (candidatePin) {
+  if (!this.pin) {
+    console.warn('[comparePin] Employee has no PIN field');
+    return false;
+  }
+  
+  // Check if PIN is hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
+  if (this.pin.startsWith('$2')) {
+    // PIN is hashed, use bcrypt.compare
+    return await bcrypt.compare(candidatePin, this.pin);
+  } else {
+    // PIN might be stored as plain text (legacy or error case)
+    // For security, we should hash it, but for now, do direct comparison
+    // This should not happen in production, but helps with debugging
+    console.warn('[comparePin] PIN appears to be stored as plain text - this should not happen');
+    return candidatePin === this.pin;
+  }
 };
 
+// Indexes for faster queries
+employeeSchema.index({ email: 1 }); // Already unique, but explicit index helps
+employeeSchema.index({ status: 1 });
+employeeSchema.index({ role: 1 });
+employeeSchema.index({ dateJoined: -1 });
+employeeSchema.index({ firstName: 'text', lastName: 'text', name: 'text', email: 'text' }); // Text search index
+
+// Export schema for dynamic connection
+module.exports.schema = employeeSchema;
+
+// Export default model for backward compatibility
 module.exports = mongoose.model('Employee', employeeSchema);
 

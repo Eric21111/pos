@@ -8,14 +8,17 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
     discountType: 'percentage',
     discountValue: '',
     appliesTo: 'all',
+    category: '',
     validFrom: '',
     validUntil: '',
     noExpiration: false,
-    minPurchaseAmount: '500.00',
-    maxPurchaseAmount: '1000.00',
-    usageLimit: '0',
+    minPurchaseAmount: '',
+    maxPurchaseAmount: '',
+    usageLimit: '',
     description: ''
   });
+
+  const categories = ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods'];
 
   useEffect(() => {
     if (!isOpen) {
@@ -25,12 +28,13 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
         discountType: 'percentage',
         discountValue: '',
         appliesTo: 'all',
+        category: '',
         validFrom: '',
         validUntil: '',
         noExpiration: false,
-        minPurchaseAmount: '500.00',
-        maxPurchaseAmount: '1000.00',
-        usageLimit: '0',
+        minPurchaseAmount: '',
+        maxPurchaseAmount: '',
+        usageLimit: '',
         description: ''
       });
     }
@@ -40,6 +44,11 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    // Validate category selection if appliesTo is 'category'
+    if (formData.appliesTo === 'category' && !formData.category) {
+      alert('Please select a category');
+      return;
+    }
     onAdd(formData);
     onClose();
   };
@@ -198,6 +207,25 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                         <span className="text-sm text-gray-700">Specific Products</span>
                       </label>
                     </div>
+                    {formData.appliesTo === 'category' && (
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Category <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="category"
+                          value={formData.category}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                          required={formData.appliesTo === 'category'}
+                        >
+                          <option value="">Select a category</option>
+                          {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   <div>

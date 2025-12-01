@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import Header from '../../components/shared/header';
 import { FaSearch, FaPlus, FaEllipsisV } from 'react-icons/fa';
 import Pagination from '../../components/inventory/Pagination';
@@ -312,19 +312,21 @@ const ManageEmployees = () => {
                 />
               </div>
               
-              <div className="absolute top-4 right-4 z-10">
-                <button
-                  id={`dropdown-btn-${employee.id}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenDropdown(openDropdown === employee.id ? null : employee.id);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <FaEllipsisV />
-                </button>
-                
-                {openDropdown === employee.id && (
+              {/* Hide 3-dot menu for Owner */}
+              {employee.role !== 'Owner' && (
+                <div className="absolute top-4 right-4 z-10">
+                  <button
+                    id={`dropdown-btn-${employee.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdown(openDropdown === employee.id ? null : employee.id);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <FaEllipsisV />
+                  </button>
+                  
+                  {openDropdown === employee.id && (
                   <div
                     id={`dropdown-menu-${employee.id}`}
                     className="fixed w-48 bg-white rounded-lg border border-gray-200 shadow-lg"
@@ -395,8 +397,9 @@ const ManageEmployees = () => {
                       Delete
                     </button>
                   </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               <div className="p-6">
                 <div className="flex items-start gap-4">
@@ -518,5 +521,5 @@ const ManageEmployees = () => {
   );
 };
 
-export default ManageEmployees;
+export default memo(ManageEmployees);
 

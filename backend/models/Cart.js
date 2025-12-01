@@ -31,5 +31,13 @@ const cartSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Indexes for faster queries
+// Note: userId index is automatically created by unique: true, no need to duplicate
+cartSchema.index({ updatedAt: -1 });
+
+// Export schema for dynamic connection
+module.exports.schema = cartSchema;
+
+// Export default model for backward compatibility
 module.exports = mongoose.model('Cart', cartSchema);
 

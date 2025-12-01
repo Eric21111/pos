@@ -68,9 +68,10 @@ const ReceiptModal = ({
     // we skip the extra automatic print and let the user decide.
     if (disableAutoPrint) return;
 
+    // Start printing immediately with minimal delay for UI rendering
     const autoPrintTimer = setTimeout(() => {
       handlePrint();
-    }, 600);
+    }, 100);
 
     return () => clearTimeout(autoPrintTimer);
   }, [isOpen, disableAutoPrint, handlePrint]);
@@ -117,14 +118,17 @@ const ReceiptModal = ({
         }}
       >
         <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <h2 style={{ margin: '5px 0' }}>Create Your Style</h2>
-          <p style={{ fontSize: '10px', margin: '2px 0' }}>TC USHS - #831100254488</p>
-          <p style={{ fontSize: '10px', margin: '2px 0' }}>Pasoanca, Zambonaga City</p>
+          <h2 style={{ margin: '5px 0', fontSize: '18px', fontWeight: 'bold' }}>Create Your Style</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', margin: '5px 0' }}>
+            <span>{receipt.time || '12:00PM'}</span>
+            <span>{receipt.contactNumber || '+631112224444'}</span>
+          </div>
+          <p style={{ fontSize: '10px', margin: '2px 0' }}>Pasonanca, Zamboanga City</p>
         </div>
         
-        <div style={{ textAlign: 'center', margin: '10px 0', borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '5px 0' }}>
-          <p style={{ fontSize: '10px', margin: '2px 0' }}>Receipt No.</p>
-          <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '2px 0' }}>#{receipt.receiptNo}</p>
+        <div style={{ textAlign: 'center', margin: '10px 0', border: '1px dashed #000', padding: '8px 5px' }}>
+          <p style={{ fontSize: '10px', margin: '2px 0' }}>Receipt No:</p>
+          <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '2px 0' }}>#{receipt.receiptNo}</p>
         </div>
         
         <table style={{ width: '100%', fontSize: '10px', marginBottom: '10px' }}>
@@ -148,37 +152,41 @@ const ReceiptModal = ({
           </tbody>
         </table>
         
-        <div style={{ borderTop: '1px solid #000', paddingTop: '5px', fontSize: '10px' }}>
+        <div style={{ borderTop: '1px dashed #000', paddingTop: '5px', fontSize: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+            <span>Transaction/Reference:</span>
+            <span>{receipt.referenceNo || receipt.reference || '-'}</span>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
             <span>Payment Method:</span>
-            <span>{receipt.paymentMethod}</span>
+            <span>{receipt.paymentMethod || 'CASH'}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
             <span>Subtotal:</span>
-            <span>₱{receipt.subtotal.toFixed(2)}</span>
+            <span>PHP {receipt.subtotal.toFixed(2)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-            <span>Discount:</span>
-            <span>₱{receipt.discount.toFixed(2)}</span>
+          <div style={{ borderTop: '1px dashed #000', margin: '5px 0', paddingTop: '5px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+              <span>Discount:</span>
+              <span>PHP {receipt.discount.toFixed(2)}</span>
+            </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', margin: '4px 0', fontWeight: 'bold', fontSize: '12px', borderTop: '1px solid #000', paddingTop: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', margin: '4px 0', fontWeight: 'bold', fontSize: '12px' }}>
             <span>Total:</span>
-            <span>₱{receipt.total.toFixed(2)}</span>
+            <span>PHP {receipt.total.toFixed(2)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
             <span>Cash:</span>
-            <span>₱{receipt.cash.toFixed(2)}</span>
+            <span>PHP {receipt.cash.toFixed(2)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
             <span>Change:</span>
-            <span>₱{receipt.change.toFixed(2)}</span>
+            <span>PHP {receipt.change.toFixed(2)}</span>
           </div>
         </div>
         
-        <div style={{ textAlign: 'center', marginTop: '15px', paddingTop: '10px', borderTop: '1px solid #000', fontSize: '9px' }}>
-          <p>Thank you for your purchase!</p>
-          <p>{receipt.date} {receipt.time}</p>
-          <p style={{ marginTop: '5px', fontStyle: 'italic' }}>This is not an official receipt</p>
+        <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '10px', fontWeight: 'bold' }}>
+          <p>This is not an official receipt</p>
         </div>
       </div>
 
@@ -191,13 +199,16 @@ const ReceiptModal = ({
           {/* Header */}
           <div className="text-center mb-4">
             <h2 className="text-lg font-bold">Create Your Style</h2>
-            <p className="text-xs text-gray-600">TC USHS - #831100254488</p>
-            <p className="text-xs text-gray-600">Pasoanca, Zambonaga City</p>
+            <div className="flex justify-between text-xs text-gray-600 mt-2">
+              <span>{receipt.time || '12:00PM'}</span>
+              <span>{receipt.contactNumber || '+631112224444'}</span>
+            </div>
+            <p className="text-xs text-gray-600">Pasonanca, Zamboanga City</p>
           </div>
 
           {/* Receipt Number */}
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 mb-4 text-center">
-            <p className="text-xs text-gray-600 mb-1">Receipt No.</p>
+            <p className="text-xs text-gray-600 mb-1">Receipt No:</p>
             <p className="text-2xl font-bold">#{receipt.receiptNo}</p>
           </div>
 
@@ -230,24 +241,26 @@ const ReceiptModal = ({
           </div>
 
           {/* Transaction Details */}
-          <div className="border-t pt-3 mb-4 space-y-1 text-sm">
+          <div className="border-t border-dashed pt-3 mb-4 space-y-1 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">Transaction/Reference</span>
-              <span></span>
+              <span>{receipt.referenceNo || receipt.reference || '-'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Payment Method</span>
-              <span>{receipt.paymentMethod}</span>
+              <span>{receipt.paymentMethod || 'CASH'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Subtotal</span>
               <span>PHP {receipt.subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Discount</span>
-              <span>PHP {receipt.discount.toFixed(2)}</span>
+            <div className="border-t border-dashed pt-2 mt-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Discount</span>
+                <span>PHP {receipt.discount.toFixed(2)}</span>
+              </div>
             </div>
-            <div className="flex justify-between font-bold text-base border-t pt-2">
+            <div className="flex justify-between font-bold text-base pt-2">
               <span>Total</span>
               <span>PHP {receipt.total.toFixed(2)}</span>
             </div>
@@ -262,8 +275,8 @@ const ReceiptModal = ({
           </div>
 
           {/* Footer Message */}
-          <div className="text-center py-4 border-t mb-4">
-            <p className="text-sm font-semibold">This is not an official receipt</p>
+          <div className="text-center py-4 mb-4">
+            <p className="text-sm font-bold">This is not an official receipt</p>
           </div>
 
           {/* Action Buttons */}
