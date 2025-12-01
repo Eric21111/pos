@@ -1,17 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from "@react-native-picker/picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 
 // Mock data - replace with your actual data source
@@ -60,12 +62,13 @@ const RolesAndPermission = () => {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     position: "Cashier",
     contactNumber: "",
-    dateJoined: "",
+    dateJoined: new Date().toISOString().split('T')[0],
     isActive: true,
     permissions: {
       pos: false,
@@ -410,12 +413,30 @@ const RolesAndPermission = () => {
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Date Joined</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.dateJoined}
-                  onChangeText={(text) => handleInputChange('dateJoined', text)}
-                  placeholder="YYYY-MM-DD"
-                />
+                <TouchableOpacity 
+                  onPress={() => setShowDatePicker(true)}
+                  style={styles.dateInputContainer}
+                >
+                  <Text style={styles.dateInputText}>
+                    {formData.dateJoined || 'Select date'}
+                  </Text>
+                  <Ionicons name="calendar" size={20} color="#666" />
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={formData.dateJoined ? new Date(formData.dateJoined) : new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, selectedDate) => {
+                      setShowDatePicker(Platform.OS === 'ios');
+                      if (selectedDate) {
+                        const formattedDate = selectedDate.toISOString().split('T')[0];
+                        handleInputChange('dateJoined', formattedDate);
+                      }
+                    }}
+                    style={styles.datePicker}
+                  />
+                )}
               </View>
 
               <View style={styles.formGroup}>
@@ -848,6 +869,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
+  },
+  dateInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+  },
+  dateInputText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  datePicker: {
+    marginTop: 10,
   },
 });
 

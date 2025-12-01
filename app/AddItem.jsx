@@ -5,49 +5,49 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
-function AddItem({ onBack }) {
-  // State declarations
-  const [itemImage, setItemImage] = useState(null);
-  const [itemName, setItemName] = useState("");
-  const [itemCategory, setItemCategory] = useState("");
-  const [itemSize, setItemSize] = useState("");
-  const [waistSize, setWaistSize] = useState("");
-  const [accessoryType, setAccessoryType] = useState("");
-  const [makeupBrand, setMakeupBrand] = useState("");
-  const [makeupShade, setMakeupShade] = useState("");
-  const [shoeSize, setShoeSize] = useState("");
-  const [essentialType, setEssentialType] = useState("");
-  const [customEssentialType, setCustomEssentialType] = useState("");
-  const [itemPrice, setItemPrice] = useState("");
-  const [itemStock, setItemStock] = useState("");
-  const [brand, setBrand] = useState("");
-  const [expirationDate, setExpirationDate] = useState("");
+function AddItem({ onBack, item, isEditing = false }) {
+  // State declarations with initial values from item prop if in edit mode
+  const [itemImage, setItemImage] = useState(item?.image || null);
+  const [itemName, setItemName] = useState(item?.name || "");
+  const [itemCategory, setItemCategory] = useState(item?.category || "");
+  const [itemSize, setItemSize] = useState(item?.size || "");
+  const [waistSize, setWaistSize] = useState(item?.waistSize || "");
+  const [accessoryType, setAccessoryType] = useState(item?.accessoryType || "");
+  const [makeupBrand, setMakeupBrand] = useState(item?.makeupBrand || "");
+  const [makeupShade, setMakeupShade] = useState(item?.makeupShade || "");
+  const [shoeSize, setShoeSize] = useState(item?.shoeSize || "");
+  const [essentialType, setEssentialType] = useState(item?.essentialType || "");
+  const [customEssentialType, setCustomEssentialType] = useState(item?.customEssentialType || "");
+  const [itemPrice, setItemPrice] = useState(item?.price ? item.price.toString() : "");
+  const [itemStock, setItemStock] = useState(item?.stock ? item.stock.toString() : "");
+  const [brand, setBrand] = useState(item?.brand || "");
+  const [expirationDate, setExpirationDate] = useState(item?.expirationDate || "");
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [essentialExpirationDate, setEssentialExpirationDate] = useState("");
+  const [essentialExpirationDate, setEssentialExpirationDate] = useState(item?.essentialExpirationDate || "");
   const [showEssentialDatePicker, setShowEssentialDatePicker] = useState(false);
-  const [foodType, setFoodType] = useState("");
-  const [customFoodType, setCustomFoodType] = useState("");
+  const [foodType, setFoodType] = useState(item?.foodType || "");
+  const [customFoodType, setCustomFoodType] = useState(item?.customFoodType || "");
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [isForPOS, setIsForPOS] = useState(false);
+  const [isForPOS, setIsForPOS] = useState(item?.isForPOS || false);
   
   // Animation refs
   const toastTranslate = useRef(new Animated.Value(-60)).current;
@@ -173,13 +173,33 @@ function AddItem({ onBack }) {
     setIsForPOS(false);
   };
   
-  // Initialize form on component mount
+  // Initialize form on component mount or when item prop changes
   useEffect(() => {
-    initializeForm();
-    return () => {
-      // Cleanup if needed
-    };
-  }, []);
+    if (isEditing && item) {
+      // Pre-fill form with item data when in edit mode
+      setItemImage(item.image || null);
+      setItemName(item.name || '');
+      setItemCategory(item.category || '');
+      setItemSize(item.size || '');
+      setWaistSize(item.waistSize || '');
+      setAccessoryType(item.accessoryType || '');
+      setMakeupBrand(item.makeupBrand || '');
+      setMakeupShade(item.makeupShade || '');
+      setShoeSize(item.shoeSize || '');
+      setEssentialType(item.essentialType || '');
+      setCustomEssentialType(item.customEssentialType || '');
+      setItemPrice(item.price ? item.price.toString() : '');
+      setItemStock(item.stock ? item.stock.toString() : '');
+      setBrand(item.brand || '');
+      setExpirationDate(item.expirationDate || '');
+      setEssentialExpirationDate(item.essentialExpirationDate || '');
+      setFoodType(item.foodType || '');
+      setCustomFoodType(item.customFoodType || '');
+      setIsForPOS(!!item.isForPOS);
+    } else {
+      initializeForm();
+    }
+  }, [isEditing, item]);
 
   const showImagePickerOptions = () => {
     Alert.alert(
@@ -259,137 +279,73 @@ function AddItem({ onBack }) {
     return true;
   };
 
-  const handleAddItem = () => {
-    if (!validateForm()) {
+  const handleSubmit = () => {
+    if (isLoading) return;
+    
+    // Basic validation
+    if (!itemName || !itemCategory || !itemPrice || !itemStock) {
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-    setShowConfirmation(true);
-  };
-
-  const confirmAddItem = () => {
-    // Close the confirmation modal
-    setShowConfirmation(false);
     
-    // Show loading state
+    if (parseFloat(itemPrice) <= 0) {
+      Alert.alert('Error', 'Price must be greater than 0');
+      return;
+    }
+    
+    if (parseInt(itemStock) < 0) {
+      Alert.alert('Error', 'Stock cannot be negative');
+      return;
+    }
+    
     setIsLoading(true);
     
-    // Simulate API call or processing
+    // Prepare the item data
+    const itemData = {
+      ...(isEditing && { id: item.id }), // Include ID if editing
+      name: itemName.trim(),
+      category: itemCategory,
+      size: itemSize,
+      waistSize: waistSize,
+      accessoryType: accessoryType,
+      makeupBrand: makeupBrand,
+      makeupShade: makeupShade,
+      shoeSize: shoeSize,
+      essentialType: essentialType,
+      customEssentialType: customEssentialType,
+      price: parseFloat(itemPrice) || 0,
+      stock: parseInt(itemStock) || 0,
+      brand: brand.trim(),
+      expirationDate: expirationDate,
+      essentialExpirationDate: essentialExpirationDate,
+      foodType: foodType,
+      customFoodType: customFoodType,
+      isForPOS: isForPOS,
+      image: itemImage,
+      // Keep the original SKU and date added when editing
+      ...(isEditing && { 
+        sku: item.sku,
+        dateAdded: item.dateAdded
+      })
+    };
+    
+    console.log(isEditing ? 'Updating item:' : 'Adding new item:', itemData);
+    
+    // Here you would typically make an API call to save the item
+    // For now, we'll just simulate an API call with a timeout
     setTimeout(() => {
-      // Reset form after successful addition
-      initializeForm();
       setIsLoading(false);
-      
-      // Show success message
-      setSuccessMessage("Item added successfully!");
+      setSuccessMessage(isEditing ? 'Item updated successfully!' : 'Item added successfully!');
       setShowSuccess(true);
       
-      // Navigate back after a short delay
+      // Hide success message after 2 seconds and go back
       setTimeout(() => {
-        if (onBack) onBack();
-      }, 1000);
-    }, 1500);
-    if (!itemCategory) {
-      Alert.alert("Error", "Please select a category");
-      return;
-    }
-    
-    const requiresSize = ['tops', 'dresses'].includes(itemCategory);
-    const requiresWaistSize = itemCategory === 'bottoms';
-    const isAccessory = itemCategory === 'accessories';
-    const isMakeup = itemCategory === 'makeup';
-    const isShoes = itemCategory === 'shoes';
-    const isFood = itemCategory === 'food';
-    const isHeadwear = itemCategory === 'headwear';
-    
-    if (isFood) {
-      if (!foodType) {
-        Alert.alert("Error", "Please select a food type");
-        return;
-      }
-      if (foodType === 'other' && !customFoodType.trim()) {
-        Alert.alert("Error", "Please specify the food type");
-        return;
-      }
-      if (!expirationDate) {
-        Alert.alert("Error", "Please select an expiration date for the food item");
-        return;
-      }
-    }
-    
-    if (isShoes && !shoeSize) {
-      Alert.alert("Error", "Please enter shoe size");
-      return;
-    }
-    
-
-    if (itemCategory === 'makeup') {
-      if (!makeupShade.trim()) {
-        Alert.alert("Error", "Please enter the makeup shade");
-        return;
-      }
-      if (!expirationDate) {
-        Alert.alert("Error", "Please select an expiration date");
-        return;
-      }
-      const selectedDate = new Date(expirationDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (selectedDate <= today) {
-        Alert.alert("Error", "Expiration date must be in the future");
-        return;
-      }
-    }
-    
-    if (requiresSize && !itemSize) {
-      Alert.alert("Error", "Please select a size");
-      return;
-    }
-    
-    if (requiresWaistSize && !waistSize) {
-      Alert.alert("Error", "Please enter waist size");
-      return;
-    }
-    
-    if (isAccessory && !accessoryType) {
-      Alert.alert("Error", "Please select an accessory type");
-      return;
-    }
-    if (!itemPrice || isNaN(Number(itemPrice)) || Number(itemPrice) <= 0) {
-      Alert.alert("Error", "Please enter a valid price");
-      return;
-    }
-    if (!itemStock || isNaN(Number(itemStock)) || Number(itemStock) < 0) {
-      Alert.alert("Error", "Please enter a valid stock quantity");
-      return;
-    }
-
-    setIsLoading(true);
-
-    // Show success toast
-    setSuccessMessage('Item added successfully!');
-    setShowSuccess(true);
-    
-    // Reset form
-    initializeForm();
-    
-    // Navigate back to inventory after delay
-    setTimeout(() => {
-      if (onBack) {
-        onBack();
-      } else {
-        router.replace('/(tabs)/inventory');
-      }
+        setShowSuccess(false);
+        // Navigate back after a short delay
+        setTimeout(() => onBack(), 500);
+      }, 2000);
     }, 1000);
   };
-
-  if (isLoading) {
-  return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#AD7F65" />
-      <Text style={styles.loadingText}>Adding item...</Text>
-    </View>
-  );
- }
 
   const handleSearch = (query) => {
     setSearchQuery(query);
@@ -418,7 +374,7 @@ function AddItem({ onBack }) {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add New Item</Text>
+        <Text style={styles.headerTitle}>{isEditing ? 'Edit Item' : 'Add New Item'}</Text>
       </View>
 
       <ScrollView 
@@ -448,7 +404,7 @@ function AddItem({ onBack }) {
                 </Pressable>
                 <Pressable
                   style={[styles.modalButton, styles.confirmButton]}
-                  onPress={confirmAddItem}
+                  onPress={handleSubmit}
                 >
                   <Text style={[styles.buttonText, {color: 'white'}]}>Add Item</Text>
                 </Pressable>
@@ -825,16 +781,24 @@ function AddItem({ onBack }) {
         </View>
       </View>
 
-        {/* Add Item Button */}
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={handleAddItem}
-          disabled={isLoading}
-        >
+        {/* Submit Button */}
+      <TouchableOpacity 
+        style={[
+          styles.addButton, 
+          isLoading && styles.disabledButton,
+          { marginBottom: 20 }
+        ]} 
+        onPress={handleSubmit}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
           <Text style={styles.addButtonText}>
-            {isLoading ? 'Adding...' : 'Add Item'}
+            {isEditing ? 'Update Item' : 'Add Item'}
           </Text>
-        </TouchableOpacity>
+        )}
+      </TouchableOpacity>
       </ScrollView>
     </View>
   );

@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   welcomeCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#53321c",
+    backgroundColor: "#f7f2ef",
     padding: 24,
     borderRadius: 18,
     marginBottom: 20,
@@ -358,12 +358,12 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#fff",
+    color: "#53321c",
     marginBottom: 4,
   },
   subtext: {
     fontSize: 15,
-    color: "#f0e6dd",
+    color: "#53321c",
     opacity: 0.9,
   },
 

@@ -18,7 +18,7 @@ import {
 } from "react-native";
 
 // Table View Component
-const InventoryTable = ({ items, onBack }) => {
+const InventoryTable = ({ items, onBack, onEditItem }) => {
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
   
   useEffect(() => {
@@ -93,42 +93,43 @@ const InventoryTable = ({ items, onBack }) => {
     },
   ];
 
+  const [menuVisible, setMenuVisible] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
 
   const menuItems = [
     { 
-      label: 'Edit Item', 
       value: 'edit', 
       icon: 'pencil',
       iconColor: '#4a90e2',
       bgColor: 'rgba(74, 144, 226, 0.1)'
     },
     { 
-      label: 'Stock In', 
       value: 'stockIn', 
       icon: 'add-circle',
       iconColor: '#2ecc71',
       bgColor: 'rgba(46, 204, 113, 0.1)'
     },
     { 
-      label: 'Stock Out', 
       value: 'stockOut', 
       icon: 'remove-circle',
-      iconColor: '#e74c3c',
-      bgColor: 'rgba(231, 76, 60, 0.1)'
+      iconColor: '#e67e22',
+      bgColor: 'rgba(230, 126, 34, 0.1)'
     },
     { 
-      label: 'Archive', 
       value: 'archive', 
       icon: 'archive', 
-      iconColor: '#e74c3c',
-      textColor: '#e74c3c',
-      bgColor: 'rgba(231, 76, 60, 0.08)'
-    },
+      iconColor: '#9b59b6',
+      bgColor: 'rgba(155, 89, 182, 0.1)'
+    }
   ];
 
   const toggleMenu = (itemId) => {
     setMenuVisible(menuVisible === itemId ? null : itemId);
+  };
+
+  const handleMenuAction = (action, itemId) => {
+    setMenuVisible(null);
+    handleAction(action, itemId);
   };
 
   const renderItem = ({ item = {} }) => {
@@ -154,19 +155,49 @@ const InventoryTable = ({ items, onBack }) => {
         <Text style={[styles.tableCell, { flex: 0.7 }]}>₱{typeof price === 'number' ? price.toFixed(2) : '0.00'}</Text>
         <Text style={[styles.tableCell, { flex: 0.4, color: (stock || 0) < 4 ? '#E74C3C' : '#000' }]}>{stock}</Text>
         <Text style={[styles.tableCell, { flex: 0.7 }]}>{dateAdded}</Text>
-        <View style={[styles.tableCell, { flex: 0.4, justifyContent: 'center' }]}>
-          <TouchableOpacity 
-            onPress={() => handleAction('archive', id)}
-            style={styles.archiveButton}
-          >
-            <Ionicons name="archive-outline" size={18} color="#8B4513" />
-          </TouchableOpacity>
+        <View style={[styles.tableCell, { flex: 0.8 }]}>
+          <View style={styles.actionButtonContainer}>
+            <TouchableOpacity 
+              onPress={() => toggleMenu(id)}
+              style={styles.menuButton}
+            >
+              <Ionicons name="ellipsis-vertical" size={20} color="#666" />
+            </TouchableOpacity>
+          
+          {isMenuVisible && (
+            <View style={[styles.menuContainer, { right: 10, top: 30 }]}>
+              {menuItems.map((menuItem) => (
+                <TouchableOpacity
+                  key={menuItem.value}
+                  style={[styles.menuItem, { backgroundColor: menuItem.bgColor }]}
+                  onPress={() => handleMenuAction(menuItem.value, id)}
+                >
+                  <Ionicons 
+                    name={menuItem.icon} 
+                    size={20} 
+                    color={menuItem.iconColor} 
+                    style={styles.menuIcon}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
         </View>
       </View>
     );
   };
 
   const handleAction = (action, itemId) => {
+    const item = tableData.find(item => item.id === itemId);
+    
+    if (!item) return;
+    
+    if (action === 'edit') {
+      onEditItem(item);
+      return;
+    }
+    
     if (action === 'archive') {
       Alert.alert(
         'Archive Item',
@@ -213,7 +244,7 @@ const InventoryTable = ({ items, onBack }) => {
         <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Price</Text>
         <Text style={[styles.tableHeaderCell, { flex: 0.4 }]}>Stock</Text>
         <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Date Added</Text>
-        <Text style={[styles.tableHeaderCell, { flex: 0.4, textAlign: 'center' }]}>Action</Text>
+        <Text style={[styles.tableHeaderCell, { flex: 0.8, textAlign: 'center' }]}>Actions</Text>
       </View>
       
       <FlatList
@@ -278,16 +309,38 @@ export default function Inventory() {
   ];
 
 
+  const [editingItem, setEditingItem] = useState(null);
+
+  const handleEditItem = (item) => {
+    setEditingItem(item);
+    setShowAddItem(true);
+  };
+
+  const handleAddItemBack = () => {
+    setShowAddItem(false);
+    setEditingItem(null);
+  };
+
   if (showAddItem) {
     return (
       <View style={{ flex: 1 }}>
-        <AddItem onBack={() => setShowAddItem(false)} />
+        <AddItem 
+          onBack={handleAddItemBack} 
+          item={editingItem} 
+          isEditing={!!editingItem}
+        />
       </View>
     );
   }
 
   if (showTableView) {
-    return <InventoryTable items={recentlyAddedItems} onBack={() => setShowTableView(false)} />;
+    return (
+      <InventoryTable 
+        items={recentlyAddedItems} 
+        onBack={() => setShowTableView(false)}
+        onEditItem={handleEditItem}
+      />
+    );
   }
 
   return (
@@ -512,12 +565,44 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
   },
-  archiveButton: {
-    padding: 6,
-    borderRadius: 4,
-    backgroundColor: 'rgba(139, 69, 19, 0.1)',
+  actionButtonContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuButton: {
+    padding: 10,
+    borderRadius: 20,
+    width: 42,
+    height: 42,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.03)',
+  },
+  menuContainer: {
+    position: 'absolute',
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 8,
+    zIndex: 1000,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  menuItem: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuIcon: {
+    fontSize: 20,
   },
   tableCell: {
     padding: 10,
