@@ -1,5 +1,6 @@
-import React, { useRef } from 'react';
+import { useState, useRef } from 'react';
 import { FaTimes, FaPrint } from 'react-icons/fa';
+import { sendReceiptToPrinter } from '../../utils/printBridge';
 
 const formatCurrency = (value = 0) =>
   new Intl.NumberFormat('en-PH', {
@@ -19,12 +20,75 @@ const formatDateTime = (dateString) => {
   });
 };
 
+const formatTime = (dateString) => {
+  if (!dateString) return '12:00PM';
+  return new Date(dateString).toLocaleString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }).replace(' ', '');
+};
+
 const PrintReceiptModal = ({ isOpen, onClose, transaction }) => {
   const printRef = useRef(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printError, setPrintError] = useState(null);
 
   if (!isOpen || !transaction) return null;
 
-  const handlePrint = () => {
+  // Calculate subtotal from items
+  const subtotal = transaction.items?.reduce((sum, item) => {
+    return sum + ((item.price || item.itemPrice || 0) * (item.quantity || 1));
+  }, 0) || transaction.totalAmount || 0;
+
+  // Get discount amount
+  const discountAmount = transaction.discountAmount || 0;
+
+  const handlePrint = async () => {
+    setIsPrinting(true);
+    setPrintError(null);
+
+    try {
+      // Build receipt data in the same format as terminal
+      const receipt = {
+        receiptNo: transaction.receiptNo || '000000',
+        storeName: 'Create Your Style',
+        location: 'Pasonanca, Zamboanga City',
+        contactNumber: '+631112224444',
+        time: formatTime(transaction.checkedOutAt || transaction.createdAt),
+        referenceNo: transaction.referenceNo || transaction._id?.substring(0, 12) || '-',
+        items: transaction.items?.map(item => ({
+          name: item.itemName || item.name || 'Item',
+          itemName: item.itemName || item.name || 'Item',
+          qty: item.quantity || 1,
+          quantity: item.quantity || 1,
+          price: item.price || item.itemPrice || 0,
+          itemPrice: item.price || item.itemPrice || 0,
+          size: item.selectedSize || item.size || ''
+        })) || [],
+        subtotal: subtotal,
+        discount: discountAmount,
+        total: transaction.totalAmount || 0,
+        cash: transaction.amountReceived || 0,
+        change: transaction.changeGiven || 0,
+        paymentMethod: (transaction.paymentMethod || 'cash').toUpperCase(),
+        cashier: transaction.performedByName || 'N/A'
+      };
+
+      await sendReceiptToPrinter(receipt);
+      setIsPrinting(false);
+      onClose();
+    } catch (error) {
+      console.error('Print error:', error);
+      setIsPrinting(false);
+      setPrintError(error.message || 'Failed to print receipt');
+      
+      // Fallback to browser print if thermal printer fails
+      fallbackBrowserPrint();
+    }
+  };
+
+  const fallbackBrowserPrint = () => {
     const printContent = printRef.current;
     if (!printContent) return;
 
@@ -35,10 +99,11 @@ const PrintReceiptModal = ({ isOpen, onClose, transaction }) => {
           <title>Receipt - ${transaction.referenceNo || 'Transaction'}</title>
           <style>
             body {
-              font-family: Arial, sans-serif;
+              font-family: 'Courier New', monospace;
               padding: 20px;
               max-width: 300px;
               margin: 0 auto;
+              font-size: 12px;
             }
             @media print {
               body { margin: 0; padding: 10px; }
@@ -52,10 +117,8 @@ const PrintReceiptModal = ({ isOpen, onClose, transaction }) => {
     `);
     printWindow.document.close();
     printWindow.focus();
-    // Use requestAnimationFrame for immediate printing - no delay needed
     requestAnimationFrame(() => {
       printWindow.print();
-      // Close window after a brief moment to allow print dialog to appear
       setTimeout(() => {
         printWindow.close();
       }, 100);
@@ -64,7 +127,7 @@ const PrintReceiptModal = ({ isOpen, onClose, transaction }) => {
 
   return (
     <div 
-      className="fixed inset-0 flex items-center justify-center z-[10000] backdrop-blur-sm bg-opacity-50"
+      className="fixed inset-0 flex items-center justify-center z-[10000] backdrop-blur-sm bg-black/50"
       onClick={onClose}
     >
       <div 
@@ -96,28 +159,34 @@ const PrintReceiptModal = ({ isOpen, onClose, transaction }) => {
             </button>
           </div>
 
+          {printError && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+              {printError}
+              <p className="text-xs mt-1">Using browser print as fallback...</p>
+            </div>
+          )}
+
+
           {/* Receipt Preview */}
-          <div ref={printRef} className="bg-white p-6 border-2 border-dashed border-gray-300 rounded-lg">
+          <div ref={printRef} className="bg-white p-6 border-2 border-dashed border-gray-300 rounded-lg font-mono text-sm">
             <div className="text-center mb-4">
-              <h3 className="text-xl font-bold text-gray-800">Create Your Style</h3>
+              <h3 className="text-lg font-bold text-gray-800">Create Your Style</h3>
               <p className="text-xs text-gray-600">Pasonanca, Zamboanga City</p>
             </div>
 
             <div className="border-t border-b border-gray-300 py-3 my-3">
               <div className="text-center">
                 <p className="text-xs text-gray-500 uppercase tracking-wider">Receipt</p>
-                {transaction.receiptNo && (
-                  <p className="text-sm font-semibold text-gray-800 mt-1">
-                    #{transaction.receiptNo}
-                  </p>
-                )}
+                <p className="text-base font-bold text-gray-800 mt-1">
+                  #{transaction.receiptNo || '000000'}
+                </p>
               </div>
             </div>
 
-            <div className="space-y-2 mb-4 text-sm">
+            <div className="space-y-1 mb-4 text-xs">
               <div className="flex justify-between">
                 <span className="text-gray-600">Date:</span>
-                <span className="text-gray-800">{formatDateTime(transaction.checkedOutAt)}</span>
+                <span className="text-gray-800">{formatDateTime(transaction.checkedOutAt || transaction.createdAt)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Cashier:</span>
@@ -129,20 +198,18 @@ const PrintReceiptModal = ({ isOpen, onClose, transaction }) => {
               </div>
             </div>
 
-            <div className="border-t border-b border-gray-300 py-3 my-3">
+            <div className="border-t border-gray-300 py-3 my-3">
               <div className="space-y-2">
                 {transaction.items && transaction.items.length > 0 ? (
                   transaction.items.map((item, idx) => (
-                    <div key={idx} className="text-sm">
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-800">{item.itemName}</p>
-                        {item.selectedSize && (
-                          <p className="text-xs text-gray-500">Size: {item.selectedSize}</p>
-                        )}
-                        <p className="text-xs text-gray-500">
-                          {item.quantity} x {formatCurrency(item.price)}
-                        </p>
-                      </div>
+                    <div key={idx} className="text-xs">
+                      <p className="font-medium text-gray-800">{item.itemName}</p>
+                      {item.selectedSize && (
+                        <p className="text-gray-500">Size: {item.selectedSize}</p>
+                      )}
+                      <p className="text-gray-500">
+                        {item.quantity} x {formatCurrency(item.price || item.itemPrice)}
+                      </p>
                     </div>
                   ))
                 ) : (
@@ -151,22 +218,30 @@ const PrintReceiptModal = ({ isOpen, onClose, transaction }) => {
               </div>
             </div>
 
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between font-semibold text-base">
+            <div className="border-t border-gray-300 pt-3 space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Subtotal:</span>
+                <span className="text-gray-800">{formatCurrency(subtotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Discount:</span>
+                <span className="text-gray-800">{formatCurrency(discountAmount)}</span>
+              </div>
+              <div className="flex justify-between font-bold text-sm pt-1 border-t border-gray-200">
                 <span>Total:</span>
                 <span>{formatCurrency(transaction.totalAmount)}</span>
               </div>
-              {transaction.amountReceived && (
-                <div className="flex justify-between">
-                  <span>Amount Received:</span>
-                  <span>{formatCurrency(transaction.amountReceived)}</span>
-                </div>
-              )}
-              {transaction.changeGiven !== undefined && transaction.changeGiven !== null && (
-                <div className="flex justify-between">
-                  <span>Change:</span>
-                  <span>{formatCurrency(transaction.changeGiven)}</span>
-                </div>
+              {transaction.amountReceived > 0 && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Amount Received:</span>
+                    <span className="text-gray-800">{formatCurrency(transaction.amountReceived)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Change:</span>
+                    <span className="text-gray-800">{formatCurrency(transaction.changeGiven)}</span>
+                  </div>
+                </>
               )}
             </div>
 
@@ -180,16 +255,27 @@ const PrintReceiptModal = ({ isOpen, onClose, transaction }) => {
         <div className="border-t border-gray-200 p-6 bg-gray-50 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-6 py-3 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold transition-all"
+            disabled={isPrinting}
+            className="flex-1 px-6 py-3 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold transition-all disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handlePrint}
-            className="flex-1 px-6 py-3 rounded-xl bg-[#AD7F65] hover:bg-[#76462B] text-white font-semibold transition-all flex items-center justify-center gap-2"
+            disabled={isPrinting}
+            className="flex-1 px-6 py-3 rounded-xl bg-[#AD7F65] hover:bg-[#76462B] text-white font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <FaPrint className="w-4 h-4" />
-            Print
+            {isPrinting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Printing...
+              </>
+            ) : (
+              <>
+                <FaPrint className="w-4 h-4" />
+                Print
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -198,4 +284,3 @@ const PrintReceiptModal = ({ isOpen, onClose, transaction }) => {
 };
 
 export default PrintReceiptModal;
-

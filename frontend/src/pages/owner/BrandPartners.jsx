@@ -3,7 +3,7 @@ import Header from '../../components/shared/header';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaPlus } from 'react-icons/fa';
-import sortIcon from '../../assets/sort.svg';
+import filterIcon from '../../assets/filter.svg';
 import ViewBrandProductsModal from '../../components/owner/ViewBrandProductsModal';
 import AddBrandPartnerModal from '../../components/owner/AddBrandPartnerModal';
 
@@ -66,7 +66,7 @@ const BrandPartners = () => {
             />
           </div>
           <button className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <img src={sortIcon} alt="Filter" className="w-5 h-5 opacity-90" />
+            <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
           </button>
         </div>
 

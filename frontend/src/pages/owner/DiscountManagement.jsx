@@ -3,7 +3,7 @@ import Header from '../../components/shared/header';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaPlus, FaEdit, FaTrash, FaBox, FaUsers, FaTag, FaCalendar } from 'react-icons/fa';
-import sortIcon from '../../assets/sort.svg';
+import filterIcon from '../../assets/filter.svg';
 import AddDiscountModal from '../../components/owner/AddDiscountModal';
 
 const icon20Percent = new URL('../../assets/owner/20.png', import.meta.url).href;
@@ -214,7 +214,7 @@ const DiscountManagement = () => {
             />
           </div>
           <button className="p-2 hover:bg-gray-100 rounded-lg ml-23">
-            <img src={sortIcon} alt="Filter" className="w-5 h-5 opacity-90" />
+            <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
           </button>
         </div>
         <button

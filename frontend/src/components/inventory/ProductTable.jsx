@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { MdCategory } from 'react-icons/md';
 
 const ProductTable = ({
@@ -7,7 +7,13 @@ const ProductTable = ({
   handleEditProduct,
   handleDeleteProduct,
   handleViewProduct,
-  handleStockUpdate
+  handleStockUpdate,
+  selectedProductIds = [],
+  onToggleSelect,
+  onToggleSelectAll,
+  showSelection = false,
+  allVisibleSelected = false,
+  someVisibleSelected = false
 }) => {
   // Helper function to get price from size data
   const getSizePrice = (sizeData) => {
@@ -16,6 +22,14 @@ const ProductTable = ({
     }
     return null;
   };
+
+  const selectAllRef = useRef(null);
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = showSelection && !allVisibleSelected && someVisibleSelected;
+    }
+  }, [showSelection, allVisibleSelected, someVisibleSelected]);
 
   // Function to get price range for products with sizes
   const getPriceRange = (product) => {
@@ -60,11 +74,22 @@ const ProductTable = ({
           <table className="w-full relative border-separate" style={{ borderSpacing: '0' }}>
             <thead className="border-b">
               <tr className="text-left text-sm text-gray-600">
+                {showSelection && (
+                  <th className="pb-3 pr-4 w-10">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      className="w-4 h-4 text-[#AD7F65] border-gray-300 rounded focus:ring-[#AD7F65]"
+                      onChange={onToggleSelectAll}
+                      checked={showSelection ? allVisibleSelected : false}
+                    />
+                  </th>
+                )}
                 <th className="pb-3 pr-4">Item Image</th>
                 <th className="pb-3 px-4">SKU</th>
                 <th className="pb-3 px-4">Item Name</th>
                 <th className="pb-3 px-4">Category</th>
-                <th className="pb-3 px-4">Variant</th>
+                <th className="pb-3 px-4">Brand</th>
                 <th className="pb-3 px-4">Item Price</th>
                 <th className="pb-3 px-4 text-center">Current Stock</th>
                 <th className="pb-3 px-4 text-center">Terminal</th>
@@ -78,6 +103,16 @@ const ProductTable = ({
                   className="border-b hover:bg-gray-50 cursor-pointer"
                   onClick={() => handleViewProduct(product)}
                 >
+                  {showSelection && (
+                    <td className="py-3 pr-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 text-[#AD7F65] border-gray-300 rounded focus:ring-[#AD7F65]"
+                        checked={selectedProductIds.includes(product._id)}
+                        onChange={() => onToggleSelect && onToggleSelect(product._id)}
+                      />
+                    </td>
+                  )}
                   <td className="py-3 pr-4">
                     {product.itemImage && product.itemImage.trim() !== '' ? (
                       <img src={product.itemImage} alt={product.itemName} className="w-12 h-12 object-cover rounded" />
@@ -90,7 +125,7 @@ const ProductTable = ({
                   <td className="py-3 px-4">{product.sku}</td>
                   <td className="py-3 px-4">{product.itemName}</td>
                   <td className="py-3 px-4">{product.category}</td>
-                  <td className="py-3 px-4">{product.variant || '-'}</td>
+                  <td className="py-3 px-4">{product.brandName || '-'}</td>
                   <td className="py-3 px-4">
                     {(() => {
                       const priceRange = getPriceRange(product);
@@ -173,19 +208,6 @@ const ProductTable = ({
                         </svg>
                       </button>
 
-                      {/* Delete Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteProduct(product);
-                        }}
-                        className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
-                        title="Delete"
-                      >
-                        <svg className="w-6 h-6 text-red-500 group-hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
                     </div>
                   </td>
                 </tr>

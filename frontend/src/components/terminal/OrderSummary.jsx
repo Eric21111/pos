@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
-import { FaEdit, FaMinus, FaPlus, FaTag, FaTimes } from 'react-icons/fa';
+import React, { useState, useRef } from 'react';
+import { FaMinus, FaPlus, FaTag, FaTimes } from 'react-icons/fa';
+import { HiDocumentRemove } from 'react-icons/hi';
 import { MdCategory } from 'react-icons/md';
 import cashIcon from '../../assets/cash.svg';
 import qrIcon from '../../assets/qr.png';
 import RemoveItemPinModal from './RemoveItemPinModal';
+import VoidTransactionModal from './VoidTransactionModal';
 import { useAuth } from '../../context/AuthContext';
 
 const OrderSummary = ({
   cart,
   removeFromCart,
+  removeFromCartDirect,
   updateQuantity,
   discountAmount,
   setDiscountAmount,
-  selectedDiscount,
+  selectedDiscounts = [],
   onRemoveDiscount,
   calculateSubtotal,
   calculateDiscount,
@@ -30,6 +33,12 @@ const OrderSummary = ({
   const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
   const [itemToRemove, setItemToRemove] = useState(null);
   const [applyingDiscount, setApplyingDiscount] = useState(false);
+  const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);
+  const [itemsToVoid, setItemsToVoid] = useState([]);
+  const [isBulkVoid, setIsBulkVoid] = useState(false);
+  const isProcessingVoidRef = useRef(false);
+  // Track pending quantity changes per item (key: item._id + selectedSize)
+  const [pendingQuantities, setPendingQuantities] = useState({});
   
   const handleProceed = () => {
     if (selectedPaymentMethod === 'cash' && onCashPayment) {
@@ -41,12 +50,95 @@ const OrderSummary = ({
     }
   };
 
-  const handleMinusClick = (item) => {
-    setItemToRemove(item);
-    setIsRemoveModalOpen(true);
+  // Get unique key for an item
+  const getItemKey = (item) => {
+    return `${item._id || item.productId}-${item.selectedSize || item.size || ''}`;
   };
 
-  const handleRemoveConfirm = async (reason) => {
+  // Get the displayed quantity (pending or actual)
+  const getDisplayQuantity = (item) => {
+    const key = getItemKey(item);
+    return pendingQuantities[key] !== undefined ? pendingQuantities[key] : item.quantity;
+  };
+
+  // Check if item has pending changes
+  const hasPendingChange = (item) => {
+    const key = getItemKey(item);
+    return pendingQuantities[key] !== undefined && pendingQuantities[key] !== item.quantity;
+  };
+
+  // Handle minus click - decrease pending quantity
+  const handleMinusClick = (item) => {
+    const key = getItemKey(item);
+    const currentPending = pendingQuantities[key] !== undefined ? pendingQuantities[key] : item.quantity;
+    
+    if (currentPending > 1) {
+      setPendingQuantities(prev => ({
+        ...prev,
+        [key]: currentPending - 1
+      }));
+    }
+  };
+
+  // Handle plus click for pending quantity
+  const handlePlusClickPending = (item) => {
+    const key = getItemKey(item);
+    const currentPending = pendingQuantities[key] !== undefined ? pendingQuantities[key] : item.quantity;
+    
+    // Check max stock
+    let maxQty = item.currentStock;
+    if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
+      const sizeData = item.sizes[item.selectedSize];
+      maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
+        ? sizeData.quantity
+        : (typeof sizeData === 'number' ? sizeData : 0);
+    }
+    
+    if (!maxQty || currentPending < maxQty) {
+      setPendingQuantities(prev => ({
+        ...prev,
+        [key]: currentPending + 1
+      }));
+    }
+  };
+
+  // Cancel pending change
+  const handleCancelPending = (item) => {
+    const key = getItemKey(item);
+    setPendingQuantities(prev => {
+      const newState = { ...prev };
+      delete newState[key];
+      return newState;
+    });
+  };
+
+  // Confirm pending change - show PIN modal if reducing quantity
+  const handleConfirmPending = (item) => {
+    const key = getItemKey(item);
+    const pendingQty = pendingQuantities[key];
+    
+    if (pendingQty < item.quantity) {
+      // Reducing quantity - need PIN verification for void
+      const voidQuantity = item.quantity - pendingQty;
+      const voidTotalAmount = item.itemPrice * voidQuantity;
+      setItemToRemove({
+        ...item,
+        voidQuantity: voidQuantity,
+        newQuantity: pendingQty,
+        // Set itemPrice to total void amount for display in modal
+        itemPrice: voidTotalAmount,
+        // Keep original unit price for void log
+        originalUnitPrice: item.itemPrice
+      });
+      setIsRemoveModalOpen(true);
+    } else if (pendingQty > item.quantity) {
+      // Increasing quantity - no PIN needed
+      updateQuantity(item, pendingQty);
+      handleCancelPending(item);
+    }
+  };
+
+  const handleRemoveConfirm = async (reason, approverInfo = {}) => {
     if (!itemToRemove) {
       setIsRemoveModalOpen(false);
       setItemToRemove(null);
@@ -54,8 +146,9 @@ const OrderSummary = ({
     }
 
     try {
-      // Calculate the quantity to void (always 1 when clicking minus)
-      const voidQuantity = 1;
+      // Calculate the quantity to void (use voidQuantity if set, otherwise 1)
+      const voidQuantity = itemToRemove.voidQuantity || 1;
+      const newQuantity = itemToRemove.newQuantity !== undefined ? itemToRemove.newQuantity : (itemToRemove.quantity - 1);
       const voidAmount = itemToRemove.itemPrice * voidQuantity;
 
       // Prepare the voided item with voidReason
@@ -96,22 +189,67 @@ const OrderSummary = ({
         // Still proceed with removing the item even if logging fails
       }
 
+      // Also create a void log entry for the void logs page
+      try {
+        const voidLogResponse = await fetch('http://localhost:5000/api/void-logs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            items: [voidedItem],
+            totalAmount: voidAmount,
+            voidReason: reason,
+            voidedById: currentUser?._id || currentUser?.id || '',
+            voidedByName: currentUser?.name || `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || 'System',
+            approvedBy: approverInfo.approvedBy || null,
+            approvedByRole: approverInfo.approvedByRole || null,
+            source: 'cart',
+            userId: userId
+          })
+        });
+
+        const voidLogData = await voidLogResponse.json();
+        
+        if (!voidLogData.success) {
+          console.error('Failed to create void log:', voidLogData.message);
+        }
+      } catch (voidLogError) {
+        console.error('Error creating void log:', voidLogError);
+      }
+
       // Remove or decrease quantity after successful void logging
-      if (itemToRemove.quantity === 1) {
-        // If quantity is 1, remove the item completely
+      if (newQuantity <= 0) {
+        // If new quantity is 0 or less, remove the item completely
         removeFromCart(itemToRemove);
       } else {
-        // If quantity > 1, decrease the quantity
-        updateQuantity(itemToRemove, itemToRemove.quantity - 1);
+        // Update to the new quantity
+        updateQuantity(itemToRemove, newQuantity);
       }
+      
+      // Clear pending quantity for this item
+      const key = getItemKey(itemToRemove);
+      setPendingQuantities(prev => {
+        const newState = { ...prev };
+        delete newState[key];
+        return newState;
+      });
     } catch (error) {
       console.error('Error recording void transaction:', error);
       // Still proceed with removing the item even if logging fails
-      if (itemToRemove.quantity === 1) {
+      const newQuantity = itemToRemove.newQuantity !== undefined ? itemToRemove.newQuantity : (itemToRemove.quantity - 1);
+      if (newQuantity <= 0) {
         removeFromCart(itemToRemove);
       } else {
-        updateQuantity(itemToRemove, itemToRemove.quantity - 1);
+        updateQuantity(itemToRemove, newQuantity);
       }
+      // Clear pending quantity
+      const key = getItemKey(itemToRemove);
+      setPendingQuantities(prev => {
+        const newState = { ...prev };
+        delete newState[key];
+        return newState;
+      });
     } finally {
       setIsRemoveModalOpen(false);
       setItemToRemove(null);
@@ -121,6 +259,158 @@ const OrderSummary = ({
   const handleRemoveModalClose = () => {
     setIsRemoveModalOpen(false);
     setItemToRemove(null);
+    setItemsToVoid([]);
+    setIsBulkVoid(false);
+  };
+
+  // Void Transaction Modal handlers
+  const handleVoidButtonClick = () => {
+    if (cart.length > 0) {
+      setIsVoidModalOpen(true);
+    }
+  };
+
+  const handleVoidModalClose = () => {
+    setIsVoidModalOpen(false);
+  };
+
+  const handleVoidItemsConfirm = (selectedItems) => {
+    if (selectedItems.length > 0) {
+      setItemsToVoid(selectedItems);
+      setIsBulkVoid(true);
+      setIsVoidModalOpen(false);
+      // Create a synthetic item for the PIN modal to show total
+      const totalAmount = selectedItems.reduce((sum, item) => sum + (item.itemPrice * item.quantity), 0);
+      setItemToRemove({
+        itemPrice: totalAmount,
+        quantity: 1,
+        itemName: `${selectedItems.length} item${selectedItems.length > 1 ? 's' : ''}`
+      });
+      setIsRemoveModalOpen(true);
+    }
+  };
+
+  const handleBulkVoidConfirm = async (reason, approverInfo = {}) => {
+    // Prevent duplicate calls
+    if (isProcessingVoidRef.current) {
+      console.log('[OrderSummary] Already processing void, skipping');
+      return;
+    }
+    
+    if (!itemsToVoid || itemsToVoid.length === 0) {
+      setIsRemoveModalOpen(false);
+      setItemsToVoid([]);
+      setIsBulkVoid(false);
+      return;
+    }
+
+    // Mark as processing
+    isProcessingVoidRef.current = true;
+
+    // Store items to remove before clearing state
+    const itemsToRemove = [...itemsToVoid];
+
+    // Clear all modal state FIRST to prevent reopening
+    setIsRemoveModalOpen(false);
+    setItemToRemove(null);
+    setItemsToVoid([]);
+    setIsBulkVoid(false);
+
+    // Small delay to ensure modal state is fully cleared before cart operations
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    try {
+      // Prepare all voided items for a single transaction
+      const voidedItems = itemsToRemove.map(item => ({
+        productId: item.productId || item._id || item.id,
+        itemName: item.itemName,
+        sku: item.sku,
+        variant: item.variant || item.selectedVariation,
+        selectedSize: item.selectedSize || item.size,
+        quantity: item.quantity,
+        price: item.itemPrice,
+        itemImage: item.itemImage || '',
+        voidReason: reason
+      }));
+
+      // Calculate total amount for all items
+      const totalAmount = itemsToRemove.reduce((sum, item) => sum + (item.itemPrice * item.quantity), 0);
+
+      // Record single void transaction for all items
+      const response = await fetch('http://localhost:5000/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId,
+          items: voidedItems,
+          paymentMethod: 'void',
+          totalAmount: totalAmount,
+          performedById: currentUser?._id || currentUser?.id || '',
+          performedByName: currentUser?.name || `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || 'System',
+          status: 'Voided',
+          voidReason: reason
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        console.error('Failed to record void transaction:', data.message);
+      }
+
+      // Also create a void log entry for the void logs page
+      try {
+        const voidLogResponse = await fetch('http://localhost:5000/api/void-logs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            items: voidedItems,
+            totalAmount: totalAmount,
+            voidReason: reason,
+            voidedById: currentUser?._id || currentUser?.id || '',
+            voidedByName: currentUser?.name || `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || 'System',
+            approvedBy: approverInfo.approvedBy || null,
+            approvedByRole: approverInfo.approvedByRole || null,
+            source: 'cart',
+            userId: userId
+          })
+        });
+
+        const voidLogData = await voidLogResponse.json();
+        
+        if (!voidLogData.success) {
+          console.error('Failed to create void log:', voidLogData.message);
+        }
+      } catch (voidLogError) {
+        console.error('Error creating void log:', voidLogError);
+      }
+
+      // Remove all items from cart using direct remove (no PIN modal)
+      for (const item of itemsToRemove) {
+        if (removeFromCartDirect) {
+          removeFromCartDirect(item);
+        } else {
+          removeFromCart(item);
+        }
+      }
+    } catch (error) {
+      console.error('Error recording bulk void transaction:', error);
+      // Still remove items from cart even if logging fails
+      for (const item of itemsToRemove) {
+        if (removeFromCartDirect) {
+          removeFromCartDirect(item);
+        } else {
+          removeFromCart(item);
+        }
+      }
+    } finally {
+      // Reset processing flag
+      isProcessingVoidRef.current = false;
+    }
   };
 
   const applyDiscountCode = async () => {
@@ -170,10 +460,20 @@ const OrderSummary = ({
   };
   return (
     <div className="h-full bg-white rounded-[22px] border border-gray-200 flex flex-col" style={{ boxShadow: '5px 0 15px rgba(0,0,0,0.08), 0 7px 17px rgba(0,0,0,0.05)' }}>
-      <div className="px-6 py-5 flex items-center">
-        <h2 className="text-xl font-bold flex-1 text-center">Order Summary</h2>
-        <button className="text-gray-400 hover:text-gray-600 ml-2">
-          <FaEdit />
+      <div className="px-6 py-5 flex items-center justify-between">
+        <div className="w-8"></div> {/* Spacer for centering */}
+        <h2 className="text-xl font-bold text-center">Order Summary</h2>
+        <button
+          onClick={handleVoidButtonClick}
+          disabled={cart.length === 0}
+          className={`w-8 h-8 flex items-center justify-center transition-all ${
+            cart.length === 0
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-red-500 hover:text-red-700'
+          }`}
+          title="Void Transaction"
+        >
+          <HiDocumentRemove className="w-6 h-6" />
         </button>
       </div>
 
@@ -184,70 +484,68 @@ const OrderSummary = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {cart.map((item) => (
-              <div key={item._id} className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-[0_3px_8px_rgba(0,0,0,0.04)] p-3">
-                <div className="w-16 h-16 bg-gray-100 rounded-lg shrink-0 overflow-hidden">
-                  {item.itemImage && item.itemImage.trim() !== '' ? (
-                    <img 
-                      src={item.itemImage} 
-                      alt={item.itemName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <MdCategory className="text-2xl text-gray-400" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-medium text-sm mb-1">
-                    {item.itemName}{item.variant ? ` (${item.variant})` : ''}
-                  </h3>
-                  <p className="text-xs text-gray-500 mb-2">
-                    SKU: {item.sku}<br />
-                    Size: {item.selectedSize || item.size || 'N/A'}<br />
-                    Color: {item.selectedVariation || item.variant || 'N/A'}
-                  </p>
-                  <p className="text-sm font-bold text-[#AD7F65]">
-                    PHP {item.itemPrice.toFixed(2)}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end justify-between gap-2">
-                  <button
-                    onClick={() => removeFromCart(item)}
-                    className="text-red-500 hover:text-red-700 text-xs"
-                  >
-                    ×
-                  </button>
-                  {/* <button
-                    className="px-3 py-1.5 text-xs text-white rounded-full hover:opacity-90 transition-all"
-                    style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
-                  >
-                    Add Discount
-                  </button> */}
-                  <div className="flex items-center gap-2">
+            {cart.map((item, index) => {
+              const displayQty = getDisplayQuantity(item);
+              const hasPending = hasPendingChange(item);
+              const isReducing = hasPending && displayQty < item.quantity;
+              
+              return (
+              <div key={item._id || item.productId || `cart-item-${index}`} className={`relative bg-white rounded-xl border shadow-[0_3px_8px_rgba(0,0,0,0.04)] p-3 ${hasPending ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 bg-gray-100 rounded-lg shrink-0 overflow-hidden">
+                    {item.itemImage && item.itemImage.trim() !== '' ? (
+                      <img 
+                        src={item.itemImage} 
+                        alt={item.itemName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <MdCategory className="text-2xl text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-sm mb-1 pr-4">
+                      {item.itemName}{item.variant ? ` (${item.variant})` : ''}
+                    </h3>
+                    <p className="text-xs text-gray-500 mb-2">
+                      SKU: {item.sku}<br />
+                      Size: {item.selectedSize || item.size || 'N/A'}<br />
+                      Color: {item.selectedVariation || item.variant || 'N/A'}
+                    </p>
+                    <p className="text-sm font-bold text-[#AD7F65]">
+                      PHP {((item.itemPrice || 0) * displayQty).toFixed(2)}
+                    </p>
+                    {displayQty > 1 && (
+                      <p className="text-xs text-gray-400">
+                        ₱{(item.itemPrice || 0).toFixed(2)} × {displayQty}
+                      </p>
+                    )}
+                    {hasPending && isReducing && (
+                      <p className="text-xs text-orange-600 mt-1">
+                        Voiding {item.quantity - displayQty} item(s)
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end justify-end gap-2">
+                    <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleMinusClick(item)}
-                      className="w-6 h-6 flex items-center justify-center bg-[#AD7F65] text-white rounded-full shadow-sm hover:bg-[#8B5F45] transition-all"
+                      disabled={displayQty <= 1}
+                      className={`w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-all ${
+                        displayQty <= 1
+                          ? 'bg-gray-300 text-white cursor-not-allowed'
+                          : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
+                      }`}
                     >
                       <FaMinus className="text-[10px]" />
                     </button>
-                    <span className="text-gray-800 font-semibold min-w-[18px] text-center text-sm">
-                      {item.quantity}
+                    <span className={`font-semibold min-w-[18px] text-center text-sm ${hasPending ? 'text-orange-600' : 'text-gray-800'}`}>
+                      {displayQty}
                     </span>
                     <button
-                      onClick={() => {
-                        let maxQty = item.currentStock;
-                        if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
-                          const sizeData = item.sizes[item.selectedSize];
-                          maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
-                            ? sizeData.quantity
-                            : (typeof sizeData === 'number' ? sizeData : 0);
-                        }
-                        if (!maxQty || item.quantity < maxQty) {
-                          updateQuantity(item, item.quantity + 1);
-                        }
-                      }}
+                      onClick={() => handlePlusClickPending(item)}
                       className={`w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-all ${
                         (() => {
                           if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
@@ -255,7 +553,7 @@ const OrderSummary = ({
                             const maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
                               ? sizeData.quantity
                               : (typeof sizeData === 'number' ? sizeData : 0);
-                            return item.quantity >= maxQty;
+                            return displayQty >= maxQty;
                           }
                           return false;
                         })()
@@ -269,7 +567,7 @@ const OrderSummary = ({
                             const maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
                               ? sizeData.quantity
                               : (typeof sizeData === 'number' ? sizeData : 0);
-                            return item.quantity >= maxQty;
+                            return displayQty >= maxQty;
                           }
                           return false;
                         })()
@@ -277,10 +575,29 @@ const OrderSummary = ({
                     >
                       <FaPlus className="text-[10px]" />
                     </button>
+                    </div>
+                    {/* Confirm/Cancel buttons when there's a pending change */}
+                    {hasPending && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <button
+                          onClick={() => handleCancelPending(item)}
+                          className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleConfirmPending(item)}
+                          className="px-2 py-1 text-xs bg-[#AD7F65] text-white rounded hover:bg-[#8B5F45] transition-all"
+                        >
+                          Confirm
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>
@@ -288,56 +605,63 @@ const OrderSummary = ({
       <div className="px-6 py-6  bg-white">
         <div className="mb-6">
           <label className="block text-xs font-semibold text-[#8B7355] mb-2">Discount</label>
-          {selectedDiscount ? (
-            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-[#d6c1b5]">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <FaTag className="text-[#AD7F65] text-sm" />
-                  <span className="text-sm font-medium text-gray-800">{selectedDiscount.title}</span>
+          
+          {/* Display applied discounts */}
+          {selectedDiscounts.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {selectedDiscounts.map((discount) => (
+                <div key={discount._id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-[#d6c1b5]">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <FaTag className="text-[#AD7F65] text-sm" />
+                      <span className="text-sm font-medium text-gray-800">{discount.title}</span>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-0.5">
+                      {discount.discountValue}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => onRemoveDiscount(discount._id)}
+                    className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-all"
+                    title="Remove discount"
+                  >
+                    <FaTimes className="w-4 h-4" />
+                  </button>
                 </div>
-                <div className="text-xs text-gray-600 mt-1">
-                  {selectedDiscount.discountValue}
-                </div>
-              </div>
-              <button
-                onClick={onRemoveDiscount}
-                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-all"
-                title="Remove discount"
-              >
-                <FaTimes className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Enter discount code"
-                value={discountCode}
-                onChange={(e) => setDiscountCode(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !applyingDiscount) {
-                    applyDiscountCode();
-                  }
-                }}
-                className="flex-1 px-4 py-2 rounded-lg border border-[#d6c1b5] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-              />
-              <button
-                onClick={onOpenDiscountModal}
-                className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-all"
-                title="Browse discounts"
-              >
-                <FaTag className="w-4 h-4" />
-              </button>
-              <button
-                onClick={applyDiscountCode}
-                disabled={applyingDiscount || !discountCode || !discountCode.trim()}
-                className="px-4 py-2 text-white rounded-lg font-medium hover:opacity-90 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
-              >
-                {applyingDiscount ? 'Applying...' : 'Apply'}
-              </button>
+              ))}
             </div>
           )}
+          
+          {/* Always show discount input to add more discounts */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Enter discount code"
+              value={discountCode}
+              onChange={(e) => setDiscountCode(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !applyingDiscount) {
+                  applyDiscountCode();
+                }
+              }}
+              className="flex-1 px-4 py-2 rounded-lg border border-[#d6c1b5] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+            />
+            <button
+              onClick={onOpenDiscountModal}
+              className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-all"
+              title="Browse discounts"
+            >
+              <FaTag className="w-4 h-4" />
+            </button>
+            <button
+              onClick={applyDiscountCode}
+              disabled={applyingDiscount || !discountCode || !discountCode.trim()}
+              className="px-4 py-2 text-white rounded-lg font-medium hover:opacity-90 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+            >
+              {applyingDiscount ? 'Applying...' : 'Apply'}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-2 mb-6 text-xs">
@@ -369,7 +693,7 @@ const OrderSummary = ({
               <img src={cashIcon} alt="Cash" className="w-7 h-7 mb-1" />
               <span className="text-xs font-medium text-gray-700">Cash</span>
             </button>
-            {/* <button
+            <button
               onClick={() => setSelectedPaymentMethod('qr')}
               className={`w-24 flex flex-col items-center justify-center py-0 rounded-lg border-2 transition-all ${
                 selectedPaymentMethod === 'qr'
@@ -379,7 +703,7 @@ const OrderSummary = ({
             >
               <img src={qrIcon} alt="QR Code" className="w-12 h-12 mb-4 " />
               <span className=" absolute text-xs font-medium text-gray-700 translate-y-4">Gcash</span>
-            </button> */}
+            </button>
           </div>
         </div>
 
@@ -393,10 +717,17 @@ const OrderSummary = ({
         </button>
       </div>
 
+      <VoidTransactionModal
+        isOpen={isVoidModalOpen}
+        onClose={handleVoidModalClose}
+        onConfirm={handleVoidItemsConfirm}
+        cartItems={cart}
+      />
+
       <RemoveItemPinModal
         isOpen={isRemoveModalOpen}
         onClose={handleRemoveModalClose}
-        onConfirm={handleRemoveConfirm}
+        onConfirm={isBulkVoid ? handleBulkVoidConfirm : handleRemoveConfirm}
         item={itemToRemove}
       />
     </div>

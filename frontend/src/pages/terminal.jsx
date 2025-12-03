@@ -8,12 +8,14 @@ import { MdCategory } from 'react-icons/md';
 import CategoryButtons from '../components/shared/CategoryButtons';
 import OrderSummary from '../components/terminal/OrderSummary';
 import ProductCard from '../components/terminal/ProductCard';
+import ProductDetailsModal from '../components/terminal/ProductDetailsModal';
 import Pagination from '../components/inventory/Pagination';
 import CheckoutConfirmationModal from '../components/terminal/CheckoutConfirmationModal';
 import CashPaymentModal from '../components/terminal/CashPaymentModal';
 import QRCodePaymentModal from '../components/terminal/QRCodePaymentModal';
 import DiscountModal from '../components/terminal/DiscountModal';
 import RemoveItemPinModal from '../components/terminal/RemoveItemPinModal';
+import DuplicateItemModal from '../components/terminal/DuplicateItemModal';
 
 
 import allIcon from '../assets/inventory-icons/ALL.svg';
@@ -28,13 +30,16 @@ import headWearIcon from '../assets/inventory-icons/head wear.svg';
 const Terminal = () => {
   const { currentUser } = useAuth();
   const { getCachedData, setCachedData, isCacheValid, invalidateCache } = useDataCache();
+  // Get userId from currentUser for transaction recording
   const userId = currentUser?._id || currentUser?.id || currentUser?.email || 'guest';
+  // Use a shared cart ID so cart persists across all users - cart is tied to the POS terminal, not individual users
+  const cartId = 'pos-shared-cart';
   const [products, setProducts] = useState(() => getCachedData('products') || []);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState([]);
   const [discountAmount, setDiscountAmount] = useState('');
-  const [selectedDiscount, setSelectedDiscount] = useState(null);
+  const [selectedDiscounts, setSelectedDiscounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expandedProductId, setExpandedProductId] = useState(null);
   const [productQuantities, setProductQuantities] = useState({});
@@ -47,6 +52,11 @@ const Terminal = () => {
   const [cartReadyForSync, setCartReadyForSync] = useState(false);
   const [showRemoveItemModal, setShowRemoveItemModal] = useState(false);
   const [itemToRemove, setItemToRemove] = useState(null);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [pendingDuplicateItem, setPendingDuplicateItem] = useState(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [sortOption, setSortOption] = useState('newest');
   const itemsPerPage = 10; 
 
   const resolveItemSize = (item = {}) => {
@@ -62,7 +72,7 @@ const Terminal = () => {
     ...item,
     _id: item._id || item.productId || item.id,
     productId: item.productId || item._id || item.id,
-    itemPrice: item.itemPrice || 0,
+    itemPrice: item.itemPrice || item.price || 0,
     quantity: item.quantity || 1,
     selectedSize: resolveItemSize(item),
     sizes: item.sizes || productSizes[item._id || item.productId] || productSizes[item.productId || item._id] || {}
@@ -131,37 +141,56 @@ const Terminal = () => {
     fetchCategories();
   }, []);
 
+  // Load cart from server first (database is source of truth), fallback to localStorage
+  // Cart is shared across all users - tied to POS terminal, not individual users
   useEffect(() => {
-    try {
-      const savedCart = localStorage.getItem('pos_cart');
-      if (savedCart) {
-        const parsedCart = JSON.parse(savedCart);
-        if (Array.isArray(parsedCart)) {
-          setCart(parsedCart.map((item) => normalizeCartItem({
-            ...item,
-            sizes: item.sizes || productSizes[item._id || item.productId] || {}
-          })));
-        }
-      }
-    } catch (error) {
-      console.warn('Unable to load saved cart', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!userId) return;
     let isMounted = true;
 
-    const fetchCartFromServer = async () => {
+    const loadCart = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/cart/${encodeURIComponent(userId)}`);
+        // First, try to load from server (database) using shared cart ID
+        const response = await fetch(`http://localhost:5000/api/cart/${encodeURIComponent(cartId)}`);
         const data = await response.json();
 
-        if (isMounted && data.success && data.data?.items?.length) {
-          setCart(data.data.items.map(normalizeCartItem));
+        if (isMounted && data.success) {
+          // If server has cart items, use them (database is source of truth)
+          if (data.data?.items?.length) {
+            setCart(data.data.items.map(normalizeCartItem));
+          } else {
+            // Server has no items - check localStorage as fallback
+            try {
+              const savedCart = localStorage.getItem('pos_cart');
+              if (savedCart) {
+                const parsedCart = JSON.parse(savedCart);
+                if (Array.isArray(parsedCart) && parsedCart.length > 0) {
+                  setCart(parsedCart.map((item) => normalizeCartItem({
+                    ...item,
+                    sizes: item.sizes || productSizes[item._id || item.productId] || {}
+                  })));
+                }
+              }
+            } catch (localError) {
+              console.warn('Unable to load saved cart from localStorage', localError);
+            }
+          }
         }
       } catch (error) {
-        console.warn('Unable to load cart from server', error);
+        console.warn('Unable to load cart from server, trying localStorage', error);
+        // Fallback to localStorage if server fails
+        try {
+          const savedCart = localStorage.getItem('pos_cart');
+          if (savedCart) {
+            const parsedCart = JSON.parse(savedCart);
+            if (Array.isArray(parsedCart)) {
+              setCart(parsedCart.map((item) => normalizeCartItem({
+                ...item,
+                sizes: item.sizes || productSizes[item._id || item.productId] || {}
+              })));
+            }
+          }
+        } catch (localError) {
+          console.warn('Unable to load saved cart from localStorage', localError);
+        }
       } finally {
         if (isMounted) {
           setCartReadyForSync(true);
@@ -169,19 +198,19 @@ const Terminal = () => {
       }
     };
 
-    fetchCartFromServer();
+    loadCart();
 
     return () => {
       isMounted = false;
     };
-  }, [userId]);
+  }, [cartId]);
 
   useEffect(() => {
-    if (!userId || !cartReadyForSync) return;
+    if (!cartReadyForSync) return;
 
     const saveCartToServer = async () => {
       try {
-        await fetch(`http://localhost:5000/api/cart/${encodeURIComponent(userId)}`, {
+        await fetch(`http://localhost:5000/api/cart/${encodeURIComponent(cartId)}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -194,15 +223,17 @@ const Terminal = () => {
     };
 
     saveCartToServer();
-  }, [cart, userId, cartReadyForSync]);
+  }, [cart, cartId, cartReadyForSync]);
 
+  // Save cart to localStorage (shared across all users)
   useEffect(() => {
+    if (!cartReadyForSync) return;
     try {
       localStorage.setItem('pos_cart', JSON.stringify(cart));
     } catch (error) {
       console.warn('Unable to persist cart', error);
     }
-  }, [cart]);
+  }, [cart, cartReadyForSync]);
 
  
   const filteredProducts = useMemo(() => {
@@ -243,8 +274,23 @@ const Terminal = () => {
       );
     }
 
+    // Apply sorting
+    filtered = [...filtered].sort((a, b) => {
+      switch (sortOption) {
+        case 'a-z':
+          return (a.itemName || '').localeCompare(b.itemName || '');
+        case 'z-a':
+          return (b.itemName || '').localeCompare(a.itemName || '');
+        case 'oldest':
+          return new Date(a.dateAdded || a.createdAt || 0) - new Date(b.dateAdded || b.createdAt || 0);
+        case 'newest':
+        default:
+          return new Date(b.dateAdded || b.createdAt || 0) - new Date(a.dateAdded || a.createdAt || 0);
+      }
+    });
+
     return filtered;
-  }, [products, selectedCategory, searchQuery]);
+  }, [products, selectedCategory, searchQuery, sortOption]);
 
   useEffect(() => {
     setCurrentPage(1); 
@@ -268,23 +314,26 @@ const Terminal = () => {
   };
 
   const handleProductClick = (product) => {
-    if (expandedProductId === product._id) {
-      setExpandedProductId(null);
-    } else {
-      setExpandedProductId(product._id);
-      if (!productQuantities[product._id]) {
-        setProductQuantities({ ...productQuantities, [product._id]: 1 });
-      }
-      if (!productSizes[product._id]) {
-     
-        const availableSizes = product.sizes && typeof product.sizes === 'object' 
-          ? Object.keys(product.sizes) 
-          : ['XS', 'S', 'M', 'L'];
-        const defaultSize = availableSizes.length > 0 ? availableSizes[0] : 'XS';
-        setProductSizes({ ...productSizes, [product._id]: defaultSize });
-      }
-     
+    // Open modal instead of expanding
+    setSelectedProduct(product);
+    setShowProductModal(true);
+    
+    // Initialize quantity and size if not set
+    if (!productQuantities[product._id]) {
+      setProductQuantities({ ...productQuantities, [product._id]: 1 });
     }
+    if (!productSizes[product._id]) {
+      const availableSizes = product.sizes && typeof product.sizes === 'object' 
+        ? Object.keys(product.sizes) 
+        : [];
+      const defaultSize = availableSizes.length > 0 ? availableSizes[0] : '';
+      setProductSizes({ ...productSizes, [product._id]: defaultSize });
+    }
+  };
+
+  const handleCloseProductModal = () => {
+    setShowProductModal(false);
+    setSelectedProduct(null);
   };
 
   const updateProductQuantity = (productId, delta) => {
@@ -411,18 +460,46 @@ const Terminal = () => {
       itemPrice: itemPrice // Use size-specific price if available
     };
     
+    // If item already exists in cart, show confirmation modal
     if (existingItem) {
-      setCart(cart.map(item => 
-        item._id === product._id && 
-        item.selectedSize === size
-          ? { ...item, quantity: item.quantity + quantity }
-          : item
-      ));
-    } else {
-      setCart([...cart, productToAdd]);
+      setPendingDuplicateItem({ product: productToAdd, existingQuantity: existingItem.quantity });
+      setShowDuplicateModal(true);
+      return;
     }
-
+    
+    // Add new item to cart
+    setCart([...cart, productToAdd]);
     setExpandedProductId(null);
+    // Close the product modal
+    setShowProductModal(false);
+    setSelectedProduct(null);
+  };
+
+  // Handle confirming duplicate item addition
+  const handleConfirmDuplicateAdd = () => {
+    if (!pendingDuplicateItem) return;
+    
+    const { product } = pendingDuplicateItem;
+    
+    setCart(cart.map(item => 
+      item._id === product._id && 
+      item.selectedSize === product.selectedSize
+        ? { ...item, quantity: item.quantity + product.quantity }
+        : item
+    ));
+    
+    setShowDuplicateModal(false);
+    setPendingDuplicateItem(null);
+    setExpandedProductId(null);
+    // Close the product modal
+    setShowProductModal(false);
+    setSelectedProduct(null);
+  };
+
+  // Handle canceling duplicate item addition
+  const handleCancelDuplicateAdd = () => {
+    setShowDuplicateModal(false);
+    setPendingDuplicateItem(null);
   };
 
   const addToCart = (product) => {
@@ -747,6 +824,26 @@ const Terminal = () => {
     handleRemoveItemClick(item);
   };
 
+  // Direct remove function that doesn't trigger PIN modal
+  // Used by OrderSummary for bulk void operations where PIN is already verified
+  const removeFromCartDirect = (item) => {
+    setCart(prevCart => {
+      const itemId = String(item._id || item.productId || item.id || '').trim();
+      const itemSize = String(item.selectedSize || item.size || '').toLowerCase().trim();
+      
+      return prevCart.filter(cartItem => {
+        const cartItemId = String(cartItem._id || cartItem.productId || cartItem.id || '').trim();
+        const cartItemSize = String(cartItem.selectedSize || cartItem.size || '').toLowerCase().trim();
+        
+        // Keep items that don't match
+        const sameProduct = cartItemId === itemId;
+        const sameSize = cartItemSize === itemSize || (cartItemSize === '' && itemSize === '');
+        
+        return !(sameProduct && sameSize);
+      });
+    });
+  };
+
   const subtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + (item.itemPrice * item.quantity), 0);
   }, [cart]);
@@ -832,53 +929,61 @@ const Terminal = () => {
     return { valid: false, message: 'Discount configuration is invalid' };
   };
 
-  // Auto-validate and remove discount when cart changes
+  // Auto-validate and remove invalid discounts when cart changes
   useEffect(() => {
-    if (selectedDiscount && cart.length > 0) {
-      const validation = validateDiscountForCart(selectedDiscount, cart);
-      if (!validation.valid) {
-        setSelectedDiscount(null);
-        setDiscountAmount('');
-        if (validation.message) {
-          alert(validation.message);
+    if (selectedDiscounts.length > 0 && cart.length > 0) {
+      const validDiscounts = selectedDiscounts.filter(discount => {
+        const validation = validateDiscountForCart(discount, cart);
+        return validation.valid;
+      });
+      
+      if (validDiscounts.length !== selectedDiscounts.length) {
+        setSelectedDiscounts(validDiscounts);
+        if (validDiscounts.length === 0) {
+          setDiscountAmount('');
         }
       }
     }
-  }, [cart, selectedDiscount, products]);
+  }, [cart, selectedDiscounts, products]);
 
+  // Calculate total discount from all selected discounts
   const discount = useMemo(() => {
-    if (!selectedDiscount) {
+    if (selectedDiscounts.length === 0) {
       return parseFloat(discountAmount) || 0;
     }
 
-    // Validate discount against current cart - if invalid, return 0
-    const validation = validateDiscountForCart(selectedDiscount, cart);
-    if (!validation.valid) {
-      return 0;
-    }
+    let totalDiscount = 0;
     
-    // Safely check discountValue
-    const discountValueStr = selectedDiscount.discountValue || '';
-    
-    try {
-      // Recalculate discount based on selected discount and current subtotal
-      if (typeof discountValueStr === 'string' && discountValueStr.includes('%')) {
-        const percentage = parseFloat(discountValueStr.replace('% OFF', '').replace(/\s/g, ''));
-        if (!isNaN(percentage)) {
-          return (subtotal * percentage) / 100;
-        }
-      } else if (typeof discountValueStr === 'string' && (discountValueStr.includes('P') || discountValueStr.includes('₱'))) {
-        const amount = parseFloat(discountValueStr.replace(/[P₱\sOFF]/g, ''));
-        if (!isNaN(amount)) {
-          return amount;
-        }
+    for (const selectedDiscount of selectedDiscounts) {
+      // Validate discount against current cart - if invalid, skip
+      const validation = validateDiscountForCart(selectedDiscount, cart);
+      if (!validation.valid) {
+        continue;
       }
-    } catch (error) {
-      console.error('Error calculating discount:', error);
+      
+      // Safely check discountValue
+      const discountValueStr = selectedDiscount.discountValue || '';
+      
+      try {
+        // Recalculate discount based on selected discount and current subtotal
+        if (typeof discountValueStr === 'string' && discountValueStr.includes('%')) {
+          const percentage = parseFloat(discountValueStr.replace('% OFF', '').replace(/\s/g, ''));
+          if (!isNaN(percentage)) {
+            totalDiscount += (subtotal * percentage) / 100;
+          }
+        } else if (typeof discountValueStr === 'string' && (discountValueStr.includes('P') || discountValueStr.includes('₱'))) {
+          const amount = parseFloat(discountValueStr.replace(/[P₱\sOFF]/g, ''));
+          if (!isNaN(amount)) {
+            totalDiscount += amount;
+          }
+        }
+      } catch (error) {
+        console.error('Error calculating discount:', error);
+      }
     }
     
-    return parseFloat(discountAmount) || 0;
-  }, [discountAmount, selectedDiscount, subtotal, cart, products]);
+    return totalDiscount || parseFloat(discountAmount) || 0;
+  }, [discountAmount, selectedDiscounts, subtotal, cart, products]);
 
   const total = useMemo(() => {
     return subtotal - discount;
@@ -929,89 +1034,87 @@ const Terminal = () => {
   const finalizeTransaction = async (meta = {}) => {
     if (!cart.length) return null;
 
+    // Store cart snapshot for restoration on error
+    const cartSnapshot = [...cart];
+    
     try {
-      // Optimistic UI update - clear cart immediately for better UX
-      const cartSnapshot = [...cart];
-      setCart([]);
-      
-      // Invalidate cache immediately so next fetch gets fresh data
-      invalidateCache('products');
-      invalidateCache('transactions');
-
-      // Run stock update and transaction recording in parallel for speed
-      const [stockUpdateResponse, transactionResponse] = await Promise.all([
-        fetch('http://localhost:5000/api/products/update-stock', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ 
-            items: mapCartItemsForStockUpdate(),
-            performedByName: currentUser?.name || `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || 'System',
-            performedById: currentUser?._id || currentUser?.id || ''
-          })
-        }),
-        fetch('http://localhost:5000/api/transactions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            userId,
-            items: mapCartItemsForTransaction(),
-            paymentMethod: meta.paymentMethod || 'cash',
-            amountReceived: meta.amountReceived,
-            changeGiven: meta.change,
-            referenceNo: meta.referenceNo,
-            receiptNo: meta.receiptNo,
-            totalAmount: total,
-            performedById: currentUser?._id || currentUser?.id,
-            performedByName: currentUser?.name,
-            status: 'Completed'
-          })
+      // Step 1: Record the transaction FIRST (before updating stock)
+      const transactionResponse = await fetch('http://localhost:5000/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId,
+          items: mapCartItemsForTransaction(),
+          paymentMethod: meta.paymentMethod || 'cash',
+          amountReceived: meta.amountReceived,
+          changeGiven: meta.change,
+          referenceNo: meta.referenceNo,
+          receiptNo: meta.receiptNo,
+          totalAmount: total,
+          performedById: currentUser?._id || currentUser?.id,
+          performedByName: currentUser?.name,
+          status: 'Completed'
         })
-      ]);
+      });
 
-      // Check stock update result
-      if (!stockUpdateResponse.ok) {
-        const errorData = await stockUpdateResponse.json().catch(() => ({}));
-        // Restore cart on error
-        setCart(cartSnapshot);
-        throw new Error(errorData.message || errorData.error || `Stock update failed: ${stockUpdateResponse.status} ${stockUpdateResponse.statusText}`);
-      }
-
-      const stockData = await stockUpdateResponse.json();
-      if (!stockData.success) {
-        // Restore cart on error
-        setCart(cartSnapshot);
-        throw new Error(stockData.message || stockData.error || 'Failed to update stock');
-      }
-
-      // Check transaction result
+      // Check transaction result FIRST
       if (!transactionResponse.ok) {
         const errorData = await transactionResponse.json().catch(() => ({}));
-        // Restore cart on error
-        setCart(cartSnapshot);
         throw new Error(errorData.message || errorData.error || `Transaction recording failed: ${transactionResponse.status} ${transactionResponse.statusText}`);
       }
 
       const transactionData = await transactionResponse.json();
       if (!transactionData.success) {
-        // Restore cart on error
-        setCart(cartSnapshot);
         throw new Error(transactionData.message || transactionData.error || 'Failed to record transaction');
       }
 
+      // Step 2: Transaction succeeded - NOW update stock
+      // Clear cart after successful transaction
+      setCart([]);
+      
+      // Invalidate cache so next fetch gets fresh data
+      invalidateCache('products');
+      invalidateCache('transactions');
+
+      const stockUpdateResponse = await fetch('http://localhost:5000/api/products/update-stock', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          items: mapCartItemsForStockUpdate(),
+          performedByName: currentUser?.name || `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || 'System',
+          performedById: currentUser?._id || currentUser?.id || ''
+        })
+      });
+
+      // Check stock update result
+      if (!stockUpdateResponse.ok) {
+        const errorData = await stockUpdateResponse.json().catch(() => ({}));
+        console.error('Stock update failed after transaction:', errorData);
+        // Don't restore cart - transaction already succeeded
+        // Just log the error and continue
+      } else {
+        const stockData = await stockUpdateResponse.json();
+        if (!stockData.success) {
+          console.error('Stock update failed after transaction:', stockData);
+          // Don't restore cart - transaction already succeeded
+        }
+      }
+
       // Success - products will refresh on next view automatically due to cache invalidation
-      // No need to await fetchProducts() - let it happen in background
       fetchProducts().catch(err => console.warn('Background product refresh failed:', err));
       
       // Return the transaction data including the receipt number
       return transactionData.data;
     } catch (error) {
       console.error('Error finalizing transaction:', error);
+      // Restore cart on error (transaction failed, stock was NOT updated)
+      setCart(cartSnapshot);
       const errorMessage = error.message || 'Unknown error occurred';
-      alert(`Transaction failed: ${errorMessage}\n\nPlease check the console for details and verify your inventory.`);
+      alert(`Transaction failed: ${errorMessage}\n\nYour cart has been restored. Please try again.`);
       throw error;
     }
   };
@@ -1028,8 +1131,14 @@ const Terminal = () => {
 
   const handleQRProceed = async (referenceNo, screenshot, receiptNo) => {
     console.log('handleQRProceed received receiptNo:', receiptNo);
-    setShowQRPaymentModal(false);
-    return await finalizeTransaction({ paymentMethod: 'gcash', referenceNo, screenshot, receiptNo });
+    try {
+      const result = await finalizeTransaction({ paymentMethod: 'gcash', referenceNo, screenshot, receiptNo });
+      setShowQRPaymentModal(false);
+      return result;
+    } catch (error) {
+      // Don't close modal on error - let user retry
+      throw error;
+    }
   };
 
   const handleSelectDiscount = (discountItem) => {
@@ -1041,6 +1150,13 @@ const Terminal = () => {
         return;
       }
 
+      // Check if discount is already selected
+      const alreadySelected = selectedDiscounts.some(d => d._id === discountItem._id);
+      if (alreadySelected) {
+        alert('This discount is already applied.');
+        return;
+      }
+
       // Validate discount against current cart
       const validation = validateDiscountForCart(discountItem, cart);
       
@@ -1049,46 +1165,25 @@ const Terminal = () => {
         return;
       }
 
-      setSelectedDiscount(discountItem);
+      // Add to selected discounts array
+      setSelectedDiscounts(prev => [...prev, discountItem]);
       
-      // Safely check discountValue
-      const discountValueStr = discountItem.discountValue || '';
-      
-      if (typeof discountValueStr === 'string' && discountValueStr.includes('%')) {
-        const percentage = parseFloat(discountValueStr.replace('% OFF', '').replace(/\s/g, ''));
-        if (!isNaN(percentage)) {
-          const discountValue = (subtotal * percentage) / 100;
-          setDiscountAmount(discountValue.toString());
-        } else {
-          console.error('Invalid percentage value:', discountValueStr);
-          alert('Invalid discount percentage value');
-        }
-      } else if (typeof discountValueStr === 'string' && (discountValueStr.includes('P') || discountValueStr.includes('₱'))) {
-        const amount = parseFloat(discountValueStr.replace(/[P₱\sOFF]/g, ''));
-        if (!isNaN(amount)) {
-          setDiscountAmount(amount.toString());
-        } else {
-          console.error('Invalid fixed amount value:', discountValueStr);
-          alert('Invalid discount amount value');
-        }
-      } else {
-        console.warn('Unknown discount value format:', discountValueStr);
-        // Try to parse as number if it's a plain number
-        const numericValue = parseFloat(discountValueStr);
-        if (!isNaN(numericValue)) {
-          setDiscountAmount(numericValue.toString());
-        } else {
-          alert('Unable to parse discount value. Please check the discount configuration.');
-        }
-      }
+      // Update discount amount (will be recalculated by useMemo)
+      setDiscountAmount('');
     } catch (error) {
       console.error('Error selecting discount:', error);
       alert('An error occurred while applying the discount. Please try again.');
     }
   };
 
-  const handleRemoveDiscount = () => {
-    setSelectedDiscount(null);
+  const handleRemoveDiscount = (discountId) => {
+    if (discountId) {
+      // Remove specific discount by ID
+      setSelectedDiscounts(prev => prev.filter(d => d._id !== discountId));
+    } else {
+      // Clear all discounts (backward compatibility)
+      setSelectedDiscounts([]);
+    }
     setDiscountAmount('');
   };
 
@@ -1096,7 +1191,7 @@ const Terminal = () => {
     <>
       <div className="relative flex flex-col h-screen">
        
-        <div className="absolute top-0 left-0 right-[420px] px-6 py-4 z-10 overflow-hidden" style={{ paddingRight: '24px', backgroundColor: '#F5F5F5' }}>
+        <div className="absolute top-0 left-0 right-[420px] px-6 py-4 z-40" style={{ paddingRight: '24px', backgroundColor: '#F5F5F5' }}>
           <Header 
             pageName="Terminal"
             showSearch={true}
@@ -1110,6 +1205,8 @@ const Terminal = () => {
             profileMinWidth="220px"
             profilePadding="px-4"
             profileGap="gap-3"
+            sortOption={sortOption}
+            onSortChange={setSortOption}
           />
         </div>
         
@@ -1119,7 +1216,7 @@ const Terminal = () => {
           
           <div className="flex-1 overflow-auto p-6 pt-24">
         
-          <div className="mb-6">
+          <div className="mb-6 relative z-10">
             <h2 className="text-lg font-semibold mb-3">Category</h2>
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
               <CategoryButtons
@@ -1147,43 +1244,13 @@ const Terminal = () => {
               </div>
             ) : (
               <div className="grid grid-cols-5 gap-4 items-start">
-                {paginatedProducts.map((product) => {
-                  const isExpanded = expandedProductId === product._id;
-                  return (
-                    <div key={product._id} className="relative">
-                     
-                      <div className={isExpanded ? 'invisible' : 'visible'}>
-                        <ProductCard
-                          product={product}
-                          isExpanded={false}
-                          onToggleExpand={() => handleProductClick(product)}
-                          productQuantity={productQuantities[product._id] || 1}
-                          onDecrement={() => updateProductQuantity(product._id, -1)}
-                          onIncrement={() => updateProductQuantity(product._id, 1)}
-                          onAdd={() => addToCartFromExpanded(product)}
-                          selectedSize={productSizes[product._id]}
-                          onSelectSize={(size) => handleSizeSelection(product._id, size)}
-                        />
-                      </div>
-                    
-                      {isExpanded && (
-                        <div className="absolute top-0 left-0 right-0 z-30">
-                          <ProductCard
-                            product={product}
-                            isExpanded={true}
-                            onToggleExpand={() => handleProductClick(product)}
-                            productQuantity={productQuantities[product._id] || 1}
-                            onDecrement={() => updateProductQuantity(product._id, -1)}
-                            onIncrement={() => updateProductQuantity(product._id, 1)}
-                            onAdd={() => addToCartFromExpanded(product)}
-                            selectedSize={productSizes[product._id]}
-                            onSelectSize={(size) => handleSizeSelection(product._id, size)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {paginatedProducts.map((product) => (
+                  <ProductCard
+                    key={product._id}
+                    product={product}
+                    onToggleExpand={() => handleProductClick(product)}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -1197,14 +1264,15 @@ const Terminal = () => {
           </div>
           
          
-          <div className="w-[420px] bg-gray-50 border-l-0 p-4 relative z-30">
+          <div className="w-[420px] bg-gray-50 border-l-0 p-4 relative">
             <OrderSummary
               cart={cart}
               removeFromCart={removeFromCart}
+              removeFromCartDirect={removeFromCartDirect}
               updateQuantity={updateQuantity}
               discountAmount={discountAmount}
               setDiscountAmount={setDiscountAmount}
-              selectedDiscount={selectedDiscount}
+              selectedDiscounts={selectedDiscounts}
               onRemoveDiscount={handleRemoveDiscount}
               calculateSubtotal={() => subtotal}
               calculateDiscount={() => discount}
@@ -1229,6 +1297,9 @@ const Terminal = () => {
         isOpen={showCashPaymentModal}
         onClose={() => setShowCashPaymentModal(false)}
         totalAmount={total}
+        subtotalAmount={subtotal}
+        discountAmount={discount}
+        selectedDiscounts={selectedDiscounts}
         onProceed={handleCashProceed}
         cartItems={cart}
       />
@@ -1247,6 +1318,7 @@ const Terminal = () => {
         onSelectDiscount={handleSelectDiscount}
         cart={cart}
         products={products}
+        selectedDiscounts={selectedDiscounts}
       />
 
       <RemoveItemPinModal
@@ -1257,6 +1329,26 @@ const Terminal = () => {
         }}
         onConfirm={confirmRemoveItem}
         item={itemToRemove}
+      />
+
+      <DuplicateItemModal
+        isOpen={showDuplicateModal}
+        onClose={handleCancelDuplicateAdd}
+        onConfirm={handleConfirmDuplicateAdd}
+        item={pendingDuplicateItem?.product}
+        existingQuantity={pendingDuplicateItem?.existingQuantity || 0}
+      />
+
+      <ProductDetailsModal
+        isOpen={showProductModal}
+        onClose={handleCloseProductModal}
+        product={selectedProduct}
+        productQuantity={selectedProduct ? (productQuantities[selectedProduct._id] || 1) : 1}
+        onDecrement={() => selectedProduct && updateProductQuantity(selectedProduct._id, -1)}
+        onIncrement={() => selectedProduct && updateProductQuantity(selectedProduct._id, 1)}
+        onAdd={() => selectedProduct && addToCartFromExpanded(selectedProduct)}
+        selectedSize={selectedProduct ? productSizes[selectedProduct._id] : ''}
+        onSelectSize={(size) => selectedProduct && handleSizeSelection(selectedProduct._id, size)}
       />
     </>
   );

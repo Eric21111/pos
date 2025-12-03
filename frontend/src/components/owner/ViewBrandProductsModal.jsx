@@ -1,81 +1,40 @@
+import { useState, useEffect } from 'react';
 import { FaTimes, FaEdit, FaTrash } from 'react-icons/fa';
-import dressImage from '../../assets/owner/dress.svg';
 
 const ViewBrandProductsModal = ({ isOpen, onClose, brandPartner }) => {
-  if (!isOpen || !brandPartner) return null;
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const products = [
-    {
-      id: 1,
-      image: dressImage,
-      sku: '234TYP',
-      itemName: 'Floral Summer Dress',
-      category: 'Top',
-      variant: 'White',
-      itemPrice: 100.00,
-      stock: 1
-    },
-    {
-      id: 2,
-      image: dressImage,
-      sku: '234TYP',
-      itemName: 'Absidy Beauty Base Weightless Touch Foundation',
-      category: 'Makeup',
-      variant: 'OW',
-      itemPrice: 100.00,
-      stock: 7
-    },
-    {
-      id: 3,
-      image: dressImage,
-      sku: '234TYP',
-      itemName: 'Absidy Beauty Glazing Serum Lip Stain',
-      category: 'Makeup',
-      variant: 'Cashew',
-      itemPrice: 100.00,
-      stock: 4
-    },
-    {
-      id: 4,
-      image: dressImage,
-      sku: '234TYP',
-      itemName: 'Baseball Cap',
-      category: 'Head Wear',
-      variant: 'Black',
-      itemPrice: 100.00,
-      stock: 18
-    },
-    {
-      id: 5,
-      image: dressImage,
-      sku: '234TYP',
-      itemName: 'Halter Top',
-      category: 'Top',
-      variant: 'Dusk',
-      itemPrice: 100.00,
-      stock: 5
-    },
-    {
-      id: 6,
-      image: dressImage,
-      sku: '234TYP',
-      itemName: 'Absidy Lipstick',
-      category: 'Makeup',
-      variant: 'Green',
-      itemPrice: 100.00,
-      stock: 0
-    },
-    {
-      id: 7,
-      image: dressImage,
-      sku: '234TYP',
-      itemName: 'Floral Summer Dress',
-      category: 'Top',
-      variant: 'Green',
-      itemPrice: 100.00,
-      stock: 3
+  useEffect(() => {
+    if (isOpen && brandPartner) {
+      fetchBrandProducts();
     }
-  ];
+  }, [isOpen, brandPartner]);
+
+  const fetchBrandProducts = async () => {
+    if (!brandPartner?.brandName) return;
+    
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/products');
+      const data = await response.json();
+      
+      if (data.success) {
+        // Filter products by brand name (matching brandName or supplierName)
+        const brandProducts = data.data.filter(product => 
+          product.brandName === brandPartner.brandName || 
+          product.supplierName === brandPartner.brandName
+        );
+        setProducts(brandProducts);
+      }
+    } catch (error) {
+      console.error('Error fetching brand products:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen || !brandPartner) return null;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4 backdrop-blur-sm">
@@ -150,57 +109,73 @@ const ViewBrandProductsModal = ({ isOpen, onClose, brandPartner }) => {
         </div>
 
         <div className="flex-1 overflow-y-auto px-12 py-8">
-          <div className="overflow-x-auto flex justify-center">
-            <table className="w-full max-w-4xl border-collapse mx-auto">
-              <thead>
-                <tr 
-                  className="text-white text-sm font-medium"
-                  style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
-                >
-                  <th className="px-4 py-3 text-center border border-white shadow-sm">Item Image</th>
-                  <th className="px-4 py-3 text-center border border-white shadow-sm">SKU</th>
-                  <th className="px-4 py-3 text-center border border-white shadow-sm">Item Name</th>
-                  <th className="px-4 py-3 text-center border border-white shadow-sm">Category</th>
-                  <th className="px-4 py-3 text-center border border-white shadow-sm">Variant</th>
-                  <th className="px-4 py-3 text-center border border-white shadow-sm">Item Price</th>
-                  <th className="px-4 py-3 text-center border border-white shadow-sm">Stock</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 border border-gray-300 text-center shadow-sm">
-                      <div className="flex justify-center">
-                        <img 
-                          src={product.image} 
-                          alt={product.itemName}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center shadow-sm">{product.sku}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center shadow-sm">{product.itemName}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center shadow-sm">{product.category}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center shadow-sm">{product.variant}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center shadow-sm">PHP {product.itemPrice.toFixed(2)}</td>
-                    <td className="px-4 py-3 border border-gray-300 text-center shadow-sm">
-                      <div className="flex justify-center">
-                        <span
-                          className={`px-2 py-1 rounded text-sm font-medium ${
-                            product.stock === 0
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-green-100 text-green-700'
-                          }`}
-                        >
-                          {product.stock}
-                        </span>
-                      </div>
-                    </td>
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="text-gray-500">Loading products...</div>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="text-gray-500">No products found for this brand.</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto flex justify-center">
+              <table className="w-full max-w-4xl border-collapse mx-auto">
+                <thead>
+                  <tr 
+                    className="text-white text-sm font-medium"
+                    style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+                  >
+                    <th className="px-4 py-3 text-center border border-white shadow-sm">Item Image</th>
+                    <th className="px-4 py-3 text-center border border-white shadow-sm">SKU</th>
+                    <th className="px-4 py-3 text-center border border-white shadow-sm">Item Name</th>
+                    <th className="px-4 py-3 text-center border border-white shadow-sm">Category</th>
+                    <th className="px-4 py-3 text-center border border-white shadow-sm">Variant</th>
+                    <th className="px-4 py-3 text-center border border-white shadow-sm">Item Price</th>
+                    <th className="px-4 py-3 text-center border border-white shadow-sm">Stock</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {products.map((product) => (
+                    <tr key={product._id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 border border-gray-300 text-center shadow-sm">
+                        <div className="flex justify-center">
+                          {product.itemImage ? (
+                            <img 
+                              src={product.itemImage} 
+                              alt={product.itemName}
+                              className="w-12 h-12 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
+                              No img
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center shadow-sm">{product.sku}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center shadow-sm">{product.itemName}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center shadow-sm">{product.category}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center shadow-sm">{product.variant || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center shadow-sm">PHP {(product.itemPrice || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 border border-gray-300 text-center shadow-sm">
+                        <div className="flex justify-center">
+                          <span
+                            className={`px-2 py-1 rounded text-sm font-medium ${
+                              product.currentStock === 0
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-green-100 text-green-700'
+                            }`}
+                          >
+                            {product.currentStock || 0}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

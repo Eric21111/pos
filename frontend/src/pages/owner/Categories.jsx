@@ -1,16 +1,17 @@
 import { useState, useEffect, memo } from 'react';
 import Header from '../../components/shared/header';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { FaSearch, FaPlus, FaEdit, FaTrash, FaUndo, FaEye } from 'react-icons/fa';
+import { FaSearch, FaPlus, FaEdit, FaTrash, FaUndo } from 'react-icons/fa';
+import ViewCategoryProductsModal from '../../components/owner/ViewCategoryProductsModal';
 
 const Categories = () => {
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('All'); // All, Active, Archived
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewProductsModal, setShowViewProductsModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -230,8 +231,9 @@ const Categories = () => {
     setShowEditModal(true);
   };
 
-  const handleViewProducts = (categoryName) => {
-    navigate('/inventory', { state: { filterCategory: categoryName } });
+  const handleViewProducts = (category) => {
+    setSelectedCategory(category);
+    setShowViewProductsModal(true);
   };
 
   const filteredCategories = categories.filter(category => {
@@ -376,7 +378,7 @@ const Categories = () => {
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 mt-2">
                     <button
-                      onClick={() => handleViewProducts(category.name)}
+                      onClick={() => handleViewProducts(category)}
                       className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
                     >
                       View Products
@@ -502,6 +504,16 @@ const Categories = () => {
           </div>
         </div>
       )}
+
+      {/* View Products Modal */}
+      <ViewCategoryProductsModal
+        isOpen={showViewProductsModal}
+        onClose={() => {
+          setShowViewProductsModal(false);
+          setSelectedCategory(null);
+        }}
+        categoryName={selectedCategory?.name}
+      />
     </div>
   );
 };

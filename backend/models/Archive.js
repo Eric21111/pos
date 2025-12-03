@@ -29,7 +29,7 @@ const archiveItemSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
-    enum: ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods']
+    enum: ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods', 'Others']
   },
   brandName: {
     type: String,
@@ -58,7 +58,7 @@ const archiveItemSchema = new mongoose.Schema({
   reason: {
     type: String,
     required: true,
-    enum: ['Damaged', 'Defective', 'Other']
+    enum: ['Damaged', 'Defective', 'Expired', 'Other']
   },
   returnReason: {
     type: String,
@@ -67,7 +67,12 @@ const archiveItemSchema = new mongoose.Schema({
   originalTransactionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SalesTransaction',
-    required: true
+    default: null
+  },
+  source: {
+    type: String,
+    enum: ['return', 'stock-out'],
+    default: 'return'
   },
   returnTransactionId: {
     type: mongoose.Schema.Types.ObjectId,

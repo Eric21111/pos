@@ -1,12 +1,29 @@
 const express = require('express');
 const router = express.Router();
-const { recordTransaction, getTransactions, updateTransaction, renumberTransactions, getDashboardStats } = require('../controllers/transactionController');
+const {
+  getAllTransactions,
+  getTransactionById,
+  updateTransaction,
+  createTransaction,
+  voidTransaction,
+  returnItems,
+  getTransactionStats,
+  recalculateTransactionNumbers,
+  getDashboardStats,
+  getTopSellingProducts,
+  getSalesOverTime
+} = require('../controllers/transactionController');
 
-router.get('/', getTransactions);
+router.get('/', getAllTransactions);
+router.get('/stats', getTransactionStats);
 router.get('/dashboard/stats', getDashboardStats);
-router.post('/', recordTransaction);
+router.get('/top-selling', getTopSellingProducts);
+router.get('/sales-over-time', getSalesOverTime);
+router.post('/', createTransaction);
+router.get('/:id', getTransactionById);
 router.put('/:id', updateTransaction);
-router.post('/renumber', renumberTransactions); // Migration endpoint to renumber transactions
+router.post('/:id/void', voidTransaction);
+router.post('/:id/return', returnItems);
+router.post('/renumber', recalculateTransactionNumbers);
 
 module.exports = router;
-

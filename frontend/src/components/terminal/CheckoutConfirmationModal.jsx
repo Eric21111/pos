@@ -56,7 +56,7 @@ const CheckoutConfirmationModal = ({ isOpen, onClose, onConfirm }) => {
           </div>
 
           <h3 className="text-xl font-bold text-gray-800 text-center mb-3">
-            Are you sure you want to checkout?
+            Are you sure you want to proceed?
           </h3>
 
           <p className="text-sm text-gray-500 text-center mb-8">

@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, memo, useRef } from 'react';
 import Header from '../components/shared/header';
-import { FaSearch, FaEye, FaPrint, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaSearch, FaEye, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { useDataCache } from '../context/DataCacheContext';
 import StockInIcon from '../assets/logs/Stock in.svg';
 import StockOutIcon from '../assets/logs/Stock out.svg';
 import PullOutIcon from '../assets/logs/Pull out.svg';
+import ViewVoidLogModal from '../components/logs/ViewVoidLogModal';
 
 const Logs = () => {
   const { currentUser } = useAuth();
@@ -14,6 +15,8 @@ const Logs = () => {
   const [movements, setMovements] = useState(() => getCachedData('stockMovements') || []);
   const [voidLogs, setVoidLogs] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showVoidLogModal, setShowVoidLogModal] = useState(false);
+  const [selectedVoidLog, setSelectedVoidLog] = useState(null);
   const [stats, setStats] = useState(() => getCachedData('stats') || {
     stockIns: 0,
     stockOuts: 0,
@@ -31,10 +34,12 @@ const Logs = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [voidCurrentPage, setVoidCurrentPage] = useState(1);
   const rowsPerPage = 8;
+  const [selectedMovementIds, setSelectedMovementIds] = useState([]);
+  const [isMovementExportMode, setIsMovementExportMode] = useState(false);
 
   const categories = ['All', 'Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods'];
   const types = ['All', 'Stock-In', 'Stock-Out', 'Pull-Out'];
-  const reasons = ['All', 'Restock', 'Sold', 'Returned Item', 'Exchange', 'Damaged', 'Lost', 'Expired', 'Other'];
+  const reasons = ['All', 'Restock', 'Sold', 'Returned Item', 'Return', 'Exchange', 'Damaged', 'Lost', 'Expired', 'Adjustment', 'Initial Stock', 'Other'];
   const dateOptions = ['All', 'Today', 'This Week', 'This Month'];
   const sortOptions = [
     { value: 'date-desc', label: 'Date: Newest First' },
@@ -70,8 +75,16 @@ const Logs = () => {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab !== 'stock-movement') {
+      setIsMovementExportMode(false);
+      setSelectedMovementIds([]);
+    }
+  }, [activeTab]);
+
   // Refetch movements when filters change (but use cache for initial load)
   const isInitialMount = useRef(true);
+  const selectAllMovementsRef = useRef(null);
   useEffect(() => {
     // Skip on initial mount (already handled by first useEffect)
     if (isInitialMount.current) {
@@ -88,8 +101,14 @@ const Logs = () => {
       const response = await fetch('http://localhost:5000/api/stock-movements/stats/today');
       const data = await response.json();
       if (data.success) {
-        setStats(data.data);
-        setCachedData('stats', data.data);
+        // Map backend response to frontend expected format
+        const mappedStats = {
+          stockIns: data.data.stockIn || 0,
+          stockOuts: data.data.stockOut || 0,
+          pullOuts: data.data.pullOut || 0
+        };
+        setStats(mappedStats);
+        setCachedData('stats', mappedStats);
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -128,18 +147,14 @@ const Logs = () => {
   const fetchVoidLogs = async () => {
     try {
       setLoading(true);
-      // Fetch voided transactions
-      const response = await fetch('http://localhost:5000/api/transactions?status=Voided&limit=1000');
+      // Fetch from VoidLog collection which has the voidId
+      const response = await fetch('http://localhost:5000/api/void-logs?limit=1000&sortBy=voidedAt&sortOrder=desc');
       const data = await response.json();
       
       if (data.success && Array.isArray(data.data)) {
-        // Sort voided transactions by date (most recent first)
-        const sortedVoidLogs = data.data.sort((a, b) => {
-          const dateA = new Date(a.checkedOutAt || a.createdAt || a.updatedAt || 0);
-          const dateB = new Date(b.checkedOutAt || b.createdAt || b.updatedAt || 0);
-          return dateB - dateA; // Descending order (newest first)
-        });
-        setVoidLogs(sortedVoidLogs);
+        setVoidLogs(data.data);
+      } else {
+        setVoidLogs([]);
       }
     } catch (error) {
       console.error('Error fetching void logs:', error);
@@ -198,13 +213,193 @@ const Logs = () => {
     return 'text-gray-600';
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handleToggleMovementSelection = (movementId) => {
+    if (!movementId) return;
+    setSelectedMovementIds((prev) =>
+      prev.includes(movementId)
+        ? prev.filter((id) => id !== movementId)
+        : [...prev, movementId]
+    );
   };
 
-  const handleView = (movement) => {
-    // You can implement a modal to view details
-    console.log('View movement:', movement);
+  const handleToggleSelectAllMovements = () => {
+    setSelectedMovementIds((prev) => {
+      if (allVisibleMovementsSelected) {
+        return prev.filter((id) => !paginatedMovementIds.includes(id));
+      }
+      const merged = new Set(prev);
+      paginatedMovementIds.forEach((id) => merged.add(id));
+      return Array.from(merged);
+    });
+  };
+
+  const handleMovementExportButtonClick = () => {
+    if (!isMovementExportMode) {
+      setIsMovementExportMode(true);
+      setSelectedMovementIds([]);
+      return;
+    }
+    handleExport();
+  };
+
+  const handleCancelMovementSelection = () => {
+    setIsMovementExportMode(false);
+    setSelectedMovementIds([]);
+  };
+
+  const handleExport = () => {
+    // Export all stock movements to CSV with all details
+    const movementsToExport = selectedMovementIds.length > 0
+      ? filteredMovements.filter((movement) => selectedMovementIds.includes(movement._id))
+      : [];
+
+    if (movementsToExport.length === 0) {
+      alert('Please select at least one stock movement to export.');
+      return;
+    }
+
+    const headers = [
+      'ID',
+      'SKU',
+      'Item Name',
+      'Category',
+      'Brand',
+      'Type',
+      'Quantity',
+      'Size Breakdown',
+      'Stock Before',
+      'Stock After',
+      'Reason',
+      'Handled By',
+      'Handled By ID',
+      'Notes',
+      'Item Image',
+      'Date & Time',
+      'Created At',
+      'Updated At'
+    ];
+
+    const csvData = movementsToExport.map(m => [
+      m._id || '',
+      m.sku || '',
+      m.itemName || '',
+      m.category || '',
+      m.brandName || '',
+      m.type || '',
+      m.quantity || 0,
+      m.sizeQuantities ? JSON.stringify(m.sizeQuantities) : '',
+      m.stockBefore || 0,
+      m.stockAfter || 0,
+      m.reason || '',
+      m.handledBy || '',
+      m.handledById || '',
+      m.notes || '',
+      m.itemImage || '',
+      formatDateTime(m.createdAt),
+      m.createdAt || '',
+      m.updatedAt || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `stock_movements_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setIsMovementExportMode(false);
+    setSelectedMovementIds([]);
+  };
+
+  const handleImport = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result;
+        const lines = text.split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          alert('CSV file is empty or invalid');
+          return;
+        }
+
+        // Parse CSV (skip header row)
+        const dataRows = lines.slice(1);
+        const importedMovements = [];
+
+        for (const row of dataRows) {
+          // Parse CSV row (handle quoted values)
+          const values = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"')) || [];
+          
+          if (values.length >= 11) {
+            importedMovements.push({
+              sku: values[1],
+              itemName: values[2],
+              category: values[3],
+              brandName: values[4],
+              type: values[5],
+              quantity: parseInt(values[6]) || 0,
+              sizeQuantities: values[7] ? JSON.parse(values[7]) : null,
+              stockBefore: parseInt(values[8]) || 0,
+              stockAfter: parseInt(values[9]) || 0,
+              reason: values[10],
+              handledBy: values[11] || currentUser?.name || 'System',
+              handledById: values[12] || currentUser?._id || '',
+              notes: values[13] || 'Imported from CSV'
+            });
+          }
+        }
+
+        if (importedMovements.length === 0) {
+          alert('No valid data found in CSV file');
+          return;
+        }
+
+        // Send to backend
+        const response = await fetch('http://localhost:5000/api/stock-movements/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ movements: importedMovements })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          alert(`Successfully imported ${importedMovements.length} stock movements`);
+          fetchMovements();
+          fetchStats();
+        } else {
+          alert(`Import failed: ${result.message || 'Unknown error'}`);
+        }
+      } catch (error) {
+        console.error('Import error:', error);
+        alert('Failed to import CSV file. Please check the file format.');
+      }
+    };
+
+    reader.readAsText(file);
+    event.target.value = ''; // Reset file input
+  };
+
+  const handleView = (item) => {
+    // For void logs, open the void log modal
+    if (activeTab === 'void-logs') {
+      setSelectedVoidLog(item);
+      setShowVoidLogModal(true);
+    } else {
+      // For stock movements, just log for now
+      console.log('View movement:', item);
+    }
   };
 
   // Get unique brands from movements
@@ -299,6 +494,16 @@ const Logs = () => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     return filteredMovements.slice(startIndex, startIndex + rowsPerPage);
   }, [filteredMovements, currentPage, rowsPerPage]);
+  const paginatedMovementIds = useMemo(
+    () => paginatedMovements.map((movement) => movement._id).filter(Boolean),
+    [paginatedMovements]
+  );
+  const allVisibleMovementsSelected =
+    paginatedMovementIds.length > 0 &&
+    paginatedMovementIds.every((id) => selectedMovementIds.includes(id));
+  const someVisibleMovementsSelected = paginatedMovementIds.some((id) =>
+    selectedMovementIds.includes(id)
+  );
 
   // Paginate void logs client-side (similar to transaction.jsx)
   const paginatedVoidLogs = useMemo(() => {
@@ -308,6 +513,22 @@ const Logs = () => {
 
   const totalPages = Math.ceil(filteredMovements.length / rowsPerPage) || 1;
   const voidTotalPages = Math.ceil(voidLogs.length / rowsPerPage) || 1;
+  const movementTableColumnCount = isMovementExportMode ? 13 : 12;
+
+  useEffect(() => {
+    setSelectedMovementIds((prev) =>
+      prev.filter((id) => filteredMovements.some((movement) => movement._id === id))
+    );
+  }, [filteredMovements]);
+
+  useEffect(() => {
+    if (selectAllMovementsRef.current) {
+      selectAllMovementsRef.current.indeterminate =
+        isMovementExportMode &&
+        !allVisibleMovementsSelected &&
+        someVisibleMovementsSelected;
+    }
+  }, [isMovementExportMode, allVisibleMovementsSelected, someVisibleMovementsSelected]);
 
   return (
     <div className="p-8 min-h-screen">
@@ -387,13 +608,41 @@ const Logs = () => {
               </div>
 
               <button 
-                onClick={handlePrint}
-                className="bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 hover:bg-gray-50 transition-colors" 
+                onClick={handleMovementExportButtonClick}
+                className={`bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isMovementExportMode ? 'border border-[#AD7F65] bg-[#AD7F65]/5' : 'hover:bg-gray-50'}`} 
                 style={{ minWidth: '100px' }}
               >
-                <FaPrint className="w-8 h-8 text-gray-700 mb-1" />
-                <div className="text-xs font-medium text-gray-700">Print</div>
+                <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <div className="text-xs font-medium text-gray-700">
+                  {isMovementExportMode ? 'Export Selected' : 'Export'}
+                </div>
               </button>
+              {isMovementExportMode && (
+                <button
+                  onClick={handleCancelMovementSelection}
+                  className="bg-white rounded-2xl shadow-md px-4 py-2 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+
+              <label 
+                className="bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer" 
+                style={{ minWidth: '100px' }}
+              >
+                <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <div className="text-xs font-medium text-gray-700">Import</div>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImport}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
 
@@ -494,6 +743,20 @@ const Logs = () => {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    {isMovementExportMode && (
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            ref={selectAllMovementsRef}
+                            type="checkbox"
+                            className="w-4 h-4 text-[#AD7F65] border-[#AD7F65] rounded focus:ring-[#AD7F65]"
+                            onChange={handleToggleSelectAllMovements}
+                            checked={isMovementExportMode ? allVisibleMovementsSelected : false}
+                          />
+                          <span>All</span>
+                        </label>
+                      </th>
+                    )}
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Image</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                   <div className="flex items-center gap-1">
@@ -532,7 +795,7 @@ const Logs = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading && movements.length === 0 ? (
                 <tr>
-                  <td colSpan="12" className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={movementTableColumnCount} className="px-4 py-8 text-center text-gray-500">
                     <div className="flex flex-col items-center justify-center">
                       <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#8B7355] mb-2"></div>
                       <span>Loading...</span>
@@ -541,13 +804,24 @@ const Logs = () => {
                 </tr>
               ) : paginatedMovements.length === 0 ? (
                 <tr>
-                  <td colSpan="12" className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={movementTableColumnCount} className="px-4 py-8 text-center text-gray-500">
                     No stock movements found
                   </td>
                 </tr>
               ) : (
                 paginatedMovements.map((movement) => (
                   <tr key={movement._id} className="hover:bg-gray-50">
+                    {isMovementExportMode && (
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 text-[#AD7F65] border-[#AD7F65] rounded focus:ring-[#AD7F65]"
+                          checked={selectedMovementIds.includes(movement._id)}
+                          onChange={() => handleToggleMovementSelection(movement._id)}
+                          disabled={!movement._id}
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <img
                         src={movement.itemImage || 'https://via.placeholder.com/50'}
@@ -678,16 +952,16 @@ const Logs = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Void Number</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Void ID</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Voided By</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Handled By</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Approved By</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quick Action</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading && voidLogs.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
                       <div className="flex flex-col items-center justify-center">
                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#8B7355] mb-2"></div>
                         <span>Loading...</span>
@@ -696,13 +970,28 @@ const Logs = () => {
                   </tr>
                 ) : voidLogs.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
                       No void logs found
                     </td>
                   </tr>
                 ) : (
                   paginatedVoidLogs.map((log, index) => {
                     const voidNumber = voidLogs.length - (voidCurrentPage - 1) * rowsPerPage - index; // Most recent void gets highest number
+                    // Determine approved by display - show name and role
+                    const getApprovedByDisplay = () => {
+                      if (log.approvedBy && log.approvedByRole) {
+                        return `${log.approvedBy} (${log.approvedByRole})`;
+                      }
+                      if (log.approvedBy) {
+                        return log.approvedBy;
+                      }
+                      if (log.approvedByRole) {
+                        return log.approvedByRole;
+                      }
+                      // Fallback: if no approvedBy info, show N/A
+                      return 'N/A';
+                    };
+                    
                     return (
                     <tr key={log._id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
@@ -711,59 +1000,31 @@ const Logs = () => {
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-700">
                         {log.voidId || 'N/A'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatDateTime(log.checkedOutAt || log.createdAt)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {log.items && log.items.length > 0 ? (
-                          <div className="space-y-3">
-                            {log.items.map((item, idx) => (
-                              <div key={idx} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
-                                <div className="shrink-0">
-                                  {item.itemImage ? (
-                                    <img 
-                                      src={item.itemImage} 
-                                      alt={item.itemName} 
-                                      className="w-12 h-12 object-cover rounded"
-                                      onError={(e) => {
-                                        e.target.src = 'https://via.placeholder.com/50';
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-gray-400">
-                                      <span className="text-xs">No Image</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-sm font-medium text-gray-900 truncate">
-                                    {item.itemName}
-                                    {item.variant && <span className="text-gray-500"> ({item.variant})</span>}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    {item.sku} {item.selectedSize && `• Size: ${item.selectedSize}`} • Qty: {item.quantity}
-                                  </div>
-                                  {item.voidReason && (
-                                    <div className="mt-1">
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
-                                        Reason: {item.voidReason}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : '-'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ₱{parseFloat(log.totalAmount || 0).toFixed(2)}
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {formatDateTime(log.voidedAt || log.checkedOutAt || log.createdAt)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {log.voidedByName || log.performedByName || 'N/A'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                          log.approvedByRole === 'Owner' 
+                            ? 'bg-purple-100 text-purple-700 border border-purple-200' 
+                            : log.approvedByRole === 'Manager'
+                            ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                            : 'bg-gray-100 text-gray-600 border border-gray-200'
+                        }`}>
+                          {getApprovedByDisplay()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                        ₱{parseFloat(log.totalAmount || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={() => handleView(log)}
-                          className="text-green-600 hover:text-green-800"
+                          className="text-green-600 hover:text-green-800 p-2 rounded-lg hover:bg-green-50 transition-colors"
+                          title="View Details"
                         >
                           <FaEye className="w-5 h-5" />
                         </button>
@@ -836,6 +1097,16 @@ const Logs = () => {
           )}
         </div>
       )}
+
+      {/* View Void Log Modal */}
+      <ViewVoidLogModal
+        isOpen={showVoidLogModal}
+        onClose={() => {
+          setShowVoidLogModal(false);
+          setSelectedVoidLog(null);
+        }}
+        voidLog={selectedVoidLog}
+      />
     </div>
   );
 };

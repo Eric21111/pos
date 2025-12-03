@@ -1,8 +1,10 @@
-import { FaBell, FaSearch } from 'react-icons/fa';
-import sortIcon from '../../assets/sort.svg';
-import { useContext, useEffect, useState } from 'react';
+import { FaBell, FaSearch, FaExclamationTriangle, FaTimes, FaTimesCircle } from 'react-icons/fa';
+import { createPortal } from 'react-dom';
+import filterIcon from '../../assets/filter.svg';
+import { useContext, useEffect, useState, useRef } from 'react';
 import { SidebarContext } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const Header = ({ 
   pageName, 
@@ -20,11 +22,142 @@ const Header = ({
   filterNextToSearch = false,
   profileMinWidth = '300px',
   profilePadding = 'px-7',
-  profileGap = 'gap-4'
+  profileGap = 'gap-4',
+  sortOption = 'newest',
+  onSortChange = null,
+  // Timeframe filter props for Dashboard
+  showTimeframeFilter = false,
+  timeframeValue = 'Daily',
+  onTimeframeChange = null,
+  timeframeOptions = ['Daily', 'Weekly', 'Monthly']
 }) => {
   const { isExpanded: sidebarExpanded } = useContext(SidebarContext) || { isExpanded: false };
   const { currentUser } = useAuth();
   const [internalSearch, setInternalSearch] = useState(searchValue);
+  const [lowStockItems, setLowStockItems] = useState([]);
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const sortButtonRef = useRef(null);
+  const [dismissedItems, setDismissedItems] = useState(() => {
+    // Load dismissed items from localStorage (now stores timestamps)
+    try {
+      const saved = localStorage.getItem('dismissedLowStockAlerts');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  const notificationRef = useRef(null);
+  const buttonRef = useRef(null);
+  const navigate = useNavigate();
+
+  // 5 hours in milliseconds (matching cron 0 */5 * * *)
+  const DISMISS_COOLDOWN_MS = 5 * 60 * 60 * 1000;
+
+  // Check if a dismissed item's cooldown has expired
+  const isDismissExpired = (dismissTimestamp) => {
+    if (!dismissTimestamp) return true;
+    const now = Date.now();
+    return now - dismissTimestamp >= DISMISS_COOLDOWN_MS;
+  };
+
+  // Update dropdown position when showing
+  useEffect(() => {
+    if (showNotifications && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right
+      });
+    }
+  }, [showNotifications]);
+
+  // Fetch low stock items
+  useEffect(() => {
+    const fetchLowStock = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/products/low-stock');
+        const data = await response.json();
+        if (data.success) {
+          const items = data.data || [];
+          setLowStockItems(items);
+          
+          // Clean up dismissed items:
+          // 1. Remove items that are no longer low stock (stock replenished)
+          // 2. Remove items whose 5-hour cooldown has expired
+          const currentLowStockIds = new Set(items.map(item => item._id));
+          setDismissedItems(prev => {
+            const updated = { ...prev };
+            let changed = false;
+            Object.keys(updated).forEach(id => {
+              // Remove if item is no longer low stock (replenished)
+              if (!currentLowStockIds.has(id)) {
+                delete updated[id];
+                changed = true;
+              }
+              // Remove if 5-hour cooldown has expired (notification should reappear)
+              else if (isDismissExpired(updated[id])) {
+                delete updated[id];
+                changed = true;
+              }
+            });
+            if (changed) {
+              localStorage.setItem('dismissedLowStockAlerts', JSON.stringify(updated));
+            }
+            return changed ? updated : prev;
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching low stock items:', error);
+      }
+    };
+
+    fetchLowStock();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchLowStock, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Dismiss a notification (stores timestamp for 5-hour cooldown)
+  const dismissNotification = (e, itemId) => {
+    e.stopPropagation(); // Prevent navigation to inventory
+    setDismissedItems(prev => {
+      const updated = { ...prev, [itemId]: Date.now() }; // Store timestamp instead of boolean
+      localStorage.setItem('dismissedLowStockAlerts', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Filter out dismissed items for display (only hide if within 5-hour cooldown)
+  const visibleLowStockItems = lowStockItems.filter(item => {
+    const dismissTimestamp = dismissedItems[item._id];
+    // Show if not dismissed or if cooldown has expired
+    return !dismissTimestamp || isDismissExpired(dismissTimestamp);
+  });
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside both the dropdown and the button
+      const isOutsideDropdown = notificationRef.current && !notificationRef.current.contains(event.target);
+      const isOutsideButton = buttonRef.current && !buttonRef.current.contains(event.target);
+      
+      if (isOutsideDropdown && isOutsideButton) {
+        setShowNotifications(false);
+      }
+      
+      // Close sort dropdown if clicking outside
+      if (showSortDropdown && sortButtonRef.current && !sortButtonRef.current.contains(event.target)) {
+        setShowSortDropdown(false);
+      }
+    };
+
+    if (showNotifications || showSortDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNotifications, showSortDropdown]);
 
   useEffect(() => {
     setInternalSearch(searchValue);
@@ -42,8 +175,16 @@ const Header = ({
   const fullNameFromUser = (currentUser?.name || `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`)?.trim();
   const displayName = fullNameFromUser || userName;
   const displayRole = currentUser?.role || userRole;
+  const profileImage =
+    currentUser?.profileImage ||
+    currentUser?.image ||
+    null;
+  const fallbackAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    displayName || 'User'
+  )}&background=AD7F65&color=fff`;
+  const profileImageSrc = profileImage || fallbackAvatarUrl;
   return (
-    <div className={`relative flex items-center justify-between ${showBorder ? 'mb-6 pb-4 border-b' : ''} ${className}`}>
+    <div className={`relative flex items-center justify-between z-[100] ${showBorder ? 'mb-6 pb-4 border-b' : ''} ${className}`}>
    
       <div className="flex items-center gap-4">
         {showSearch ? (
@@ -63,12 +204,38 @@ const Header = ({
             </div>
             {filterNextToSearch && showFilter && (
               <button className="ml-2 w-12 h-10 bg-white rounded-2xl flex items-center justify-center border border-gray-100 shadow-[0_8px_16px_rgba(0,0,0,0.12)] hover:shadow-[0_12px_22px_rgba(0,0,0,0.16)]">
-                <img src={sortIcon} alt="Sort" className="w-5 h-5 opacity-90" />
+                <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
               </button>
             )}
           </>
         ) : (
-          !hidePageName && <h1 className="text-3xl font-bold">{pageName}</h1>
+          <>
+            {!hidePageName && <h1 className="text-3xl font-bold">{pageName}</h1>}
+            {/* Timeframe Filter for Dashboard */}
+            {showTimeframeFilter && (
+              <div 
+                className="flex gap-2 ml-4"
+                role="tablist"
+                aria-label="Dashboard timeframe filter"
+              >
+                {timeframeOptions.map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => onTimeframeChange && onTimeframeChange(option)}
+                    role="tab"
+                    aria-selected={timeframeValue === option}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:ring-offset-2 ${
+                      timeframeValue === option
+                        ? 'bg-[#AD7F65] text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -76,19 +243,116 @@ const Header = ({
       {centerProfile && (
         <div className="absolute left-1/2 -translate-x-1/2">
           <div className="flex items-center gap-4">
-            <button className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)]">
-              <FaBell className="text-gray-800 text-2xl" />
-            </button>
-            <div className={`flex items-center ${profileGap} ${profileBackground} ${profilePadding} py-2.5 rounded-full border border-gray-200 shadow-[0_6px_14px_rgba(0,0,0,0.15)]`} style={{ minWidth: profileMinWidth }}>
-            <img 
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=AD7F65&color=fff`}
-              alt="User" 
-              className="w-10 h-10 rounded-full ring-2 ring-white shadow-sm object-cover"
-            />
-            <div>
-              <div className="text-sm font-semibold">{displayName}</div>
-              <div className="text-xs text-gray-500">{displayRole}</div>
+            <div className="relative">
+              <button 
+                ref={buttonRef}
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] relative transition-all"
+              >
+                <FaBell className="text-gray-800 text-2xl" />
+                {visibleLowStockItems.length > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
+                    {visibleLowStockItems.length > 99 ? '99+' : visibleLowStockItems.length}
+                  </span>
+                )}
+              </button>
+              
+              {/* Notification Dropdown for centered profile - Using Portal */}
+              {showNotifications && createPortal(
+                <div 
+                  ref={notificationRef}
+                  className="fixed w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden"
+                  style={{ 
+                    top: dropdownPosition.top, 
+                    right: dropdownPosition.right,
+                    zIndex: 99999
+                  }}
+                >
+                  <div className="px-4 py-3 bg-gradient-to-r from-[#AD7F65] to-[#76462B] text-white flex items-center justify-between">
+                    <span className="font-semibold">Stock Alerts</span>
+                    <button onClick={() => setShowNotifications(false)} className="hover:bg-white/20 rounded-full p-1">
+                      <FaTimes className="text-sm" />
+                    </button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {visibleLowStockItems.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-gray-500">
+                        <FaBell className="text-4xl mx-auto mb-2 text-gray-300" />
+                        <p>No stock alerts</p>
+                      </div>
+                    ) : (
+                      visibleLowStockItems.map((item) => (
+                        <div 
+                          key={item._id} 
+                          className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-center gap-3"
+                        >
+                          <div 
+                            className="flex items-center gap-3 flex-1 cursor-pointer"
+                            onClick={() => {
+                              setShowNotifications(false);
+                              navigate('/inventory');
+                            }}
+                          >
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              item.alertType === 'out_of_stock' ? 'bg-red-100' : 'bg-orange-100'
+                            }`}>
+                              {item.alertType === 'out_of_stock' ? (
+                                <FaTimesCircle className="text-red-500" />
+                              ) : (
+                                <FaExclamationTriangle className="text-orange-500" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">{item.itemName}</p>
+                              <p className="text-xs text-gray-500">SKU: {item.sku}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className={`text-sm font-bold ${item.alertType === 'out_of_stock' ? 'text-red-600' : 'text-orange-500'}`}>
+                                {item.currentStock}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {item.alertType === 'out_of_stock' ? 'out of stock' : 'low stock'}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => dismissNotification(e, item._id)}
+                            className="p-1.5 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0"
+                            title="Dismiss"
+                          >
+                            <FaTimes className="text-gray-400 text-xs" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {visibleLowStockItems.length > 0 && (
+                    <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+                      <button 
+                        onClick={() => {
+                          setShowNotifications(false);
+                          navigate('/inventory');
+                        }}
+                        className="w-full text-center text-sm text-[#76462B] font-medium hover:underline"
+                      >
+                        View All in Inventory
+                      </button>
+                    </div>
+                  )}
+                </div>,
+                document.body
+              )}
             </div>
+            <div className={`flex items-center ${profileGap} ${profileBackground} ${profilePadding} py-2.5 rounded-full border border-gray-200 shadow-[0_6px_14px_rgba(0,0,0,0.15)]`} style={{ minWidth: profileMinWidth }}>
+              <img 
+                src={profileImageSrc}
+                alt="User" 
+                className="w-10 h-10 rounded-full ring-2 ring-white shadow-sm object-cover"
+              />
+              <div>
+                <div className="text-sm font-semibold">{displayName}</div>
+                <div className="text-xs text-gray-500">{displayRole}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -97,19 +361,182 @@ const Header = ({
    
       <div className="flex items-center gap-5">
         {!centerProfile && showFilter && !filterNextToSearch && (
-          <button className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center border border-gray-100 shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)]">
-            <img src={sortIcon} alt="Sort" className="w-5 h-5 opacity-90" />
-          </button>
+          <div className="relative" ref={sortButtonRef}>
+            <button 
+              onClick={() => setShowSortDropdown(!showSortDropdown)}
+              className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center border shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] ${
+                sortOption !== 'newest' ? 'border-[#AD7F65] bg-[#AD7F65]/10' : 'border-gray-100'
+              }`}
+            >
+              <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
+            </button>
+            
+            {/* Sort Dropdown */}
+            {showSortDropdown && (
+              <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-[9999]">
+                <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                  <span className="text-xs font-semibold text-gray-600">Sort By</span>
+                </div>
+                <div className="py-1">
+                  <button
+                    onClick={() => {
+                      onSortChange && onSortChange('a-z');
+                      setShowSortDropdown(false);
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
+                      sortOption === 'a-z' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                    }`}
+                  >
+                    Name (A-Z)
+                    {sortOption === 'a-z' && <span className="text-[#AD7F65]">✓</span>}
+                  </button>
+                  <button
+                    onClick={() => {
+                      onSortChange && onSortChange('z-a');
+                      setShowSortDropdown(false);
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
+                      sortOption === 'z-a' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                    }`}
+                  >
+                    Name (Z-A)
+                    {sortOption === 'z-a' && <span className="text-[#AD7F65]">✓</span>}
+                  </button>
+                  <button
+                    onClick={() => {
+                      onSortChange && onSortChange('newest');
+                      setShowSortDropdown(false);
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
+                      sortOption === 'newest' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                    }`}
+                  >
+                    Newest First
+                    {sortOption === 'newest' && <span className="text-[#AD7F65]">✓</span>}
+                  </button>
+                  <button
+                    onClick={() => {
+                      onSortChange && onSortChange('oldest');
+                      setShowSortDropdown(false);
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
+                      sortOption === 'oldest' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                    }`}
+                  >
+                    Oldest First
+                    {sortOption === 'oldest' && <span className="text-[#AD7F65]">✓</span>}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
         {!centerProfile && (
-          <button className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] relative">
-            <FaBell className="text-gray-800 text-2xl" />
-          </button>
+          <div className="relative" ref={notificationRef}>
+            <button 
+              ref={buttonRef}
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] relative transition-all"
+            >
+              <FaBell className="text-gray-800 text-2xl" />
+              {visibleLowStockItems.length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
+                  {visibleLowStockItems.length > 99 ? '99+' : visibleLowStockItems.length}
+                </span>
+              )}
+            </button>
+            
+            {/* Notification Dropdown - Using Portal */}
+            {showNotifications && createPortal(
+              <div 
+                ref={notificationRef}
+                className="fixed w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden"
+                style={{ 
+                  top: dropdownPosition.top, 
+                  right: dropdownPosition.right,
+                  zIndex: 99999
+                }}
+              >
+                <div className="px-4 py-3 bg-gradient-to-r from-[#AD7F65] to-[#76462B] text-white flex items-center justify-between">
+                  <span className="font-semibold">Stock Alerts</span>
+                  <button onClick={() => setShowNotifications(false)} className="hover:bg-white/20 rounded-full p-1">
+                    <FaTimes className="text-sm" />
+                  </button>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {visibleLowStockItems.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-gray-500">
+                      <FaBell className="text-4xl mx-auto mb-2 text-gray-300" />
+                      <p>No stock alerts</p>
+                    </div>
+                  ) : (
+                    visibleLowStockItems.map((item) => (
+                      <div 
+                        key={item._id} 
+                        className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-center gap-3"
+                      >
+                        <div 
+                          className="flex items-center gap-3 flex-1 cursor-pointer"
+                          onClick={() => {
+                            setShowNotifications(false);
+                            navigate('/inventory');
+                          }}
+                        >
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            item.alertType === 'out_of_stock' ? 'bg-red-100' : 'bg-orange-100'
+                          }`}>
+                            {item.alertType === 'out_of_stock' ? (
+                              <FaTimesCircle className="text-red-500" />
+                            ) : (
+                              <FaExclamationTriangle className="text-orange-500" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{item.itemName}</p>
+                            <p className="text-xs text-gray-500">SKU: {item.sku}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className={`text-sm font-bold ${item.alertType === 'out_of_stock' ? 'text-red-600' : 'text-orange-500'}`}>
+                              {item.currentStock}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {item.alertType === 'out_of_stock' ? 'out of stock' : 'low stock'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => dismissNotification(e, item._id)}
+                          className="p-1.5 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0"
+                          title="Dismiss"
+                        >
+                          <FaTimes className="text-gray-400 text-xs" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {visibleLowStockItems.length > 0 && (
+                  <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+                    <button 
+                      onClick={() => {
+                        setShowNotifications(false);
+                        navigate('/inventory');
+                      }}
+                      className="w-full text-center text-sm text-[#76462B] font-medium hover:underline"
+                    >
+                      View All in Inventory
+                    </button>
+                  </div>
+                )}
+              </div>,
+              document.body
+            )}
+          </div>
         )}
         {!centerProfile && (
           <div className={`flex items-center ${profileGap} ${profileBackground} ${profilePadding} py-2.5 rounded-full border border-gray-200 shadow-[0_6px_14px_rgba(0,0,0,0.15)]`} style={{ minWidth: profileMinWidth }}>
             <img 
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=AD7F65&color=fff`}
+              src={profileImageSrc}
               alt="User" 
               className="w-10 h-10 rounded-full ring-2 ring-white shadow-sm object-cover"
             />

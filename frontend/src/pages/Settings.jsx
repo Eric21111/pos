@@ -126,24 +126,35 @@ const Settings = () => {
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      setProfileImage(reader.result);
+      const newImageData = reader.result;
+      setProfileImage(newImageData);
       setError('');
+      handleAutoSaveProfileImage(newImageData);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSaveProfile = async () => {
+  const saveProfile = async (overrides = {}) => {
     if (!currentUser?._id && !currentUser?.id) {
       setError('User not found');
       return;
     }
 
-    if (!firstName.trim() || !lastName.trim()) {
+    const mergedProfile = {
+      firstName: overrides.firstName ?? firstName,
+      lastName: overrides.lastName ?? lastName,
+      email: overrides.email ?? email,
+      contactNumber: overrides.contactNumber ?? contactNumber,
+      profileImage: overrides.profileImage ?? profileImage,
+      image: overrides.image ?? overrides.profileImage ?? profileImage
+    };
+
+    if (!mergedProfile.firstName?.trim() || !mergedProfile.lastName?.trim()) {
       setError('First name and last name are required');
       return;
     }
 
-    if (!email.trim()) {
+    if (!mergedProfile.email?.trim()) {
       setError('Email is required');
       return;
     }
@@ -156,12 +167,13 @@ const Settings = () => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          name: `${firstName} ${lastName}`.trim(),
-          email: email.trim().toLowerCase(),
-          contactNo: contactNumber.trim(),
-          profileImage
+          firstName: mergedProfile.firstName.trim(),
+          lastName: mergedProfile.lastName.trim(),
+          name: `${mergedProfile.firstName} ${mergedProfile.lastName}`.trim(),
+          email: mergedProfile.email.trim().toLowerCase(),
+          contactNo: mergedProfile.contactNumber.trim(),
+          profileImage: mergedProfile.profileImage,
+          image: mergedProfile.image
         })
       });
 
@@ -174,15 +186,20 @@ const Settings = () => {
         setIsEditingContact(false);
         setSuccessMessage('Profile updated successfully!');
         setShowSuccessModal(true);
+        const apiUser = data.data || {};
+        const finalProfileImage =
+          apiUser.profileImage || apiUser.image || mergedProfile.profileImage;
+
         const updatedUser = {
           ...currentUser,
-          ...(data.data || {}),
-          firstName: data.data?.firstName ?? firstName.trim(),
-          lastName: data.data?.lastName ?? lastName.trim(),
-          name: data.data?.name ?? `${firstName} ${lastName}`.trim(),
-          email: data.data?.email ?? email.trim().toLowerCase(),
-          contactNo: data.data?.contactNo ?? contactNumber.trim(),
-          profileImage: data.data?.profileImage ?? profileImage
+          ...apiUser,
+          firstName: apiUser.firstName ?? mergedProfile.firstName.trim(),
+          lastName: apiUser.lastName ?? mergedProfile.lastName.trim(),
+          name: apiUser.name ?? `${mergedProfile.firstName} ${mergedProfile.lastName}`.trim(),
+          email: apiUser.email ?? mergedProfile.email.trim().toLowerCase(),
+          contactNo: apiUser.contactNo ?? mergedProfile.contactNumber.trim(),
+          profileImage: finalProfileImage,
+          image: finalProfileImage
         };
         login(updatedUser);
       } else {
@@ -194,6 +211,14 @@ const Settings = () => {
     } finally {
       setProfileLoading(false);
     }
+  };
+
+  const handleSaveProfile = async () => {
+    await saveProfile();
+  };
+
+  const handleAutoSaveProfileImage = async (imageData) => {
+    await saveProfile({ profileImage: imageData, image: imageData });
   };
 
   const handleUpdatePin = async () => {
@@ -466,7 +491,9 @@ const Settings = () => {
                 <img
                   src={profileImage}
                   alt={computedName}
-                  className="w-40 h-40 rounded-full object-cover"
+                  className="w-40 h-40 rounded-full object-cover cursor-pointer border-2 border-transparent hover:border-[#AD7F65] transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Click to change photo"
                 />
                 <div>
                   <h2 className="text-2xl font-bold mb-1">{computedName}</h2>

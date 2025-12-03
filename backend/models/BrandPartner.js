@@ -36,3 +36,8 @@ brandPartnerSchema.index({ brandName: 1 }, { unique: true });
 
 module.exports = mongoose.model('BrandPartner', brandPartnerSchema);
 
+
+
+
+
+

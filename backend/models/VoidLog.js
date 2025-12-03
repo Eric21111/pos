@@ -72,6 +72,15 @@ const voidLogSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  approvedBy: {
+    type: String,
+    default: null
+  },
+  approvedByRole: {
+    type: String,
+    enum: ['Owner', 'Manager', null],
+    default: null
+  },
   voidedAt: {
     type: Date,
     default: Date.now,

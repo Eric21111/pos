@@ -166,10 +166,25 @@ const ReceiptModal = ({
             <span>PHP {receipt.subtotal.toFixed(2)}</span>
           </div>
           <div style={{ borderTop: '1px dashed #000', margin: '5px 0', paddingTop: '5px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-              <span>Discount:</span>
-              <span>PHP {receipt.discount.toFixed(2)}</span>
-            </div>
+            {receipt.discounts && receipt.discounts.length > 0 ? (
+              <>
+                {receipt.discounts.map((d, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0', fontSize: '9px' }}>
+                    <span>{d.title}</span>
+                    <span>{d.value}</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                  <span>Total Discount:</span>
+                  <span>PHP {receipt.discount.toFixed(2)}</span>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                <span>Discount:</span>
+                <span>PHP {receipt.discount.toFixed(2)}</span>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', margin: '4px 0', fontWeight: 'bold', fontSize: '12px' }}>
             <span>Total:</span>
@@ -255,10 +270,25 @@ const ReceiptModal = ({
               <span>PHP {receipt.subtotal.toFixed(2)}</span>
             </div>
             <div className="border-t border-dashed pt-2 mt-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Discount</span>
-                <span>PHP {receipt.discount.toFixed(2)}</span>
-              </div>
+              {receipt.discounts && receipt.discounts.length > 0 ? (
+                <>
+                  {receipt.discounts.map((d, idx) => (
+                    <div key={idx} className="flex justify-between text-xs text-gray-500">
+                      <span>{d.title}</span>
+                      <span>{d.value}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between mt-1">
+                    <span className="text-gray-600">Total Discount</span>
+                    <span>PHP {receipt.discount.toFixed(2)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Discount</span>
+                  <span>PHP {receipt.discount.toFixed(2)}</span>
+                </div>
+              )}
             </div>
             <div className="flex justify-between font-bold text-base pt-2">
               <span>Total</span>

@@ -10,3 +10,8 @@ router.post('/', createBrandPartner);
 
 module.exports = router;
 
+
+
+
+
+

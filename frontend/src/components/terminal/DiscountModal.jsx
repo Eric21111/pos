@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { FaTimes, FaSearch, FaTag, FaCalendar, FaBox, FaUsers } from 'react-icons/fa';
-import sortIcon from '../../assets/sort.svg';
+import filterIcon from '../../assets/filter.svg';
 
 const icon20Percent = new URL('../../assets/owner/20.png', import.meta.url).href;
 const icon50Percent = new URL('../../assets/owner/50.png', import.meta.url).href;
 const iconSenior = new URL('../../assets/owner/Senior&ani.png', import.meta.url).href;
 
-const DiscountModal = ({ isOpen, onClose, onSelectDiscount, cart = [], products = [] }) => {
+const DiscountModal = ({ isOpen, onClose, onSelectDiscount, cart = [], products = [], selectedDiscounts = [] }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [discounts, setDiscounts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -139,6 +139,10 @@ const DiscountModal = ({ isOpen, onClose, onSelectDiscount, cart = [], products 
     
     if (!matchesSearch) return false;
 
+    // Filter out already selected discounts
+    const alreadySelected = selectedDiscounts.some(d => d._id === discount._id);
+    if (alreadySelected) return false;
+
     // Then filter by whether it applies to cart
     return discountAppliesToCart(discount);
   });
@@ -177,7 +181,7 @@ const DiscountModal = ({ isOpen, onClose, onSelectDiscount, cart = [], products 
               />
             </div>
             <button className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-              <img src={sortIcon} alt="Filter" className="w-5 h-5 opacity-90" />
+              <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
             </button>
           </div>
         </div>

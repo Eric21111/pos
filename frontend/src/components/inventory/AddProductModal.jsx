@@ -236,16 +236,19 @@ const AddProductModal = ({
                                     onChange={(e) => {
                                       setNewProduct(prev => {
                                         const newSizePrices = {};
+                                        const newSizeCostPrices = {};
                                         if (e.target.checked) {
                                           // Initialize prices for all selected sizes with default price
                                           prev.selectedSizes.forEach(size => {
                                             newSizePrices[size] = prev.itemPrice || '';
+                                            newSizeCostPrices[size] = prev.costPrice || '';
                                           });
                                         }
                                         return {
                                           ...prev,
                                           differentPricesPerSize: e.target.checked,
-                                          sizePrices: e.target.checked ? newSizePrices : {}
+                                          sizePrices: e.target.checked ? newSizePrices : {},
+                                          sizeCostPrices: e.target.checked ? newSizeCostPrices : {}
                                         };
                                       });
                                     }}
@@ -279,21 +282,43 @@ const AddProductModal = ({
                               {newProduct.differentPricesPerSize && (
                                 <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
                                   <label className="block text-xs font-semibold text-gray-700 mb-2">
-                                    Price per Size:
+                                    Pricing per Size:
                                   </label>
-                                  <div className="grid grid-cols-2 gap-3">
+                                  <div className="space-y-3">
                                     {newProduct.selectedSizes.map((size) => (
-                                      <div key={size}>
-                                        <label className="block text-xs text-gray-600 mb-1">{size} Price</label>
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          min="0"
-                                          value={newProduct.sizePrices?.[size] || ''}
-                                          onChange={(e) => handleSizePriceChange(size, e.target.value)}
-                                          placeholder="Enter price"
-                                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                                        />
+                                      <div key={size} className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-xs text-gray-600 mb-1">{size} Cost Price</label>
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={newProduct.sizeCostPrices?.[size] || ''}
+                                            onChange={(e) => {
+                                              setNewProduct(prev => ({
+                                                ...prev,
+                                                sizeCostPrices: {
+                                                  ...prev.sizeCostPrices,
+                                                  [size]: e.target.value
+                                                }
+                                              }));
+                                            }}
+                                            placeholder="Enter cost price"
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-600 mb-1">{size} Selling Price</label>
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={newProduct.sizePrices?.[size] || ''}
+                                            onChange={(e) => handleSizePriceChange(size, e.target.value)}
+                                            placeholder="Enter selling price"
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                                          />
+                                        </div>
                                       </div>
                                     ))}
                                   </div>
@@ -321,66 +346,38 @@ const AddProductModal = ({
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-base font-semibold mb-3">Pricing</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Cost Price</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        name="costPrice"
-                        value={newProduct.costPrice}
-                        onChange={handleInputChange}
-                        placeholder="Enter cost price"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                      />
+                {!newProduct.differentPricesPerSize && (
+                  <div>
+                    <h3 className="text-base font-semibold mb-3">Pricing</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Cost Price</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="costPrice"
+                          value={newProduct.costPrice}
+                          onChange={handleInputChange}
+                          placeholder="Enter cost price"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Selling Price</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="itemPrice"
+                          value={newProduct.itemPrice}
+                          onChange={handleInputChange}
+                          required={!newProduct.differentPricesPerSize}
+                          placeholder="Enter selling price"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                        />
+                      </div>
                     </div>
-                    {!newProduct.differentPricesPerSize && (
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Selling Price</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        name="itemPrice"
-                        value={newProduct.itemPrice}
-                        onChange={handleInputChange}
-                        required
-                        placeholder="Enter selling price"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                      />
-                    </div>
-                    )}
                   </div>
-                </div>
-
-                <div>
-                  <h3 className="text-base font-semibold mb-3">Supplier Info</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Supplier Name</label>
-                      <input
-                        type="text"
-                        name="supplierName"
-                        value={newProduct.supplierName}
-                        onChange={handleInputChange}
-                        placeholder="Supplier"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                      />
-                    </div>
-                    {/* <div>
-                      <label className="block text-xs text-gray-600 mb-1">Supplier Contact</label>
-                      <input
-                        type="text"
-                        name="supplierContact"
-                        value={newProduct.supplierContact}
-                        onChange={handleInputChange}
-                        placeholder="Supplier Contact"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                      />
-                    </div> */}
-                  </div>
-                </div>
+                )}
 
                 <div>
                   <h3 className="text-base font-semibold mb-3">Display Settings</h3>

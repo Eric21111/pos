@@ -22,6 +22,15 @@ const transactionItemSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  returnStatus: {
+    type: String,
+    enum: ['Returned', 'Partially Returned', null],
+    default: null
+  },
+  returnedQuantity: {
+    type: Number,
+    default: null
+  },
   returnReason: {
     type: String,
     default: null

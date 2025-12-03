@@ -1,4 +1,5 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, memo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import terminalIcon from '../../assets/icons/terminal.svg';
@@ -13,11 +14,44 @@ import LogoutConfirmationModal from './LogoutConfirmationModal';
 
 import logo from '../../assets/logo.png';
 
+// Tooltip component that renders outside the sidebar using portal
+const SidebarTooltip = ({ label, targetRef, show }) => {
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (show && targetRef.current) {
+      const rect = targetRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.top + rect.height / 2,
+        left: rect.right + 12
+      });
+    }
+  }, [show, targetRef]);
+
+  if (!show) return null;
+
+  return createPortal(
+    <div
+      className="fixed px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white shadow-lg whitespace-nowrap z-[9999] transform -translate-y-1/2 pointer-events-none"
+      style={{
+        top: position.top,
+        left: position.left,
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+      }}
+    >
+      {label}
+    </div>,
+    document.body
+  );
+};
+
 const Sidebar = ({ isExpanded, setIsExpanded }) => {
   const location = useLocation();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
   const [posExpanded, setPosExpanded] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState(null);
+  const itemRefs = useRef({});
   const { logout, isOwner, hasPermission } = useAuth();
 
   // Define all menu items in the correct order
@@ -170,42 +204,52 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
           borderRadius: '0 30px 30px 0',
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.2)'
         }}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => {
+          // Toggle sidebar - clicking anywhere expands/collapses it
+          setIsExpanded(!isExpanded);
+        }}
       >
       
         <div 
-          className="relative flex items-center justify-center border-b border-gray-100 px-6 py-6 h-[140px] overflow-hidden"
+          className={`relative flex items-center border-b border-gray-100 px-4 py-4 overflow-hidden ${isExpanded ? '' : 'justify-center'}`}
+          style={{ minHeight: '120px' }}
           onClick={(e) => {
             e.stopPropagation();
-            setIsExpanded(!isExpanded);
           }}
         >
-          <div className="transition-all duration-300 flex items-center justify-center w-full">
-            <img 
-              src={logo} 
-              alt="Create Your Style Logo" 
-              className={`transition-all duration-300 object-contain ${
-                isExpanded ? 'w-48 h-auto max-h-28' : 'w-10 h-10'
-              }`}
-              style={{ 
-                display: 'block !important',
-                maxWidth: '100%',
-                visibility: 'visible',
-                filter: 'invert(53%) sepia(23%) saturate(828%) hue-rotate(343deg) brightness(92%) contrast(91%)'
-              }}
-              onLoad={() => console.log('✅ Logo loaded successfully:', logo)}
-              onError={(e) => {
-                console.error('❌ Logo failed to load:', logo);
-                e.target.style.display = 'block';
-                e.target.alt = 'Logo loading error';
-              }}
-            />
-          </div>
+          {/* Hamburger Menu Button - on the left side */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 shrink-0 z-10"
+          >
+            <div className="flex flex-col justify-center items-center w-6 h-6 shrink-0">
+              <span className="block h-0.5 w-5 bg-gray-600 rounded transition-all duration-300"></span>
+              <span className="block h-0.5 w-5 bg-gray-600 rounded transition-all duration-300 my-1"></span>
+              <span className="block h-0.5 w-5 bg-gray-600 rounded transition-all duration-300"></span>
+            </div>
+          </button>
+          
+          {/* Logo - only shown when expanded, positioned after hamburger */}
+          {isExpanded && (
+            <div className="flex-1 flex items-center justify-center pointer-events-none">
+              <img 
+                src={logo} 
+                alt="Create Your Style Logo" 
+                className="h-20 w-auto object-contain transition-all duration-300"
+                style={{ 
+                  filter: 'invert(53%) sepia(23%) saturate(828%) hue-rotate(343deg) brightness(92%) contrast(91%)'
+                }}
+              />
+            </div>
+          )}
         </div>
 
         
-        <nav className={`flex-1 overflow-y-auto overflow-x-hidden pb-8 px-2 ${
-          isExpanded ? 'pt-15' : 'pt-15'
+        <nav className={`flex-1 pb-8 px-2 ${
+          isExpanded ? 'pt-15 overflow-y-auto overflow-x-hidden' : 'pt-15 overflow-visible'
         }`}>
           <div className="space-y-3">
             {menuItems.map((item) => {
@@ -285,9 +329,12 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                     ) : (
                       <Link
                         to="/terminal"
+                        ref={(el) => (itemRefs.current['pos-terminal'] = el)}
                         onClick={(e) => {
                           e.stopPropagation();
                         }}
+                        onMouseEnter={() => !isExpanded && setHoveredItem('pos-terminal')}
+                        onMouseLeave={() => setHoveredItem(null)}
                         className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
                           posActive 
                             ? 'shadow-lg' 
@@ -299,7 +346,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         } : {}}
                       >
                         <div className="flex items-center flex-1">
-                          <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
+                          <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4 relative">
                             <img 
                               src={item.icon} 
                               alt={item.name}
@@ -309,6 +356,11 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                             />
                           </div>
                         </div>
+                        <SidebarTooltip 
+                          label={item.name} 
+                          targetRef={{ current: itemRefs.current['pos-terminal'] }} 
+                          show={hoveredItem === 'pos-terminal' && !isExpanded} 
+                        />
                         {posActive && (
                           <div 
                             className="absolute inset-0 rounded-2xl"
@@ -437,9 +489,12 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                     ) : (
                       <Link
                         to="/inventory"
+                        ref={(el) => (itemRefs.current['inventory'] = el)}
                         onClick={(e) => {
                           e.stopPropagation();
                         }}
+                        onMouseEnter={() => !isExpanded && setHoveredItem('inventory')}
+                        onMouseLeave={() => setHoveredItem(null)}
                         className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
                           inventoryActive 
                             ? 'shadow-lg' 
@@ -451,7 +506,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         } : {}}
                       >
                         <div className="flex items-center flex-1">
-                          <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
+                          <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4 relative">
                             <img 
                               src={item.icon} 
                               alt={item.name}
@@ -461,6 +516,11 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                             />
                           </div>
                         </div>
+                        <SidebarTooltip 
+                          label={item.name} 
+                          targetRef={{ current: itemRefs.current['inventory'] }} 
+                          show={hoveredItem === 'inventory' && !isExpanded} 
+                        />
                         {inventoryActive && (
                           <div 
                             className="absolute inset-0 rounded-2xl"
@@ -520,9 +580,12 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                 <Link
                   key={item.path}
                   to={item.path}
+                  ref={(el) => (itemRefs.current[item.path] = el)}
                   onClick={(e) => {
                     e.stopPropagation();
                   }}
+                  onMouseEnter={() => !isExpanded && setHoveredItem(item.path)}
+                  onMouseLeave={() => setHoveredItem(null)}
                   className={`w-full flex items-center rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
                     active 
                       ? 'shadow-lg' 
@@ -534,7 +597,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                   } : {}}
                 >
               
-                  <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
+                  <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4 relative">
                     <img 
                       src={item.icon} 
                       alt={item.name}
@@ -544,6 +607,11 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                     />
                   </div>
                   
+                  <SidebarTooltip 
+                    label={item.name} 
+                    targetRef={{ current: itemRefs.current[item.path] }} 
+                    show={hoveredItem === item.path && !isExpanded} 
+                  />
                 
                   {isExpanded && (
                     <span
@@ -577,19 +645,27 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
        
         <div className="border-t border-gray-100 py-6 px-2">
           <button
+            ref={(el) => (itemRefs.current['logout'] = el)}
             onClick={(e) => {
               e.stopPropagation();
               handleLogout();
             }}
+            onMouseEnter={() => !isExpanded && setHoveredItem('logout')}
+            onMouseLeave={() => setHoveredItem(null)}
             className="w-full flex items-center rounded-2xl transition-all duration-300 hover:bg-gray-50 group py-3.5"
           >
-            <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
+            <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4 relative">
               <img 
                 src={logoutIcon} 
                 alt="Log Out"
                 className="w-6 h-6 opacity-80 group-hover:opacity-100 transition-all duration-300"
               />
             </div>
+            <SidebarTooltip 
+              label="Log Out" 
+              targetRef={{ current: itemRefs.current['logout'] }} 
+              show={hoveredItem === 'logout' && !isExpanded} 
+            />
             {isExpanded && (
               <span
                 className="font-medium text-gray-800 group-hover:text-[#76462B] transition-all duration-300 whitespace-nowrap ml-4"

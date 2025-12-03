@@ -120,18 +120,29 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
         // PIN verified successfully - proceed with void transaction
         console.log('[RemoveItemPinModal] PIN verified successfully, calling onConfirm with reason:', voidReason);
         
-        // Mark that we're in a successful confirmation flow
+        // Mark that we're in a successful confirmation flow - prevent double calls
+        if (isConfirmingRef.current) {
+          console.log('[RemoveItemPinModal] Already confirming, skipping duplicate call');
+          return;
+        }
         isConfirmingRef.current = true;
         
+        // Extract approver info from the verified employee
+        const approverInfo = {
+          approvedBy: data.data?.name || data.data?.firstName || 'Unknown',
+          approvedById: data.data?._id || data.data?.id || '',
+          approvedByRole: data.data?.role || null
+        };
+        
         // Store reason in variable to ensure it's passed correctly
-        // Call onConfirm with the reason - it will handle the void transaction and close the modal
+        // Call onConfirm with the reason and approver info - it will handle the void transaction and close the modal
         if (voidReason && onConfirm) {
           try {
-            // Call onConfirm synchronously to ensure it executes before modal closes
-            onConfirm(voidReason);
-            console.log('[RemoveItemPinModal] onConfirm called successfully');
-            // Don't clear state here - let the parent component close the modal
-            // The useEffect will reset state when isOpen becomes false
+            // Set loading to false before calling onConfirm
+            setLoading(false);
+            // Call onConfirm - parent will handle closing the modal
+            await onConfirm(voidReason, approverInfo);
+            console.log('[RemoveItemPinModal] onConfirm called successfully with approver:', approverInfo);
           } catch (error) {
             console.error('[RemoveItemPinModal] Error calling onConfirm:', error);
             setError('Failed to void item. Please try again.');
@@ -146,8 +157,6 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
           isConfirmingRef.current = false;
           return;
         }
-        // Set loading to false - modal will close via parent component
-        setLoading(false);
       } else {
         // PIN verification failed
         setError(data.message || 'Invalid PIN. Please try again.');
@@ -164,7 +173,9 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
 
   if (!isOpen) return null;
 
-  const itemTotal = item ? (item.itemPrice * item.quantity).toFixed(2) : '0.00';
+  // For single item void (minus button), show price for 1 quantity only
+  // For bulk void, the item is already set with quantity=1 and itemPrice=totalAmount
+  const itemTotal = item ? item.itemPrice.toFixed(2) : '0.00';
 
   return (
     <div

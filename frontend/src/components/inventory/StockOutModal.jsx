@@ -11,9 +11,10 @@ const StockOutModal = ({
   const [sizeQuantities, setSizeQuantities] = useState({});
   const [quantity, setQuantity] = useState('');
   const [reason, setReason] = useState('Sold');
+  const [otherReason, setOtherReason] = useState('');
 
   const allSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Free Size'];
-  const reasons = ['Sold', 'Damaged', 'Returned Item', 'Lost', 'Expired', 'Other'];
+  const reasons = ['Sold', 'Damaged', 'Defective', 'Returned Item', 'Lost', 'Expired', 'Other'];
 
   const getSizeQuantity = (sizeData) => {
     if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
@@ -32,6 +33,7 @@ const StockOutModal = ({
       setSizeQuantities({});
       setQuantity('');
       setReason('Sold');
+      setOtherReason('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, product?._id]);
@@ -43,6 +45,7 @@ const StockOutModal = ({
     setSizeQuantities({});
     setQuantity('');
     setReason('Sold');
+    setOtherReason('');
     onClose();
   };
 
@@ -106,10 +109,18 @@ const StockOutModal = ({
       return;
     }
 
+    // Validate other reason if "Other" is selected
+    if (reason === 'Other' && !otherReason.trim()) {
+      alert('Please specify the reason');
+      return;
+    }
+
+    const finalReason = reason === 'Other' ? `Other: ${otherReason.trim()}` : reason;
+
     onConfirm({
       sizes: sizeQuantities,
       selectedSizes: selectedSizes,
-      reason: reason
+      reason: finalReason
     });
   };
 
@@ -256,7 +267,12 @@ const StockOutModal = ({
                   <div className="relative">
                     <select
                       value={reason}
-                      onChange={(e) => setReason(e.target.value)}
+                      onChange={(e) => {
+                        setReason(e.target.value);
+                        if (e.target.value !== 'Other') {
+                          setOtherReason('');
+                        }
+                      }}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent appearance-none cursor-pointer"
                     >
                       {reasons.map((r) => (
@@ -269,6 +285,15 @@ const StockOutModal = ({
                       </svg>
                     </div>
                   </div>
+                  {reason === 'Other' && (
+                    <input
+                      type="text"
+                      value={otherReason}
+                      onChange={(e) => setOtherReason(e.target.value)}
+                      placeholder="Please specify the reason"
+                      className="w-full mt-2 px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                    />
+                  )}
                 </div>
               </div>
 

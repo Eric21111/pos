@@ -2,7 +2,6 @@ const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const connectDB = require('../config/database');
 const Employee = require('../models/Employee');
-const bcrypt = require('bcryptjs');
 
 dotenv.config();
 
@@ -12,24 +11,7 @@ const run = async () => {
   try {
     await connectDB();
 
-    // Try to find owner in cloud database first
-    let owner = null;
-    try {
-      owner = await Employee.findOne({ email: OWNER_EMAIL, role: 'Owner' });
-    } catch (error) {
-      console.log('Cloud database not available, checking local...');
-    }
-
-    // If not found in cloud, check local database
-    if (!owner) {
-      const dbManager = require('../config/databaseManager');
-      const localConnection = dbManager.getLocalConnection();
-      
-      if (localConnection && localConnection.readyState === 1) {
-        const LocalEmployee = localConnection.model('Employee', Employee.schema);
-        owner = await LocalEmployee.findOne({ email: OWNER_EMAIL, role: 'Owner' });
-      }
-    }
+    const owner = await Employee.findOne({ email: OWNER_EMAIL, role: 'Owner' });
 
     if (!owner) {
       console.log('❌ Owner account not found in database.');

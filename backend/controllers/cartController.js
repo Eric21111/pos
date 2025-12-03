@@ -1,5 +1,5 @@
-const dbManager = require('../config/databaseManager');
 const mongoose = require('mongoose');
+const Cart = require('../models/Cart');
 
 exports.getCartByUser = async (req, res) => {
   try {
@@ -12,19 +12,7 @@ exports.getCartByUser = async (req, res) => {
       });
     }
 
-    // Carts are ALWAYS stored in local database only
-    const localConnection = dbManager.getLocalConnection();
-    if (!localConnection || localConnection.readyState !== 1) {
-      // If local not available, return empty cart
-      return res.json({
-        success: true,
-        data: { userId, items: [] }
-      });
-    }
-
-    const CartModule = require('../models/Cart');
-    const LocalCart = localConnection.model('Cart', CartModule.schema);
-    const cart = await LocalCart.findOne({ userId }).lean();
+    const cart = await Cart.findOne({ userId }).lean();
 
     res.json({
       success: true,
@@ -59,15 +47,6 @@ exports.saveCart = async (req, res) => {
       });
     }
 
-    // Carts are ALWAYS stored in local database only (never in cloud)
-    const localConnection = dbManager.getLocalConnection();
-    if (!localConnection || localConnection.readyState !== 1) {
-      return res.status(503).json({
-        success: false,
-        message: 'Local database not available. Carts require local storage.'
-      });
-    }
-
     const sanitizedItems = items.map((item) => ({
       productId: item._id || item.productId,
       itemName: item.itemName || '',
@@ -79,9 +58,7 @@ exports.saveCart = async (req, res) => {
       itemImage: item.itemImage || ''
     }));
 
-    const CartModule = require('../models/Cart');
-    const LocalCart = localConnection.model('Cart', CartModule.schema);
-    const cart = await LocalCart.findOneAndUpdate(
+    const cart = await Cart.findOneAndUpdate(
       { userId },
       { items: sanitizedItems },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -101,4 +78,3 @@ exports.saveCart = async (req, res) => {
     });
   }
 };
-

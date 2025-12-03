@@ -18,7 +18,6 @@ import shoesIcon from '../assets/inventory-icons/shoe.svg';
 import headWearIcon from '../assets/inventory-icons/head wear.svg';
 import printIcon from '../assets/inventory-icons/print.png';
 import exportIcon from '../assets/inventory-icons/Export.svg';
-import sortIcon from '../assets/sort.svg';
 import AddProductModal from '../components/inventory/AddProductModal';
 import ConfirmAddProductModal from '../components/inventory/ConfirmAddProductModal';
 import SuccessModal from '../components/inventory/SuccessModal';
@@ -30,6 +29,34 @@ import ViewProductModal from '../components/inventory/ViewProductModal';
 import Pagination from '../components/inventory/Pagination';
 import StockInModal from '../components/inventory/StockInModal';
 import StockOutModal from '../components/inventory/StockOutModal';
+
+const preferredExportFieldOrder = [
+  '_id',
+  'sku',
+  'itemName',
+  'category',
+  'brandName',
+  'variant',
+  'itemPrice',
+  'costPrice',
+  'currentStock',
+  'reorderNumber',
+  'displayInTerminal',
+  'terminalStatus',
+  'selectedSizes',
+  'sizeQuantities',
+  'sizePrices',
+  'sizes',
+  'differentPricesPerSize',
+  'foodSubtype',
+  'supplierName',
+  'supplierContact',
+  'itemImage',
+  'dateAdded',
+  'lastUpdated',
+  'createdAt',
+  'updatedAt'
+];
 
 const Inventory = () => {
   const { getCachedData, setCachedData, isCacheValid, invalidateCache } = useDataCache();
@@ -59,6 +86,8 @@ const Inventory = () => {
   const [showImportResultModal, setShowImportResultModal] = useState(false);
   const [importResult, setImportResult] = useState({ successCount: 0, errorCount: 0, errors: [] });
   const itemsPerPage = 6;
+  const [selectedProductIds, setSelectedProductIds] = useState([]);
+  const [isExportSelectionMode, setIsExportSelectionMode] = useState(false);
 
   const [newProduct, setNewProduct] = useState({
     sku: '',
@@ -77,6 +106,7 @@ const Inventory = () => {
     selectedSizes: [], 
     sizeQuantities: {},
     sizePrices: {},
+    sizeCostPrices: {},
     differentPricesPerSize: false,
     foodSubtype: '', // Subtype for Foods category
     displayInTerminal: true // Display in POS/terminal by default
@@ -308,10 +338,19 @@ const Inventory = () => {
   const paginatedProducts = useMemo(() => {
     return filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filteredProducts, currentPage, itemsPerPage]);
+  const paginatedProductIds = useMemo(() => paginatedProducts.map(product => product._id), [paginatedProducts]);
+  const allVisibleSelected = paginatedProductIds.length > 0 && paginatedProductIds.every(id => selectedProductIds.includes(id));
+  const someVisibleSelected = paginatedProductIds.some(id => selectedProductIds.includes(id));
 
   useEffect(() => {
     setCurrentPage(1); 
   }, [filterCategory, filterBrand, filterStatus, searchQuery, sortBy]);
+
+  useEffect(() => {
+    setSelectedProductIds(prev =>
+      prev.filter(id => filteredProducts.some(product => product._id === id))
+    );
+  }, [filteredProducts]);
 
   const fetchProducts = async () => {
     try {
@@ -987,6 +1026,44 @@ const Inventory = () => {
       const data = await response.json();
 
       if (data.success) {
+        // Archive items if reason is Damaged, Defective, or Expired
+        const archiveReasons = ['Damaged', 'Defective', 'Expired'];
+        if (archiveReasons.includes(stockData.reason)) {
+          // Create archive entries for each size
+          const totalQuantityRemoved = Object.values(sizeQuantitiesRemoved).reduce((sum, qty) => sum + qty, 0);
+          const sizesString = stockData.selectedSizes.join(', ');
+          
+          try {
+            await fetch('http://localhost:5000/api/archive', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                productId: editingProduct._id,
+                itemName: editingProduct.itemName,
+                sku: editingProduct.sku,
+                variant: editingProduct.variant || '',
+                selectedSize: sizesString,
+                category: editingProduct.category,
+                brandName: editingProduct.brandName || '',
+                itemPrice: editingProduct.itemPrice || 0,
+                costPrice: editingProduct.costPrice || 0,
+                quantity: totalQuantityRemoved,
+                itemImage: editingProduct.itemImage || '',
+                reason: stockData.reason === 'Defective' ? 'Defective' : stockData.reason,
+                archivedBy: handledBy,
+                archivedById: handledById,
+                source: 'stock-out',
+                notes: `Stock out - ${stockData.reason}. Sizes: ${sizesString}`
+              })
+            });
+          } catch (archiveError) {
+            console.error('Error archiving item:', archiveError);
+            // Don't fail the whole operation if archiving fails
+          }
+        }
+
         setShowStockModal(false);
         setEditingProduct(null);
         setStockAmount('');
@@ -1024,54 +1101,83 @@ const Inventory = () => {
     }
   };
 
+  const formatCsvValue = (value) => {
+    if (value === null || value === undefined) return '';
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch (error) {
+        return '';
+      }
+    }
+    return String(value);
+  };
+
+  const handleToggleProductSelection = (productId) => {
+    setSelectedProductIds((prev) =>
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  const handleToggleSelectAllVisible = () => {
+    setSelectedProductIds((prev) => {
+      if (allVisibleSelected) {
+        return prev.filter(id => !paginatedProductIds.includes(id));
+      }
+      const merged = new Set(prev);
+      paginatedProductIds.forEach(id => merged.add(id));
+      return Array.from(merged);
+    });
+  };
+
+  const handleExportButtonClick = () => {
+    if (!isExportSelectionMode) {
+      setIsExportSelectionMode(true);
+      setSelectedProductIds([]);
+      return;
+    }
+    handleExportToCSV();
+  };
+
+  const handleCancelExportSelection = () => {
+    setIsExportSelectionMode(false);
+    setSelectedProductIds([]);
+  };
+
   const handleExportToCSV = () => {
     try {
-      // Prepare CSV headers
-      const headers = [
-        'SKU',
-        'Item Name',
-        'Category',
-        'Brand',
-        'Variant',
-        'Item Price',
-        'Cost Price',
-        'Current Stock',
-        'Reorder Level',
-        'Status',
-        'Sizes',
-        'Date Added',
-        'Last Updated',
-        'Supplier Name',
-        'Supplier Contact',
-        'Image URL'
-      ];
+      const productsToExport = selectedProductIds.length > 0
+        ? filteredProducts.filter(product => selectedProductIds.includes(product._id))
+        : [];
 
-      // Prepare CSV rows
-      const rows = filteredProducts.map(product => {
+      if (productsToExport.length === 0) {
+        alert('Please select at least one item to export.');
+        return;
+      }
+
+      const dynamicFields = new Set();
+      productsToExport.forEach(product => {
+        Object.keys(product || {}).forEach(key => dynamicFields.add(key));
+      });
+
+      const orderedFields = preferredExportFieldOrder.filter(field => dynamicFields.has(field));
+      const remainingFields = Array.from(dynamicFields).filter(field => !orderedFields.includes(field)).sort();
+      const headers = [...orderedFields, ...remainingFields, 'stockStatus'];
+
+      const rows = productsToExport.map(product => {
         const status = getStockStatus(product.currentStock, product.reorderNumber);
-        // Convert sizes object to JSON string for CSV
-        const sizesJson = product.sizes && typeof product.sizes === 'object' && Object.keys(product.sizes).length > 0
-          ? JSON.stringify(product.sizes)
-          : '';
-        
-        return [
-          product.sku || '',
-          product.itemName || '',
-          product.category || '',
-          product.brandName || '',
-          product.variant || '',
-          product.itemPrice || 0,
-          product.costPrice || 0,
-          product.currentStock || 0,
-          product.reorderNumber || 10,
-          status.label,
-          sizesJson,
-          formatDate(product.dateAdded),
-          formatDate(product.lastUpdated),
-          product.supplierName || '',
-          product.supplierContact || '',
-          product.itemImage || ''
-        ];
+        return headers.map(field => {
+          if (field === 'stockStatus') {
+            return status.label;
+          }
+          const value = field === 'dateAdded' || field === 'lastUpdated'
+            ? formatDate(product[field])
+            : product[field];
+          return formatCsvValue(value);
+        });
       });
 
       // Convert to CSV format
@@ -1080,7 +1186,7 @@ const Inventory = () => {
         ...rows.map(row => 
           row.map(cell => {
             // Escape cells that contain commas, quotes, or newlines
-            const cellStr = String(cell);
+            const cellStr = String(cell ?? '');
             if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
               return `"${cellStr.replace(/"/g, '""')}"`;
             }
@@ -1103,6 +1209,8 @@ const Inventory = () => {
       document.body.removeChild(link);
       
       alert('Inventory exported successfully!');
+      setIsExportSelectionMode(false);
+      setSelectedProductIds([]);
     } catch (error) {
       console.error('Error exporting inventory:', error);
       alert('Failed to export inventory. Please try again.');
@@ -1290,23 +1398,26 @@ const Inventory = () => {
               </div>
             </div>
 
-            <button className="bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 hover:bg-gray-50 transition-colors" style={{ minWidth: '100px' }}>
-              <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              <div className="text-xs font-medium text-gray-700">Print</div>
-            </button>
-
             <button 
-              onClick={handleExportToCSV}
-              className="bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 hover:bg-gray-50 transition-colors" 
+              onClick={handleExportButtonClick}
+              className={`bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isExportSelectionMode ? 'border border-[#AD7F65] bg-[#AD7F65]/5' : 'hover:bg-gray-50'}`} 
               style={{ minWidth: '100px' }}
             >
               <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <div className="text-xs font-medium text-gray-700">Export</div>
+              <div className="text-xs font-medium text-gray-700">
+                {isExportSelectionMode ? 'Export Selected' : 'Export'}
+              </div>
             </button>
+            {isExportSelectionMode && (
+              <button
+                onClick={handleCancelExportSelection}
+                className="bg-white rounded-2xl shadow-md px-4 py-2 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
 
             <button 
               onClick={() => document.getElementById('csv-file-input').click()}
@@ -1414,6 +1525,12 @@ const Inventory = () => {
           handleDeleteProduct={handleDeleteClick}
           handleViewProduct={handleViewProduct}
           handleStockUpdate={handleStockUpdate}
+          selectedProductIds={selectedProductIds}
+          onToggleSelect={handleToggleProductSelection}
+          onToggleSelectAll={handleToggleSelectAllVisible}
+          showSelection={isExportSelectionMode}
+          allVisibleSelected={allVisibleSelected}
+          someVisibleSelected={someVisibleSelected}
         />
 
         {filteredProducts.length >= itemsPerPage && (

@@ -17,6 +17,8 @@ import { useDataCache } from '../context/DataCacheContext';
 import ViewTransactionModal from '../components/transaction/ViewTransactionModal';
 import PrintReceiptModal from '../components/transaction/PrintReceiptModal';
 import ReturnItemsModal from '../components/transaction/ReturnItemsModal';
+import TotalTransactionIcon from '../assets/total-transaction.svg';
+import CompletedIcon from '../assets/completed.svg';
 
 const STATUS_STYLES = {
   Completed: 'bg-green-100 text-green-700 border border-green-200',
@@ -162,7 +164,10 @@ const Transaction = () => {
   const [transactionToPrint, setTransactionToPrint] = useState(null);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [transactionToReturn, setTransactionToReturn] = useState(null);
+  const [showReturnSuccessModal, setShowReturnSuccessModal] = useState(false);
   const rowsPerPage = 8;
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState([]);
+  const [isExportSelectionMode, setIsExportSelectionMode] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 350);
@@ -173,6 +178,7 @@ const Transaction = () => {
   const hasLoaded = useRef(false);
   const isInitialLoading = useRef(true);
   const setCachedDataRef = useRef(setCachedData);
+  const selectAllTransactionsRef = useRef(null);
 
   // Keep ref updated
   useEffect(() => {
@@ -361,6 +367,16 @@ const Transaction = () => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     return filteredTransactions.slice(startIndex, startIndex + rowsPerPage);
   }, [filteredTransactions, currentPage]);
+  const paginatedTransactionIds = useMemo(
+    () => paginatedTransactions.map((trx) => trx._id).filter(Boolean),
+    [paginatedTransactions]
+  );
+  const allVisibleTransactionsSelected =
+    paginatedTransactionIds.length > 0 &&
+    paginatedTransactionIds.every((id) => selectedTransactionIds.includes(id));
+  const someVisibleTransactionsSelected = paginatedTransactionIds.some((id) =>
+    selectedTransactionIds.includes(id)
+  );
 
   const stats = useMemo(() => {
     // Exclude voided transactions from stats - they're shown in void logs
@@ -380,6 +396,21 @@ const Transaction = () => {
     return totals;
   }, [transactions]);
 
+  useEffect(() => {
+    setSelectedTransactionIds((prev) =>
+      prev.filter((id) => filteredTransactions.some((trx) => trx._id === id))
+    );
+  }, [filteredTransactions]);
+
+  useEffect(() => {
+    if (selectAllTransactionsRef.current) {
+      selectAllTransactionsRef.current.indeterminate =
+        isExportSelectionMode &&
+        !allVisibleTransactionsSelected &&
+        someVisibleTransactionsSelected;
+    }
+  }, [isExportSelectionMode, allVisibleTransactionsSelected, someVisibleTransactionsSelected]);
+
   // Memoize user options to avoid conditional hook usage
   const userDropdownOptions = useMemo(() => [
     ...userOptions,
@@ -389,6 +420,40 @@ const Transaction = () => {
   const handleRowClick = (trx) => {
     setSelectedTransaction(trx);
     setSelectedTransactionNumber(trx.transactionNumber || null);
+  };
+
+  const handleToggleTransactionSelection = (transactionId) => {
+    if (!transactionId) return;
+    setSelectedTransactionIds((prev) =>
+      prev.includes(transactionId)
+        ? prev.filter((id) => id !== transactionId)
+        : [...prev, transactionId]
+    );
+  };
+
+  const handleToggleSelectAllTransactions = () => {
+    setSelectedTransactionIds((prev) => {
+      if (allVisibleTransactionsSelected) {
+        return prev.filter((id) => !paginatedTransactionIds.includes(id));
+      }
+      const merged = new Set(prev);
+      paginatedTransactionIds.forEach((id) => merged.add(id));
+      return Array.from(merged);
+    });
+  };
+
+  const handleExportButtonClick = () => {
+    if (!isExportSelectionMode) {
+      setIsExportSelectionMode(true);
+      setSelectedTransactionIds([]);
+      return;
+    }
+    handleExportToCSV();
+  };
+
+  const handleCancelExportSelection = () => {
+    setIsExportSelectionMode(false);
+    setSelectedTransactionIds([]);
   };
 
   const renderStatusPill = (status = 'Completed') => (
@@ -420,6 +485,139 @@ const Transaction = () => {
     setShowPrintModal(true);
   };
 
+  const handleExportToCSV = () => {
+    try {
+      const transactionsToExport = selectedTransactionIds.length > 0
+        ? filteredTransactions.filter((trx) => selectedTransactionIds.includes(trx._id))
+        : [];
+
+      if (transactionsToExport.length === 0) {
+        alert('Please select at least one transaction to export.');
+        return;
+      }
+
+      const headers = [
+        'Transaction No.',
+        'Receipt No.',
+        'Transaction ID',
+        'Date',
+        'Time',
+        'User ID',
+        'Performed By ID',
+        'Performed By Name',
+        'Payment Method',
+        'Reference No.',
+        'Total Amount',
+        'Amount Received',
+        'Change Given',
+        'Status',
+        'Item Count',
+        'Items (Name)',
+        'Items (SKU)',
+        'Items (Variant)',
+        'Items (Size)',
+        'Items (Qty)',
+        'Items (Price)',
+        'Items (Subtotal)',
+        'Voided By',
+        'Voided By Name',
+        'Voided At',
+        'Void Reason',
+        'Original Transaction ID',
+        'Created At',
+        'Updated At'
+      ];
+
+      const escapeCSV = (value) => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const csvRows = transactionsToExport.map(trx => {
+        const checkoutDate = trx.checkedOutAt ? new Date(trx.checkedOutAt) : new Date(trx.createdAt);
+        const createdDate = trx.createdAt ? new Date(trx.createdAt) : null;
+        const updatedDate = trx.updatedAt ? new Date(trx.updatedAt) : null;
+        const voidedDate = trx.voidedAt ? new Date(trx.voidedAt) : null;
+        
+        // Extract item details
+        const itemNames = trx.items?.map(item => item.itemName || '').join('; ') || '';
+        const itemSkus = trx.items?.map(item => item.sku || '').join('; ') || '';
+        const itemVariants = trx.items?.map(item => item.variant || '').join('; ') || '';
+        const itemSizes = trx.items?.map(item => item.selectedSize || '').join('; ') || '';
+        const itemQtys = trx.items?.map(item => item.quantity || 0).join('; ') || '';
+        const itemPrices = trx.items?.map(item => item.price || 0).join('; ') || '';
+        const itemSubtotals = trx.items?.map(item => (item.quantity || 0) * (item.price || 0)).join('; ') || '';
+        
+        return [
+          escapeCSV(trx.transactionNumber || ''),
+          escapeCSV(trx.receiptNo || ''),
+          escapeCSV(trx._id || ''),
+          escapeCSV(checkoutDate.toLocaleDateString()),
+          escapeCSV(checkoutDate.toLocaleTimeString()),
+          escapeCSV(trx.userId || ''),
+          escapeCSV(trx.performedById || ''),
+          escapeCSV(trx.performedByName || ''),
+          escapeCSV(trx.paymentMethod || ''),
+          escapeCSV(trx.referenceNo || ''),
+          escapeCSV(trx.totalAmount || 0),
+          escapeCSV(trx.amountReceived || 0),
+          escapeCSV(trx.changeGiven || 0),
+          escapeCSV(trx.status || ''),
+          escapeCSV(trx.items?.length || 0),
+          escapeCSV(itemNames),
+          escapeCSV(itemSkus),
+          escapeCSV(itemVariants),
+          escapeCSV(itemSizes),
+          escapeCSV(itemQtys),
+          escapeCSV(itemPrices),
+          escapeCSV(itemSubtotals),
+          escapeCSV(trx.voidedBy || ''),
+          escapeCSV(trx.voidedByName || ''),
+          escapeCSV(voidedDate ? voidedDate.toLocaleString() : ''),
+          escapeCSV(trx.voidReason || ''),
+          escapeCSV(trx.originalTransactionId || ''),
+          escapeCSV(createdDate ? createdDate.toLocaleString() : ''),
+          escapeCSV(updatedDate ? updatedDate.toLocaleString() : '')
+        ].join(',');
+      });
+
+      const csvContent = [headers.join(','), ...csvRows].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `transactions_export_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert('Transactions exported successfully!');
+      setIsExportSelectionMode(false);
+      setSelectedTransactionIds([]);
+    } catch (error) {
+      console.error('Error exporting transactions:', error);
+      alert('Failed to export transactions. Please try again.');
+    }
+  };
+
+  const handleImportFromCSV = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      alert('Transaction import is not supported. Transactions are created through the POS terminal.');
+      event.target.value = '';
+    } catch (error) {
+      console.error('Error with import:', error);
+      event.target.value = '';
+    }
+  };
+
   const handleReturnClick = (transaction) => {
     if (!isTransactionReturnable(transaction)) {
       alert('This transaction is more than 2 days old and cannot be returned.');
@@ -436,176 +634,207 @@ const Transaction = () => {
   const handleReturnConfirm = async (itemsToReturn, transaction) => {
     try {
       setLoading(true);
+      console.log('Processing return for items:', itemsToReturn);
 
       // Get indices of returned items in original transaction
       const returnedIndices = itemsToReturn.map(item => item.originalIndex);
 
-      // Separate items by reason
+      // Separate items by reason - Damaged/Defective go to archive, others go back to stock
       const damagedItems = itemsToReturn.filter(item =>
-        item.reason === 'Damaged' || item.reason === 'Defective'
+        item.reason === 'Damaged' || item.reason === 'Defective' || item.reason === 'Expired'
       );
       const returnableItems = itemsToReturn.filter(item =>
-        item.reason !== 'Damaged' && item.reason !== 'Defective'
+        item.reason !== 'Damaged' && item.reason !== 'Defective' && item.reason !== 'Expired'
       );
 
-      // Process damaged items - archive them (DO NOT pull from inventory)
-      if (damagedItems.length > 0) {
-        for (const item of damagedItems) {
-          // Get product details for archiving
-          let productDetails = null;
-          try {
-            const productResponse = await fetch(`http://localhost:5000/api/products/${item.productId}`);
-            const productData = await productResponse.json();
-            if (productData.success) {
-              productDetails = productData.data;
-            }
-          } catch (error) {
-            console.warn('Failed to fetch product details for archiving:', error);
-          }
+      console.log('Damaged items (to archive):', damagedItems.length);
+      console.log('Returnable items (to stock):', returnableItems.length);
 
-          // Create return transaction for damaged item
-          const damagedReturnTransaction = {
-            userId: transaction.userId,
-            items: [{
-              productId: item.productId,
-              itemName: item.itemName,
-              sku: item.sku,
-              variant: item.variant,
-              selectedSize: item.selectedSize,
-              quantity: item.quantity,
-              price: item.price,
-              returnReason: item.reason
-            }],
-            paymentMethod: 'return',
-            amountReceived: 0,
-            changeGiven: 0,
-            referenceNo: `RET-${transaction.referenceNo || transaction._id?.substring(0, 12)}-${Date.now()}-${damagedItems.indexOf(item)}`,
-            receiptNo: null,
-            totalAmount: item.quantity * item.price,
-            performedById: transaction.performedById,
-            performedByName: transaction.performedByName,
-            status: 'Returned',
-            originalTransactionId: transaction._id,
-            checkedOutAt: new Date()
-          };
-
-          const returnTrxResponse = await fetch('http://localhost:5000/api/transactions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(damagedReturnTransaction)
-          });
-          const returnTrxData = await returnTrxResponse.json();
-
-          // Archive the damaged item (NO inventory pull-out, just archive)
-          if (returnTrxData.success && returnTrxData.data) {
-            await fetch('http://localhost:5000/api/archive', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                productId: item.productId,
-                itemName: item.itemName,
-                sku: item.sku,
-                variant: item.variant || '',
-                selectedSize: item.selectedSize || '',
-                category: productDetails?.category || 'Foods',
-                brandName: productDetails?.brandName || '',
-                itemPrice: item.price,
-                costPrice: productDetails?.costPrice || 0,
-                quantity: item.quantity,
-                itemImage: productDetails?.itemImage || '',
-                reason: item.reason === 'Damaged' ? 'Damaged' : 'Defective',
-                returnReason: item.reason,
-                originalTransactionId: transaction._id,
-                returnTransactionId: returnTrxData.data._id,
-                archivedBy: transaction.performedByName || 'System',
-                archivedById: transaction.performedById || '',
-                notes: `Returned due to: ${item.reason}`
-              })
-            });
+      // STEP 1: Update original transaction FIRST (most likely to fail)
+      // This ensures we don't modify stock/archive if transaction update fails
+      const updatedItems = transaction.items.map((item, idx) => {
+        if (returnedIndices.includes(idx)) {
+          const returnedItem = itemsToReturn.find(ri => ri.originalIndex === idx);
+          const returnedQty = returnedItem?.quantity || item.quantity;
+          const originalQty = item.quantity;
+          
+          // If returning all quantity, mark as fully returned
+          if (returnedQty >= originalQty) {
+            return {
+              ...item,
+              returnStatus: 'Returned',
+              returnReason: returnedItem?.reason || 'Returned',
+              returnedQuantity: originalQty
+            };
+          } else {
+            // Partial return - reduce quantity and track returned amount
+            return {
+              ...item,
+              quantity: originalQty - returnedQty,
+              returnStatus: 'Partially Returned',
+              returnReason: returnedItem?.reason || 'Returned',
+              returnedQuantity: returnedQty
+            };
           }
         }
-      }
-
-      // Process returnable items - restore stock and create return transactions
-      if (returnableItems.length > 0) {
-        // Restore stock for all returnable items
-        await fetch('http://localhost:5000/api/products/update-stock', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            items: returnableItems.map(item => ({
-              _id: item.productId,
-              sku: item.sku,
-              size: item.selectedSize,
-              quantity: item.quantity
-            })),
-            performedByName: transaction.performedByName || 'System',
-            performedById: transaction.performedById || '',
-            reason: 'Returned Item',
-            type: 'Stock-In' // Return items go back to inventory
-          })
-        });
-
-        // Create a separate return transaction for each returned item
-        for (const item of returnableItems) {
-          const returnTransaction = {
-            userId: transaction.userId,
-            items: [{
-              productId: item.productId,
-              itemName: item.itemName,
-              sku: item.sku,
-              variant: item.variant,
-              selectedSize: item.selectedSize,
-              quantity: item.quantity,
-              price: item.price,
-              returnReason: item.reason
-            }],
-            paymentMethod: 'return',
-            amountReceived: 0,
-            changeGiven: 0,
-            referenceNo: `RET-${transaction.referenceNo || transaction._id?.substring(0, 12)}-${Date.now()}-${returnableItems.indexOf(item)}`,
-            receiptNo: null,
-            totalAmount: item.quantity * item.price,
-            performedById: transaction.performedById,
-            performedByName: transaction.performedByName,
-            status: 'Returned',
-            originalTransactionId: transaction._id,
-            checkedOutAt: new Date()
-          };
-
-          await fetch('http://localhost:5000/api/transactions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(returnTransaction)
-          });
-        }
-      }
-
-      // Update original transaction - remove returned items and update status
-      const remainingItems = transaction.items.filter((item, idx) =>
-        !returnedIndices.includes(idx)
-      );
-
-      const allItemsReturned = remainingItems.length === 0;
-      const newStatus = allItemsReturned ? 'Returned' : 'Partially Returned';
-      const newTotalAmount = remainingItems.reduce((sum, item) =>
-        sum + (item.quantity * (item.price || item.itemPrice || 0)), 0
-      );
-
-      // Update original transaction with remaining items
-      await fetch(`http://localhost:5000/api/transactions/${transaction._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: newStatus,
-          items: remainingItems,
-          totalAmount: newTotalAmount
-        })
+        return item;
       });
 
-      alert('Return processed successfully!');
-      // Refresh transactions
-      window.location.reload();
+      // Count items - check if all items are fully returned
+      const fullyReturnedCount = updatedItems.filter(item => item.returnStatus === 'Returned').length;
+      const partiallyReturnedCount = updatedItems.filter(item => item.returnStatus === 'Partially Returned').length;
+      const allItemsFullyReturned = fullyReturnedCount === updatedItems.length;
+      const hasAnyReturns = fullyReturnedCount > 0 || partiallyReturnedCount > 0;
+      
+      let newStatus = 'Completed';
+      if (allItemsFullyReturned) {
+        newStatus = 'Returned';
+      } else if (hasAnyReturns) {
+        newStatus = 'Partially Returned';
+      }
+      
+      // Calculate total amount from remaining quantities (excluding fully returned items)
+      const newTotalAmount = updatedItems
+        .filter(item => item.returnStatus !== 'Returned')
+        .reduce((sum, item) => sum + (item.quantity * (item.price || item.itemPrice || 0)), 0);
+
+      // Update original transaction - keep all items but mark returned ones
+      const updatePayload = {
+        status: newStatus,
+        items: updatedItems,
+        totalAmount: newTotalAmount
+      };
+      console.log('Updating original transaction FIRST:', updatePayload);
+      
+      const updateResponse = await fetch(`http://localhost:5000/api/transactions/${transaction._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload)
+      });
+      const updateData = await updateResponse.json();
+      console.log('Transaction update response:', updateData);
+
+      // If transaction update fails, stop here - don't modify stock or archive
+      if (!updateResponse.ok || !updateData.success) {
+        throw new Error(updateData.message || 'Failed to update transaction');
+      }
+
+      // STEP 2: Only after transaction update succeeds, process archive for damaged items
+      for (const item of damagedItems) {
+        // Get product details for archiving
+        let productDetails = null;
+        try {
+          const productResponse = await fetch(`http://localhost:5000/api/products/${item.productId}`);
+          const productData = await productResponse.json();
+          if (productData.success) {
+            productDetails = productData.data;
+          }
+        } catch (error) {
+          console.warn('Failed to fetch product details for archiving:', error);
+        }
+
+        // Archive the damaged item
+        const archivePayload = {
+          productId: item.productId,
+          itemName: item.itemName,
+          sku: item.sku || 'N/A',
+          variant: item.variant || '',
+          selectedSize: item.selectedSize || '',
+          category: productDetails?.category || 'Others',
+          brandName: productDetails?.brandName || '',
+          itemPrice: item.price || 0,
+          costPrice: productDetails?.costPrice || 0,
+          quantity: item.quantity,
+          itemImage: productDetails?.itemImage || '',
+          reason: item.reason === 'Expired' ? 'Other' : item.reason,
+          returnReason: item.reason,
+          originalTransactionId: transaction._id,
+          archivedBy: transaction.performedByName || 'System',
+          archivedById: transaction.performedById || '',
+          notes: `Returned due to: ${item.reason}`
+        };
+
+        console.log('Archiving item:', archivePayload);
+        const archiveResponse = await fetch('http://localhost:5000/api/archive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(archivePayload)
+        });
+        const archiveData = await archiveResponse.json();
+        console.log('Archive response:', archiveData);
+
+        if (!archiveData.success) {
+          console.error('Failed to archive item:', archiveData);
+        }
+      }
+
+      // STEP 3: Process returnable items - restore stock (Stock-In)
+      if (returnableItems.length > 0) {
+        const stockUpdatePayload = {
+          items: returnableItems.map(item => ({
+            _id: item.productId,
+            sku: item.sku,
+            size: item.selectedSize,
+            quantity: item.quantity
+          })),
+          performedByName: transaction.performedByName || 'System',
+          performedById: transaction.performedById || '',
+          reason: 'Returned Item',
+          type: 'Stock-In'
+        };
+
+        console.log('Updating stock (Stock-In):', stockUpdatePayload);
+        const stockResponse = await fetch('http://localhost:5000/api/products/update-stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(stockUpdatePayload)
+        });
+        const stockData = await stockResponse.json();
+        console.log('Stock update response:', stockData);
+
+        if (!stockData.success) {
+          console.error('Failed to update stock:', stockData);
+        }
+      }
+
+      // STEP 4: Create return transactions for record keeping (for all returned items)
+      for (const item of itemsToReturn) {
+        const returnTransaction = {
+          userId: transaction.userId,
+          items: [{
+            productId: item.productId,
+            itemName: item.itemName,
+            sku: item.sku,
+            variant: item.variant,
+            selectedSize: item.selectedSize,
+            quantity: item.quantity,
+            price: item.price,
+            returnReason: item.reason
+          }],
+          paymentMethod: 'return',
+          amountReceived: 0,
+          changeGiven: 0,
+          referenceNo: `RET-${transaction.referenceNo || transaction._id?.substring(0, 12)}-${Date.now()}-${itemsToReturn.indexOf(item)}`,
+          receiptNo: null,
+          totalAmount: item.quantity * item.price,
+          performedById: transaction.performedById,
+          performedByName: transaction.performedByName,
+          status: 'Returned',
+          originalTransactionId: transaction._id,
+          checkedOutAt: new Date()
+        };
+
+        console.log('Creating return transaction:', returnTransaction);
+        const returnTrxResponse = await fetch('http://localhost:5000/api/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(returnTransaction)
+        });
+        const returnTrxData = await returnTrxResponse.json();
+        console.log('Return transaction response:', returnTrxData);
+      }
+
+      setShowReturnSuccessModal(true);
     } catch (error) {
       console.error('Error processing return:', error);
       alert('Failed to process return. Please try again.');
@@ -615,11 +844,12 @@ const Transaction = () => {
   };
 
   const totalPages = Math.ceil(filteredTransactions.length / rowsPerPage) || 1;
+  const transactionTableColumnCount = isExportSelectionMode ? 10 : 9;
 
   // Show loading only on initial load when there's no data yet
   if (isInitialLoading.current && transactions.length === 0) {
     return (
-      <div className="p-6 min-h-screen flex items-center justify-center" style={{ background: '#F8F6F3' }}>
+      <div className="p-6 min-h-screen flex items-center justify-center" style={{ background: '#F5F5F5' }}>
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#8B7355] mb-4"></div>
           <p className="text-gray-600">Loading transactions...</p>
@@ -629,42 +859,86 @@ const Transaction = () => {
   }
 
   return (
-    <div className="p-6 min-h-screen" style={{ background: '#F8F6F3' }}>
+    <div className="p-6 min-h-screen" style={{ background: '#F5F5F5' }}>
       <>
-        <Header pageName="POS Transactions" showBorder={false} profileBackground="bg-[#F1ECE5]" />
+        <Header pageName="POS Transactions" showBorder={false} profileBackground="" />
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6 mt-4">
+        <div className="flex gap-4 flex-wrap mb-6 mt-4">
           {[
-            { label: 'Total Transactions', count: stats.total, gradient: ['#5A8DEE', '#3A6BCB'], icon: <FaMoneyBillWave /> },
-            { label: 'Completed', count: stats.Completed || 0, gradient: ['#49C178', '#2F8C54'], icon: <FaCheckCircle /> },
-            { label: 'Returned', count: stats.Returned || 0, gradient: ['#FFB347', '#F97316'], icon: <FaUndoAlt /> }
+            { label: 'Total Transactions', count: stats.total, borderColor: '#3B82F6', textColor: '#3B82F6', iconBg: '#DBEAFE', icon: <img src={TotalTransactionIcon} alt="Total Transactions" className="w-10 h-10" /> },
+            { label: 'Completed', count: stats.Completed || 0, borderColor: '#22C55E', textColor: '#22C55E', iconBg: '#DCFCE7', icon: <img src={CompletedIcon} alt="Completed" className="w-10 h-10" /> },
+            { label: 'Returned', count: stats.Returned || 0, borderColor: '#F97316', textColor: '#F97316', iconBg: '#FFEDD5', icon: <FaUndoAlt /> }
           ].map((card) => (
-            <motion.button
+            <motion.div
               key={card.label}
               whileHover={{ y: -4 }}
               whileTap={{ scale: 0.98 }}
-              className="p-4 rounded-2xl text-left text-white shadow-lg relative overflow-hidden"
-              style={{ backgroundImage: `linear-gradient(135deg, ${card.gradient[0]}, ${card.gradient[1]})` }}
+              className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden text-left"
+              style={{ minWidth: '200px' }}
             >
-              <div className="absolute inset-0 opacity-20 bg-white pointer-events-none" />
-              <div className="relative flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-lg">
-                  {card.icon}
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide opacity-80">{card.label}</p>
-                  <motion.p
-                    key={card.count}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-2xl font-bold"
-                  >
-                    {card.count}
-                  </motion.p>
-                </div>
+              <div 
+                className="absolute left-0 top-0 bottom-0 w-2" 
+                style={{ backgroundColor: card.borderColor }}
+              />
+              <div className="ml-2">
+                <motion.p
+                  key={card.count}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-3xl font-bold"
+                  style={{ color: card.textColor }}
+                >
+                  {card.count}
+                </motion.p>
+                <p className="text-xs mt-0.5" style={{ color: card.textColor }}>{card.label}</p>
               </div>
-            </motion.button>
+              <div 
+                className="w-16 h-16 rounded-full flex items-center justify-center text-2xl"
+                style={{ backgroundColor: card.iconBg, color: card.textColor }}
+              >
+                {card.icon}
+              </div>
+            </motion.div>
           ))}
+
+          <button 
+            onClick={handleExportButtonClick}
+            className={`bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isExportSelectionMode ? 'border border-[#AD7F65] bg-[#AD7F65]/5' : 'hover:bg-gray-50'}`} 
+            style={{ minWidth: '100px' }}
+          >
+            <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <div className="text-xs font-medium text-gray-700">
+              {isExportSelectionMode ? 'Export Selected' : 'Export'}
+            </div>
+          </button>
+          {isExportSelectionMode && (
+            <button
+              onClick={handleCancelExportSelection}
+              className="bg-white rounded-2xl shadow-md px-4 py-2 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          )}
+
+          <button 
+            onClick={() => document.getElementById('transaction-csv-file-input').click()}
+            className="bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 hover:bg-gray-50 transition-colors" 
+            style={{ minWidth: '100px' }}
+          >
+            <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <div className="text-xs font-medium text-gray-700">Import</div>
+          </button>
+          <input
+            id="transaction-csv-file-input"
+            type="file"
+            accept=".csv"
+            onChange={handleImportFromCSV}
+            style={{ display: 'none' }}
+          />
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
@@ -707,14 +981,6 @@ const Transaction = () => {
                   isOpen={dropdownOpen.status}
                   setIsOpen={(value) => setDropdownOpen((prev) => ({ ...prev, status: value }))}
                 />
-                <Dropdown
-                  label="By user"
-                  options={userDropdownOptions}
-                  selected={filters.user}
-                  onSelect={(value) => setFilters((prev) => ({ ...prev, user: value }))}
-                  isOpen={dropdownOpen.user}
-                  setIsOpen={(value) => setDropdownOpen((prev) => ({ ...prev, user: value }))}
-                />
               </div>
             </div>
 
@@ -722,6 +988,20 @@ const Transaction = () => {
               <table className="w-full text-sm text-left">
                 <thead className="sticky top-0">
                   <tr className="bg-[#F6EEE7] text-[#4A3B2F] text-xs uppercase tracking-wider">
+                    {isExportSelectionMode && (
+                      <th className="px-4 py-3 font-semibold">
+                        <label className="flex items-center gap-2 text-[#4A3B2F]">
+                          <input
+                            ref={selectAllTransactionsRef}
+                            type="checkbox"
+                            className="w-4 h-4 text-[#AD7F65] border-[#AD7F65] rounded focus:ring-[#AD7F65]"
+                            onChange={handleToggleSelectAllTransactions}
+                            checked={isExportSelectionMode ? allVisibleTransactionsSelected : false}
+                          />
+                          <span className="text-[11px] tracking-wide">All</span>
+                        </label>
+                      </th>
+                    )}
                     {['Transaction No.', 'Receipt No.', 'Transaction ID', 'Date', 'Performed By', 'Payment Method', 'Total', 'Status', 'Quick Action'].map((col) => (
                       <th key={col} className="px-4 py-3 font-semibold">
                         {col}
@@ -730,16 +1010,16 @@ const Transaction = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading && (
+                  {loading && paginatedTransactions.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="py-10 text-center text-gray-500">
+                      <td colSpan={transactionTableColumnCount} className="py-10 text-center text-gray-500">
                         Loading transactions...
                       </td>
                     </tr>
                   )}
                   {!loading && paginatedTransactions.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="py-10 text-center text-gray-400 italic">
+                      <td colSpan={transactionTableColumnCount} className="py-10 text-center text-gray-400 italic">
                         No transactions found
                       </td>
                     </tr>
@@ -756,6 +1036,17 @@ const Transaction = () => {
                         className={`cursor-pointer border-b border-gray-100 transition-all ${isActive ? 'bg-[#FDF7F1] shadow-inner' : 'hover:bg-[#F9F2EC]'
                           }`}
                       >
+                        {isExportSelectionMode && (
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 text-[#AD7F65] border-[#AD7F65] rounded focus:ring-[#AD7F65]"
+                              checked={selectedTransactionIds.includes(trx._id)}
+                              onChange={() => handleToggleTransactionSelection(trx._id)}
+                              disabled={!trx._id}
+                            />
+                          </td>
+                        )}
                         <td className="px-4 py-3 font-bold text-[#AD7F65]">
                           {transactionNumber ? `#${transactionNumber}` : '---'}
                         </td>
@@ -957,6 +1248,16 @@ const Transaction = () => {
             setTransactionToView(null);
           }}
           transaction={transactionToView}
+          onReturnItems={(trx) => {
+            setShowViewModal(false);
+            setTransactionToView(null);
+            handleReturnClick(trx);
+          }}
+          onPrintReceipt={(trx) => {
+            setShowViewModal(false);
+            setTransactionToView(null);
+            handlePrintClick(trx);
+          }}
         />
 
         <PrintReceiptModal
@@ -977,6 +1278,29 @@ const Transaction = () => {
           transaction={transactionToReturn}
           onConfirm={handleReturnConfirm}
         />
+
+        {/* Return Success Modal */}
+        {showReturnSuccessModal && (
+          <div className="fixed inset-0 flex items-center justify-center z-[10002] bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl text-center">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
+                <FaCheckCircle className="w-10 h-10 text-green-500" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">Return Processed!</h3>
+              <p className="text-gray-500 mb-6">The return has been processed successfully.</p>
+              <button
+                onClick={() => {
+                  setShowReturnSuccessModal(false);
+                  window.location.reload();
+                }}
+                className="px-8 py-3 rounded-lg text-white font-semibold transition-all hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)' }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
       </>
     </div>
   );

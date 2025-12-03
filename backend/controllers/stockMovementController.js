@@ -1,6 +1,5 @@
 const StockMovement = require('../models/StockMovement');
 const Product = require('../models/Product');
-const { mergeDataFromBothSources } = require('../utils/mergeData');
 
 // Create a stock movement log
 exports.createStockMovement = async (req, res) => {
@@ -24,7 +23,6 @@ exports.createStockMovement = async (req, res) => {
       });
     }
 
-    // Get product details
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({
@@ -65,6 +63,7 @@ exports.createStockMovement = async (req, res) => {
   }
 };
 
+
 // Get all stock movements with filters
 exports.getStockMovements = async (req, res) => {
   try {
@@ -80,65 +79,76 @@ exports.getStockMovements = async (req, res) => {
       limit = 60
     } = req.query;
 
-    const filters = {};
+    console.log('Stock movements query params:', { search, category, type, brand, reason, date, sortBy, page, limit });
 
-    // Search filter
+    const query = {};
+
     if (search) {
-      filters.$or = [
+      query.$or = [
         { itemName: { $regex: search, $options: 'i' } },
         { sku: { $regex: search, $options: 'i' } },
         { handledBy: { $regex: search, $options: 'i' } }
       ];
     }
 
-    // Category filter
     if (category && category !== 'All') {
-      filters.category = category;
+      query.category = category;
     }
 
-    // Type filter
     if (type && type !== 'All') {
-      filters.type = type;
+      query.type = type;
     }
 
-    // Brand filter
     if (brand && brand !== 'All') {
-      filters.brandName = brand;
+      query.brandName = brand;
     }
 
-    // Reason filter
     if (reason && reason !== 'All') {
-      filters.reason = reason;
+      query.reason = reason;
     }
 
-    // Date filter
     if (date && date !== 'All') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
+      const now = new Date();
+      let startDate, endDate;
+      
       if (date === 'Today') {
-        filters.createdAt = { $gte: today, $lt: tomorrow };
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(now);
+        endDate.setHours(23, 59, 59, 999);
       } else if (date === 'This Week') {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        filters.createdAt = { $gte: weekAgo };
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(now);
+        endDate.setHours(23, 59, 59, 999);
       } else if (date === 'This Month') {
-        const monthAgo = new Date(today);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        filters.createdAt = { $gte: monthAgo };
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(now);
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        // Assume it's a specific date string
+        startDate = new Date(date);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(date);
+        endDate.setHours(23, 59, 59, 999);
       }
+      
+      query.createdAt = { $gte: startDate, $lte: endDate };
     }
 
-    // Sort
-    let sort = {};
+    // Determine sort order
+    let sort = { createdAt: -1 };
     switch (sortBy) {
-      case 'date-desc':
-        sort = { createdAt: -1 };
-        break;
       case 'date-asc':
         sort = { createdAt: 1 };
+        break;
+      case 'quantity-desc':
+        sort = { quantity: -1 };
+        break;
+      case 'quantity-asc':
+        sort = { quantity: 1 };
         break;
       case 'name-asc':
         sort = { itemName: 1 };
@@ -146,114 +156,31 @@ exports.getStockMovements = async (req, res) => {
       case 'name-desc':
         sort = { itemName: -1 };
         break;
-      case 'sku-asc':
-        sort = { sku: 1 };
-        break;
-      case 'sku-desc':
-        sort = { sku: -1 };
-        break;
-      default:
-        sort = { createdAt: -1 };
     }
 
-    // Build query for database-level filtering (more efficient)
-    const query = {};
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    if (category && category !== 'All') {
-      query.category = category;
-    }
+    console.log('Stock movements query:', JSON.stringify(query));
     
-    if (type && type !== 'All') {
-      query.type = type;
-    }
-    
-    if (brand && brand !== 'All') {
-      query.brandName = brand;
-    }
-    
-    if (reason && reason !== 'All') {
-      query.reason = reason;
-    }
-    
-    // Date filter at database level
-    if (date && date !== 'All') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      
-      if (date === 'Today') {
-        query.createdAt = { $gte: today, $lt: tomorrow };
-      } else if (date === 'This Week') {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        query.createdAt = { $gte: weekAgo };
-      } else if (date === 'This Month') {
-        const monthAgo = new Date(today);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        query.createdAt = { $gte: monthAgo };
-      }
-    }
+    const [movements, total] = await Promise.all([
+      StockMovement.find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      StockMovement.countDocuments(query)
+    ]);
 
-    // Get movements from both local and cloud with query filter and limit
-    const limitNum = parseInt(limit, 10) || 500;
-    const allMovements = await mergeDataFromBothSources('StockMovement', query, {
-      sort: { createdAt: -1 },
-      limit: limitNum
-    });
-    
-    // Apply search filter in memory (text search is complex)
-    let filteredMovements = allMovements;
-    
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filteredMovements = filteredMovements.filter(m => 
-        (m.itemName && m.itemName.toLowerCase().includes(searchLower)) ||
-        (m.sku && m.sku.toLowerCase().includes(searchLower)) ||
-        (m.handledBy && m.handledBy.toLowerCase().includes(searchLower))
-      );
-    }
-    
-    // Apply sorting (already sorted by mergeDataFromBothSources, but re-sort if needed)
-    switch (sortBy) {
-      case 'date-asc':
-        filteredMovements.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        break;
-      case 'name-asc':
-        filteredMovements.sort((a, b) => (a.itemName || '').localeCompare(b.itemName || ''));
-        break;
-      case 'name-desc':
-        filteredMovements.sort((a, b) => (b.itemName || '').localeCompare(a.itemName || ''));
-        break;
-      case 'sku-asc':
-        filteredMovements.sort((a, b) => (a.sku || '').localeCompare(b.sku || ''));
-        break;
-      case 'sku-desc':
-        filteredMovements.sort((a, b) => (b.sku || '').localeCompare(a.sku || ''));
-        break;
-      default:
-        // Already sorted by date-desc from mergeDataFromBothSources
-        break;
-    }
-    
-    // Limit results for pagination (limitNum already declared above for mergeDataFromBothSources)
-    // Use pagination limit (default 60) which may be different from query limit
-    const paginationLimit = parseInt(limit, 10) || 60;
-    const pageNum = parseInt(page, 10) || 1;
-    const skip = (pageNum - 1) * paginationLimit;
-    const paginatedMovements = filteredMovements.slice(skip, skip + paginationLimit);
-    
-    // Pagination info
-    const total = filteredMovements.length;
+    console.log(`Found ${movements.length} stock movements out of ${total} total`);
 
     res.json({
       success: true,
-      data: paginatedMovements,
+      data: movements,
       pagination: {
-        page: pageNum,
-        limit: limitNum,
+        page: parseInt(page),
+        limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limitNum)
+        pages: Math.ceil(total / parseInt(limit))
       }
     });
   } catch (error) {
@@ -266,7 +193,7 @@ exports.getStockMovements = async (req, res) => {
   }
 };
 
-// Get stock movement statistics for today
+// Get stock movement stats for today
 exports.getTodayStats = async (req, res) => {
   try {
     const today = new Date();
@@ -274,60 +201,63 @@ exports.getTodayStats = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Use mergeDataFromBothSources to get deduplicated movements
-    // This ensures we count correctly even if duplicates exist in cloud and local
-    const allMovements = await mergeDataFromBothSources('StockMovement', {
+    const movements = await StockMovement.find({
       createdAt: { $gte: today, $lt: tomorrow }
-    }, {
-      sort: { createdAt: -1 }
-    });
+    }).lean();
 
-    // Count deduplicated movements by type
-    const stockIns = allMovements.filter(m => m.type === 'Stock-In').length;
-    const stockOuts = allMovements.filter(m => m.type === 'Stock-Out').length;
-    const pullOuts = allMovements.filter(m => m.type === 'Pull-Out').length;
+    const stats = {
+      stockIn: 0,
+      stockOut: 0,
+      pullOut: 0,
+      totalMovements: movements.length
+    };
+
+    movements.forEach(movement => {
+      if (movement.type === 'Stock-In') {
+        stats.stockIn += movement.quantity;
+      } else if (movement.type === 'Stock-Out') {
+        stats.stockOut += movement.quantity;
+      } else if (movement.type === 'Pull-Out') {
+        stats.pullOut += movement.quantity;
+      }
+    });
 
     res.json({
       success: true,
-      data: {
-        stockIns,
-        stockOuts,
-        pullOuts
-      }
+      data: stats
     });
   } catch (error) {
     console.error('Error fetching today stats:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching statistics',
+      message: 'Error fetching today stats',
       error: error.message
     });
   }
 };
 
-// Get stock movement by ID
-exports.getStockMovementById = async (req, res) => {
+// Get stock movements by product
+exports.getMovementsByProduct = async (req, res) => {
   try {
-    const movement = await StockMovement.findById(req.params.id).lean();
+    const { productId } = req.params;
+    const { limit = 50 } = req.query;
 
-    if (!movement) {
-      return res.status(404).json({
-        success: false,
-        message: 'Stock movement not found'
-      });
-    }
+    const movements = await StockMovement.find({ productId })
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .lean();
 
     res.json({
       success: true,
-      data: movement
+      count: movements.length,
+      data: movements
     });
   } catch (error) {
-    console.error('Error fetching stock movement:', error);
+    console.error('Error fetching product movements:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching stock movement',
+      message: 'Error fetching product movements',
       error: error.message
     });
   }
 };
-

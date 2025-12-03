@@ -1,103 +1,103 @@
-# Accessing Local MongoDB Database in MongoDB Compass
+# Local Database Access
 
-## Yes, your local database is accessible via MongoDB Compass!
+This document explains how to access and manage the local MongoDB database.
 
-The local database is running on `mongodb://localhost:27017/pos-system` and can be accessed using MongoDB Compass.
+## Prerequisites
 
-## Connection Details
+- MongoDB installed locally
+- MongoDB running on default port (27017)
 
-**Connection String:**
+## Starting MongoDB
+
+### Windows
+```bash
+mongod
 ```
-mongodb://localhost:27017/pos-system
+
+Or use the provided batch file:
+```bash
+start-mongodb.bat
 ```
 
-**Or use the simplified connection:**
-- **Host:** `localhost`
-- **Port:** `27017`
-- **Database:** `pos-system`
+### Mac/Linux
+```bash
+mongod --dbpath /data/db
+```
 
-## Steps to Connect in MongoDB Compass
+## Connecting to Database
 
-1. **Open MongoDB Compass**
-2. **Click "New Connection"**
-3. **Enter the connection string:**
-   ```
-   mongodb://localhost:27017/pos-system
-   ```
-   Or use the form:
-   - Hostname: `localhost`
-   - Port: `27017`
-   - Authentication: None (if MongoDB is running without auth)
-   - Default Database: `pos-system`
+### Using MongoDB Compass
 
-4. **Click "Connect"**
+1. Open MongoDB Compass
+2. Connect to: `mongodb://localhost:27017`
+3. Select database: `pos_system`
 
-## Important Notes
+### Using MongoDB Shell
 
-### Prerequisites
-- **MongoDB must be running locally** on your machine
-- If you're using the provided script, run `start-mongodb.bat` first
-- Or start MongoDB manually: `mongod`
+```bash
+mongosh
+use pos_system
+```
 
-### Database Name
-- The local database name is: **`pos-system`**
-- This matches your connection string: `mongodb://localhost:27017/pos-system`
+## Common Commands
 
-### What You'll See
-Once connected, you'll see all collections:
-- `products` - All products
-- `employees` - All employees
-- `salestransactions` - All transactions
-- `stockmovements` - All stock movement logs
-- `carts` - Shopping carts
+### View Collections
+```javascript
+show collections
+```
 
-### Data in Local Database
-- **When Online:** Data is written to both cloud (Atlas) and local
-- **When Offline:** Data is written only to local
-- **After Sync:** Local data is synced to cloud when connection is restored
+### View Products
+```javascript
+db.products.find().pretty()
+```
+
+### View Employees
+```javascript
+db.employees.find().pretty()
+```
+
+### View Transactions
+```javascript
+db.salestransactions.find().sort({createdAt: -1}).limit(10).pretty()
+```
+
+### Count Documents
+```javascript
+db.products.countDocuments()
+db.employees.countDocuments()
+db.salestransactions.countDocuments()
+```
+
+## Backup Database
+
+```bash
+mongodump --db pos_system --out ./backup
+```
+
+## Restore Database
+
+```bash
+mongorestore --db pos_system ./backup/pos_system
+```
+
+## Environment Configuration
+
+The database connection is configured in `backend/.env`:
+
+```env
+MONGODB_URI=mongodb://localhost:27017/pos_system
+```
 
 ## Troubleshooting
 
-### Can't Connect?
-1. **Check if MongoDB is running:**
-   ```bash
-   # Windows
-   net start MongoDB
-   
-   # Or check if mongod process is running
-   ```
+### MongoDB Not Starting
 
-2. **Verify the port:**
-   - Default MongoDB port is `27017`
-   - Check if another service is using this port
+1. Check if port 27017 is available
+2. Ensure data directory exists
+3. Check MongoDB logs for errors
 
-3. **Check connection string:**
-   - Make sure it's exactly: `mongodb://localhost:27017/pos-system`
-   - No authentication required if MongoDB is running locally without auth
+### Connection Refused
 
-### Database Not Showing?
-- Make sure you've created at least one document in the database
-- Empty databases might not appear in some MongoDB tools
-- Try creating a test document first
-
-## Viewing Data
-
-Once connected, you can:
-- ✅ View all collections
-- ✅ Browse documents
-- ✅ Edit documents directly
-- ✅ Query data
-- ✅ See indexes
-- ✅ Monitor database performance
-
-## Dual Database System
-
-Remember:
-- **Cloud Database (Atlas):** `pos_system` (with underscore)
-- **Local Database (Compass):** `pos-system` (with hyphen)
-
-Both databases work together:
-- Online: Data written to both
-- Offline: Data written to local only
-- Sync: Local data synced to cloud when online
-
+1. Verify MongoDB is running: `mongosh`
+2. Check firewall settings
+3. Verify connection string in `.env`

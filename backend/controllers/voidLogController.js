@@ -1,9 +1,7 @@
-const { getTransactionModel } = require('../utils/getModel');
-const dbManager = require('../config/databaseManager');
-const mongoose = require('mongoose');
+const VoidLog = require('../models/VoidLog');
 
 // Generate a unique void ID
-const generateVoidId = async (VoidLog) => {
+const generateVoidId = async () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let voidId;
   let isUnique = false;
@@ -33,22 +31,6 @@ const generateVoidId = async (VoidLog) => {
   return voidId;
 };
 
-// Get VoidLog model based on connection
-const getVoidLogModel = (req) => {
-  const VoidLogModule = require('../models/VoidLog');
-  const schema = VoidLogModule.schema;
-  
-  if (req && req.dbManager) {
-    const connection = req.dbManager.getConnection();
-    if (connection) {
-      return connection.model('VoidLog', schema);
-    }
-  }
-  
-  // Default to cloud connection
-  return mongoose.model('VoidLog', schema);
-};
-
 // Create a new void log entry
 exports.createVoidLog = async (req, res) => {
   try {
@@ -59,6 +41,8 @@ exports.createVoidLog = async (req, res) => {
       voidedBy,
       voidedById,
       voidedByName,
+      approvedBy,
+      approvedByRole,
       originalTransactionId,
       source,
       userId,
@@ -79,10 +63,8 @@ exports.createVoidLog = async (req, res) => {
       });
     }
 
-    const VoidLog = getVoidLogModel(req);
-    
     // Generate unique void ID
-    const voidId = await generateVoidId(VoidLog);
+    const voidId = await generateVoidId();
 
     const voidLogData = {
       voidId,
@@ -102,6 +84,8 @@ exports.createVoidLog = async (req, res) => {
       voidedBy: voidedBy || voidedById || '',
       voidedById: voidedById || voidedBy || '',
       voidedByName,
+      approvedBy: approvedBy || null,
+      approvedByRole: approvedByRole || null,
       voidedAt: new Date(),
       originalTransactionId: originalTransactionId || null,
       source: source || 'cart',
@@ -109,87 +93,7 @@ exports.createVoidLog = async (req, res) => {
       notes: notes || ''
     };
 
-    // Save to local and cloud in parallel
-    const reqDbManager = req.dbManager || dbManager;
-    let localConnection = reqDbManager.getLocalConnection();
-    
-    // Ensure local connection exists
-    if (!localConnection || localConnection.readyState !== 1) {
-      try {
-        await reqDbManager.connectLocalForSync();
-        localConnection = reqDbManager.getLocalConnection();
-      } catch (error) {
-        console.warn('Could not initialize local connection:', error.message);
-      }
-    }
-    
-    const savePromises = [];
-    
-    // Always try to save to local (works offline)
-    if (localConnection && localConnection.readyState === 1) {
-      savePromises.push(
-        (async () => {
-          try {
-            const VoidLogModule = require('../models/VoidLog');
-            const LocalVoidLog = localConnection.model('VoidLog', VoidLogModule.schema);
-            const localVoidLog = await LocalVoidLog.create(voidLogData);
-            console.log('Void log saved to local database');
-            return { type: 'local', voidLog: localVoidLog };
-          } catch (localError) {
-            console.error('Failed to write void log to local database:', localError.message);
-            if (!req.isOnline) {
-              throw new Error('Failed to save void log to local database: ' + localError.message);
-            }
-            return { type: 'local', voidLog: null, error: localError };
-          }
-        })()
-      );
-    }
-    
-    // Try to save to cloud if online (parallel with local)
-    if (req.isOnline) {
-      savePromises.push(
-        (async () => {
-          try {
-            const cloudVoidLog = await VoidLog.create(voidLogData);
-            console.log('Void log saved to cloud database');
-            return { type: 'cloud', voidLog: cloudVoidLog };
-          } catch (cloudError) {
-            console.warn('Failed to write void log to cloud database:', cloudError.message);
-            return { type: 'cloud', voidLog: null, error: cloudError };
-          }
-        })()
-      );
-    }
-    
-    // Wait for all saves to complete (in parallel)
-    const results = await Promise.all(savePromises);
-    
-    // Extract void logs from results
-    const localResult = results.find(r => r.type === 'local');
-    const cloudResult = results.find(r => r.type === 'cloud');
-    
-    const localVoidLog = localResult?.voidLog || null;
-    const cloudVoidLog = cloudResult?.voidLog || null;
-    
-    // Check for critical errors
-    if (localResult?.error && !req.isOnline) {
-      return res.status(503).json({
-        success: false,
-        message: 'Failed to save void log to local database',
-        error: localResult.error.message
-      });
-    }
-    
-    // Use cloud void log if available, otherwise use local
-    const voidLog = cloudVoidLog || localVoidLog;
-    
-    if (!voidLog) {
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to save void log to any database'
-      });
-    }
+    const voidLog = await VoidLog.create(voidLogData);
 
     res.json({
       success: true,
@@ -221,8 +125,6 @@ exports.getVoidLogs = async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    const VoidLog = getVoidLogModel(req);
-    
     // Build query
     const query = {};
     
@@ -291,7 +193,6 @@ exports.getVoidLogs = async (req, res) => {
 exports.getVoidLogById = async (req, res) => {
   try {
     const { id } = req.params;
-    const VoidLog = getVoidLogModel(req);
     
     const voidLog = await VoidLog.findOne({ 
       $or: [
@@ -325,7 +226,6 @@ exports.getVoidLogById = async (req, res) => {
 exports.getVoidLogStats = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    const VoidLog = getVoidLogModel(req);
     
     const query = {};
     if (startDate || endDate) {
@@ -379,5 +279,3 @@ exports.getVoidLogStats = async (req, res) => {
     });
   }
 };
-
-

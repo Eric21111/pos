@@ -12,13 +12,40 @@ const getDisplayDate = () =>
 
 const getTodayISO = () => new Date().toISOString().split('T')[0];
 
+const ROLE_ACCESS_RECOMMENDATIONS = {
+  Cashier: {
+    posTerminal: true,
+    inventory: false,
+    viewTransactions: true,
+    generateReports: false,
+  },
+  Manager: {
+    posTerminal: true,
+    inventory: true,
+    viewTransactions: true,
+    generateReports: true,
+  },
+  'Sub-Cashier': {
+    posTerminal: true,
+    inventory: false,
+    viewTransactions: false,
+    generateReports: false,
+  },
+  'Stock Manager': {
+    posTerminal: false,
+    inventory: true,
+    viewTransactions: true,
+    generateReports: false,
+  },
+};
+
 const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     contactNo: '+63',
     email: '',
-    role: 'Sales Clerk',
+    role: 'Cashier',
     dateCreated: getDisplayDate(),
     dateJoined: getTodayISO(),
   });
@@ -52,7 +79,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
         lastName: '',
         contactNo: '+63',
         email: '',
-        role: 'Sales Clerk',
+        role: 'Cashier',
         dateCreated: getDisplayDate(),
         dateJoined: getTodayISO(),
       });
@@ -91,6 +118,16 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
       ...prev,
       [name]: value,
     }));
+
+    if (name === 'role') {
+      const recommendedPermissions = ROLE_ACCESS_RECOMMENDATIONS[value];
+      if (recommendedPermissions) {
+        setAccessControl((prev) => ({
+          ...prev,
+          ...recommendedPermissions,
+        }));
+      }
+    }
   };
 
   const handleAccessControlToggle = (key) => {
@@ -221,7 +258,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
           lastName: '',
           contactNo: '+63',
           email: '',
-          role: 'Sales Clerk',
+          role: 'Cashier',
           dateCreated: getDisplayDate(),
           dateJoined: getTodayISO(),
         });
@@ -410,10 +447,10 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65] bg-white"
                   >
-                    <option value="Sales Clerk">Sales Clerk</option>
-                    <option value="Manager">Manager</option>
                     <option value="Cashier">Cashier</option>
-                    <option value="Supervisor">Supervisor</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Sub-Cashier">Sub-Cashier</option>
+                    <option value="Stock Manager">Stock Manager</option>
                   </select>
                 </div>
                 <div>

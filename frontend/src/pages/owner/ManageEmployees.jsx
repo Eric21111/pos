@@ -8,10 +8,9 @@ import DeleteEmployeeModal from '../../components/owner/DeleteEmployeeModal';
 import AddEmployeeModal from '../../components/owner/AddEmployeeModal';
 import DisableAccountModal from '../../components/owner/DisableAccountModal';
 import SuccessModal from '../../components/inventory/SuccessModal';
-import TemporaryPinModal from '../../components/owner/TemporaryPinModal';
 import ResetPinConfirmModal from '../../components/owner/ResetPinConfirmModal';
 import defaultAvatar from '../../assets/default.jpeg';
-import sortIcon from '../../assets/sort.svg';
+import filterIcon from '../../assets/filter.svg';
 
 const ManageEmployees = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,13 +28,13 @@ const ManageEmployees = () => {
   const [toggleAction, setToggleAction] = useState('disable');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [showTempPinModal, setShowTempPinModal] = useState(false);
-  const [temporaryPin, setTemporaryPin] = useState('');
-  const [createdEmployeeName, setCreatedEmployeeName] = useState('');
   const [showResetPinModal, setShowResetPinModal] = useState(false);
   const [resettingEmployee, setResettingEmployee] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [roleFilter, setRoleFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
   const itemsPerPage = 12;
 
   // Fetch employees from database
@@ -66,9 +65,21 @@ const ManageEmployees = () => {
     fetchEmployees();
   }, []);
 
-  const filteredEmployees = employees.filter(employee =>
-    employee.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredEmployees = employees.filter(employee => {
+    // Search filter
+    const matchesSearch = employee.name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Role filter
+    const matchesRole = roleFilter === 'All' || employee.role === roleFilter;
+    
+    // Status filter
+    const matchesStatus = statusFilter === 'All' || employee.status === statusFilter;
+    
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
+  // Get unique roles from employees for filter options
+  const availableRoles = ['All', ...new Set(employees.map(emp => emp.role).filter(Boolean))];
 
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
   const paginatedEmployees = filteredEmployees.slice(
@@ -78,6 +89,7 @@ const ManageEmployees = () => {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Handle employee action dropdown
       if (openDropdown !== null) {
         const buttonElement = document.getElementById(`dropdown-btn-${openDropdown}`);
         const dropdownElement = document.getElementById(`dropdown-menu-${openDropdown}`);
@@ -91,13 +103,23 @@ const ManageEmployees = () => {
           setOpenDropdown(null);
         }
       }
+      
+      // Handle filter dropdown
+      if (showFilterDropdown) {
+        const filterButton = event.target.closest('[data-filter-button]');
+        const filterDropdown = event.target.closest('[data-filter-dropdown]');
+        
+        if (!filterButton && !filterDropdown) {
+          setShowFilterDropdown(false);
+        }
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openDropdown]);
+  }, [openDropdown, showFilterDropdown]);
 
   const handleViewEmployee = (employee) => {
     setViewingEmployee(employee);
@@ -128,7 +150,7 @@ const ManageEmployees = () => {
 
     try {
       const newTempPin = generateRandomPin();
-      
+
       const response = await fetch(`http://localhost:5000/api/employees/${resettingEmployee._id || resettingEmployee.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -141,11 +163,11 @@ const ManageEmployees = () => {
       const data = await response.json();
 
       if (data.success) {
-        // Show temporary PIN modal
-        setCreatedEmployeeName(resettingEmployee.name);
-        setTemporaryPin(newTempPin);
-        setShowTempPinModal(true);
         setResettingEmployee(null);
+        setSuccessMessage(`A new temporary PIN has been emailed to ${resettingEmployee.email || resettingEmployee.name}.`);
+        setShowSuccessModal(true);
+        // Refresh employees to reflect any changes
+        fetchEmployees();
       } else {
         alert(data.message || 'Failed to reset PIN');
       }
@@ -263,9 +285,78 @@ const ManageEmployees = () => {
                 }}
               />
             </div>
-            <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <img src={sortIcon} alt="Filter" className="w-5 h-5 opacity-90" />
-            </button>
+            <div className="relative">
+              <button 
+                data-filter-button
+                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                className={`p-2 border rounded-lg hover:bg-gray-50 transition-colors ${
+                  (roleFilter !== 'All' || statusFilter !== 'All') 
+                    ? 'border-[#AD7F65] bg-[#AD7F65]/10' 
+                    : 'border-gray-300'
+                }`}
+              >
+                <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
+              </button>
+              
+              {showFilterDropdown && (
+                <div data-filter-dropdown className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-gray-700">Filters</h4>
+                    <button
+                      onClick={() => {
+                        setRoleFilter('All');
+                        setStatusFilter('All');
+                      }}
+                      className="text-xs text-[#AD7F65] hover:underline"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  
+                  {/* Role Filter */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-600 mb-2">Role</label>
+                    <select
+                      value={roleFilter}
+                      onChange={(e) => {
+                        setRoleFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                    >
+                      {availableRoles.map(role => (
+                        <option key={role} value={role}>{role}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Status Filter */}
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-600 mb-2">Status</label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => {
+                        setStatusFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                    >
+                      <option value="All">All</option>
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowFilterDropdown(false)}
+                    className="w-full py-2 text-white rounded-lg text-sm font-medium"
+                    style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           
           <button
@@ -477,11 +568,6 @@ const ManageEmployees = () => {
           setShowAddModal(false);
         }}
         onEmployeeAdded={fetchEmployees}
-        onEmployeeCreated={(name, pin) => {
-          setCreatedEmployeeName(name);
-          setTemporaryPin(pin);
-          setShowTempPinModal(true);
-        }}
       />
 
       <DisableAccountModal
@@ -499,13 +585,6 @@ const ManageEmployees = () => {
         isOpen={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
         message={successMessage}
-      />
-
-      <TemporaryPinModal
-        isOpen={showTempPinModal}
-        onClose={() => setShowTempPinModal(false)}
-        employeeName={createdEmployeeName}
-        temporaryPin={temporaryPin}
       />
 
       <ResetPinConfirmModal

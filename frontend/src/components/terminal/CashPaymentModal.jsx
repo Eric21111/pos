@@ -6,7 +6,7 @@ import ReceiptModal from './ReceiptModal';
 import PrintingModal from './PrintingModal';
 import { sendReceiptToPrinter } from '../../utils/printBridge';
 
-const CashPaymentModal = ({ isOpen, onClose, totalAmount, onProceed, cartItems = [] }) => {
+const CashPaymentModal = ({ isOpen, onClose, totalAmount, subtotalAmount = 0, discountAmount = 0, selectedDiscounts = [], onProceed, cartItems = [] }) => {
   const [amountReceived, setAmountReceived] = useState('');
   const [change, setChange] = useState(0);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -15,14 +15,21 @@ const CashPaymentModal = ({ isOpen, onClose, totalAmount, onProceed, cartItems =
   const [receiptData, setReceiptData] = useState(null);
   const [isAutoPrinting, setIsAutoPrinting] = useState(false);
   const [printError, setPrintError] = useState(null);
+  const [amountError, setAmountError] = useState('');
 
   useEffect(() => {
     if (amountReceived && !isNaN(parseFloat(amountReceived))) {
       const received = parseFloat(amountReceived);
       const changeAmount = received - totalAmount;
       setChange(changeAmount >= 0 ? changeAmount : 0);
+      setAmountError('');
     } else {
       setChange(0);
+      if (amountReceived) {
+        setAmountError('Please enter a valid amount.');
+      } else {
+        setAmountError('');
+      }
     }
   }, [amountReceived, totalAmount]);
 
@@ -36,6 +43,7 @@ const CashPaymentModal = ({ isOpen, onClose, totalAmount, onProceed, cartItems =
       setReceiptData(null);
       setIsAutoPrinting(false);
       setPrintError(null);
+      setAmountError('');
     }
   }, [isOpen]);
 
@@ -48,9 +56,14 @@ const CashPaymentModal = ({ isOpen, onClose, totalAmount, onProceed, cartItems =
   const handleProceed = () => {
     const received = parseFloat(amountReceived);
     if (!amountReceived || isNaN(received) || received < totalAmount) {
-      alert('Please enter an amount equal to or greater than the total amount.');
+      if (!amountReceived || isNaN(received)) {
+        setAmountError('Please enter a valid amount.');
+      } else if (received < totalAmount) {
+        setAmountError('Amount must be equal to or greater than the total.');
+      }
       return;
     }
+    setAmountError('');
     setShowConfirmation(true);
   };
 
@@ -77,8 +90,12 @@ const CashPaymentModal = ({ isOpen, onClose, totalAmount, onProceed, cartItems =
         total: (item.itemPrice || item.price || 0) * (item.quantity || 1)
       })),
       paymentMethod: 'CASH',
-      subtotal: totalAmount,
-      discount: 0.00,
+      subtotal: subtotalAmount || totalAmount + discountAmount,
+      discount: discountAmount,
+      discounts: selectedDiscounts.map(d => ({
+        title: d.title,
+        value: d.discountValue
+      })),
       total: totalAmount,
       cash: received,
       change: change,
@@ -158,7 +175,7 @@ const CashPaymentModal = ({ isOpen, onClose, totalAmount, onProceed, cartItems =
               </div>
             </div>
 
-            <div className="mb-6">
+            <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Amount Received:
               </label>
@@ -170,6 +187,38 @@ const CashPaymentModal = ({ isOpen, onClose, totalAmount, onProceed, cartItems =
                 className="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 autoFocus
               />
+              {amountError && (
+                <p className="mt-2 text-sm text-red-600">
+                  {amountError}
+                </p>
+              )}
+            </div>
+
+            {/* Quick Amount Suggestions */}
+            <div className="mb-6">
+              <label className="block text-xs font-medium text-gray-500 mb-2">
+                Quick Select:
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {/* Exact Amount Button */}
+                <button
+                  onClick={() => setAmountReceived(totalAmount.toString())}
+                  className="px-3 py-2 text-sm font-medium rounded-lg border border-orange-300 bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors"
+                >
+                  Exact ₱{totalAmount.toFixed(0)}
+                </button>
+                
+                {/* Dynamic suggestions based on total amount */}
+                {[20, 50, 100, 200, 500, 1000, 2000, 5000].filter(amount => amount >= totalAmount).slice(0, 4).map(amount => (
+                  <button
+                    key={amount}
+                    onClick={() => setAmountReceived(amount.toString())}
+                    className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    ₱{amount.toLocaleString()}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="mb-8">

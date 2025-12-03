@@ -46,7 +46,7 @@ const stockMovementSchema = new mongoose.Schema({
   reason: {
     type: String,
     required: true,
-    enum: ['Restock', 'Sold', 'Returned Item', 'Exchange', 'Damaged', 'Lost', 'Expired', 'Other']
+    enum: ['Restock', 'Sold', 'Returned Item', 'Return', 'Exchange', 'Damaged', 'Lost', 'Expired', 'Adjustment', 'Initial Stock', 'Other']
   },
   handledBy: {
     type: String,
