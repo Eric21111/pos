@@ -9,6 +9,7 @@ import AddEmployeeModal from '../../components/owner/AddEmployeeModal';
 import DisableAccountModal from '../../components/owner/DisableAccountModal';
 import SuccessModal from '../../components/inventory/SuccessModal';
 import ResetPinConfirmModal from '../../components/owner/ResetPinConfirmModal';
+import TemporaryPinModal from '../../components/owner/TemporaryPinModal';
 import defaultAvatar from '../../assets/default.jpeg';
 import filterIcon from '../../assets/filter.svg';
 
@@ -30,6 +31,9 @@ const ManageEmployees = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showResetPinModal, setShowResetPinModal] = useState(false);
   const [resettingEmployee, setResettingEmployee] = useState(null);
+  const [showTempPinModal, setShowTempPinModal] = useState(false);
+  const [newEmployeeName, setNewEmployeeName] = useState('');
+  const [newEmployeePin, setNewEmployeePin] = useState('');
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -149,22 +153,21 @@ const ManageEmployees = () => {
     setShowResetPinModal(false);
 
     try {
-      const newTempPin = generateRandomPin();
-
-      const response = await fetch(`http://localhost:5000/api/employees/${resettingEmployee._id || resettingEmployee.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          pin: newTempPin,
-          requiresPinReset: true 
-        })
+      // Use the send-temporary-pin endpoint which generates PIN and sends email
+      const response = await fetch(`http://localhost:5000/api/employees/${resettingEmployee._id || resettingEmployee.id}/send-temporary-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
       });
 
       const data = await response.json();
 
       if (data.success) {
         setResettingEmployee(null);
-        setSuccessMessage(`A new temporary PIN has been emailed to ${resettingEmployee.email || resettingEmployee.name}.`);
+        if (data.emailSent) {
+          setSuccessMessage(`A new temporary PIN has been emailed to ${resettingEmployee.email}.`);
+        } else {
+          setSuccessMessage(`Temporary PIN generated: ${data.tempPin}. Email could not be sent - please share this PIN manually.`);
+        }
         setShowSuccessModal(true);
         // Refresh employees to reflect any changes
         fetchEmployees();
@@ -458,7 +461,7 @@ const ManageEmployees = () => {
                     </button>
                     <button
                       onClick={() => handleToggleStatus(employee)}
-                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b ${
+                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 rounded-b-lg ${
                         employee.status === 'Active' ? 'text-orange-600' : 'text-green-600'
                       }`}
                     >
@@ -477,15 +480,6 @@ const ManageEmployees = () => {
                           Enable
                         </>
                       )}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteEmployee(employee)}
-                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 text-red-600 rounded-b-lg"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      Delete
                     </button>
                   </div>
                   )}
@@ -568,6 +562,11 @@ const ManageEmployees = () => {
           setShowAddModal(false);
         }}
         onEmployeeAdded={fetchEmployees}
+        onEmployeeCreated={(name, pin) => {
+          setNewEmployeeName(name);
+          setNewEmployeePin(pin);
+          setShowTempPinModal(true);
+        }}
       />
 
       <DisableAccountModal
@@ -595,6 +594,17 @@ const ManageEmployees = () => {
         }}
         onConfirm={confirmResetPin}
         employeeName={resettingEmployee?.name || ''}
+      />
+
+      <TemporaryPinModal
+        isOpen={showTempPinModal}
+        onClose={() => {
+          setShowTempPinModal(false);
+          setNewEmployeeName('');
+          setNewEmployeePin('');
+        }}
+        employeeName={newEmployeeName}
+        temporaryPin={newEmployeePin}
       />
     </div>
   );

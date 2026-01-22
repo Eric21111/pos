@@ -65,7 +65,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
       requiredPermission: null // Owner only, no permission check needed
     },
     {
-      name: 'POS / Terminal',
+      name: 'POS',
       icon: terminalIcon,
       path: '/terminal',
       gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',

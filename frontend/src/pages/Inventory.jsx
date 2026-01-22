@@ -58,6 +58,38 @@ const preferredExportFieldOrder = [
   'updatedAt'
 ];
 
+// Map database field names to human-readable CSV headers
+const fieldToHeaderMap = {
+  '_id': 'ID',
+  'sku': 'SKU',
+  'itemName': 'Item Name',
+  'category': 'Category',
+  'brandName': 'Brand',
+  'variant': 'Variant',
+  'itemPrice': 'Item Price',
+  'costPrice': 'Cost Price',
+  'currentStock': 'Current Stock',
+  'reorderNumber': 'Reorder Level',
+  'displayInTerminal': 'Display In Terminal',
+  'terminalStatus': 'Terminal Status',
+  'selectedSizes': 'Selected Sizes',
+  'sizeQuantities': 'Size Quantities',
+  'sizePrices': 'Size Prices',
+  'sizes': 'Sizes',
+  'differentPricesPerSize': 'Different Prices Per Size',
+  'foodSubtype': 'Food Subtype',
+  'supplierName': 'Supplier Name',
+  'supplierContact': 'Supplier Contact',
+  'itemImage': 'Image URL',
+  'dateAdded': 'Date Added',
+  'lastUpdated': 'Last Updated',
+  'createdAt': 'Created At',
+  'updatedAt': 'Updated At',
+  'stockStatus': 'Stock Status'
+};
+
+const ADD_PRODUCT_STORAGE_KEY = 'addProductFormDraft';
+
 const Inventory = () => {
   const { getCachedData, setCachedData, isCacheValid, invalidateCache } = useDataCache();
   const [products, setProducts] = useState(() => getCachedData('products') || []);
@@ -89,11 +121,11 @@ const Inventory = () => {
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [isExportSelectionMode, setIsExportSelectionMode] = useState(false);
 
-  const [newProduct, setNewProduct] = useState({
+  const defaultProductState = {
     sku: '',
     itemName: '',
     category: 'Tops',
-    brandName: 'Brandless',
+    brandName: 'Default',
     variant: '',
     size: '',
     itemPrice: '',
@@ -110,12 +142,46 @@ const Inventory = () => {
     differentPricesPerSize: false,
     foodSubtype: '', // Subtype for Foods category
     displayInTerminal: true // Display in POS/terminal by default
+  };
+
+  // Load saved draft from localStorage on initial render
+  const [newProduct, setNewProduct] = useState(() => {
+    try {
+      const savedDraft = localStorage.getItem(ADD_PRODUCT_STORAGE_KEY);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        // Merge with defaults to ensure all fields exist
+        return { ...defaultProductState, ...parsed };
+      }
+    } catch (error) {
+      console.error('Error loading product draft from localStorage:', error);
+    }
+    return defaultProductState;
   });
 
   const [categories, setCategories] = useState([
     { name: 'All', icon: allIcon }
   ]);
   const [brandPartners, setBrandPartners] = useState([]);
+
+  // Save form data to localStorage whenever newProduct changes (only when not editing)
+  useEffect(() => {
+    if (!editingProduct && showAddModal) {
+      try {
+        // Don't save if form is essentially empty (just defaults)
+        const hasData = newProduct.itemName || newProduct.variant || 
+                        newProduct.itemPrice || newProduct.costPrice || 
+                        newProduct.currentStock || newProduct.itemImage ||
+                        (newProduct.selectedSizes && newProduct.selectedSizes.length > 0);
+        
+        if (hasData) {
+          localStorage.setItem(ADD_PRODUCT_STORAGE_KEY, JSON.stringify(newProduct));
+        }
+      } catch (error) {
+        console.error('Error saving product draft to localStorage:', error);
+      }
+    }
+  }, [newProduct, editingProduct, showAddModal]);
 
   // Icon mapping for categories
   const categoryIconMap = {
@@ -217,14 +283,20 @@ const Inventory = () => {
 
   const generateSKU = (category, variant) => {
     const categoryCode = categoryCodeMap[category] || 'OTH';
-    const incrementalCode = getNextIncrementalCode();
+    
+    // Generate random alphanumeric string (6 characters)
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let randomCode = '';
+    for (let i = 0; i < 6; i++) {
+      randomCode += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
     
     if (!variant || variant.trim() === '') {
-      return `${categoryCode}-${incrementalCode}`;
+      return `${categoryCode}-${randomCode}`;
     }
     
     const colorCode = getColorCode(variant);
-    return `${categoryCode}-${incrementalCode}-${colorCode}`;
+    return `${categoryCode}-${randomCode}-${colorCode}`;
   };
 
   // Only fetch if cache is empty or invalid
@@ -449,14 +521,14 @@ const Inventory = () => {
     }));
   };
 
-  const resetProductForm = () => {
+  const resetProductForm = (clearStorage = true) => {
     const defaultCategory = 'Tops';
     const defaultVariant = '';
     setNewProduct({
       sku: generateSKU(defaultCategory, defaultVariant),
       itemName: '',
       category: defaultCategory,
-      brandName: 'Brandless',
+      brandName: 'Default',
       variant: defaultVariant,
       size: '',
       itemPrice: '',
@@ -474,6 +546,15 @@ const Inventory = () => {
       displayInTerminal: true
     });
     setEditingProduct(null);
+    
+    // Clear localStorage draft when form is reset
+    if (clearStorage) {
+      try {
+        localStorage.removeItem(ADD_PRODUCT_STORAGE_KEY);
+      } catch (error) {
+        console.error('Error clearing product draft from localStorage:', error);
+      }
+    }
   };
 
   const handleAddProduct = async (e) => {
@@ -644,7 +725,7 @@ const Inventory = () => {
       sku: product.sku || '',
       itemName: product.itemName || '',
       category: product.category || 'Tops',
-      brandName: product.brandName || 'Brandless',
+      brandName: product.brandName || 'Default',
       variant: product.variant || '',
       size: product.size || '',
       itemPrice: product.itemPrice || '',
@@ -1134,11 +1215,7 @@ const Inventory = () => {
   };
 
   const handleExportButtonClick = () => {
-    if (!isExportSelectionMode) {
-      setIsExportSelectionMode(true);
-      setSelectedProductIds([]);
-      return;
-    }
+    // Export all products automatically without requiring selection
     handleExportToCSV();
   };
 
@@ -1149,21 +1226,36 @@ const Inventory = () => {
 
   const handleExportToCSV = () => {
     try {
+      // Export all filtered products automatically (no selection required)
+      // If user has selected specific products, export those; otherwise export all filtered products
       const productsToExport = selectedProductIds.length > 0
         ? filteredProducts.filter(product => selectedProductIds.includes(product._id))
-        : [];
+        : filteredProducts;
 
       if (productsToExport.length === 0) {
-        alert('Please select at least one item to export.');
+        alert('No products to export.');
         return;
       }
 
+      // Fields to exclude from export
+      const excludedFields = ['__v'];
+
       const dynamicFields = new Set();
       productsToExport.forEach(product => {
-        Object.keys(product || {}).forEach(key => dynamicFields.add(key));
+        Object.keys(product || {}).forEach(key => {
+          // Exclude SKU and other internal fields
+          if (!excludedFields.includes(key)) {
+            dynamicFields.add(key);
+          }
+        });
       });
 
-      const orderedFields = preferredExportFieldOrder.filter(field => dynamicFields.has(field));
+      // Filter out excluded fields from preferred order
+      const filteredPreferredOrder = preferredExportFieldOrder.filter(
+        field => !excludedFields.includes(field)
+      );
+      
+      const orderedFields = filteredPreferredOrder.filter(field => dynamicFields.has(field));
       const remainingFields = Array.from(dynamicFields).filter(field => !orderedFields.includes(field)).sort();
       const headers = [...orderedFields, ...remainingFields, 'stockStatus'];
 
@@ -1180,9 +1272,12 @@ const Inventory = () => {
         });
       });
 
+      // Convert field names to human-readable headers
+      const humanReadableHeaders = headers.map(field => fieldToHeaderMap[field] || field);
+
       // Convert to CSV format
       const csvContent = [
-        headers.join(','),
+        humanReadableHeaders.join(','),
         ...rows.map(row => 
           row.map(cell => {
             // Escape cells that contain commas, quotes, or newlines
@@ -1208,7 +1303,7 @@ const Inventory = () => {
       link.click();
       document.body.removeChild(link);
       
-      alert('Inventory exported successfully!');
+      alert(`${productsToExport.length} products exported successfully!`);
       setIsExportSelectionMode(false);
       setSelectedProductIds([]);
     } catch (error) {
@@ -1271,11 +1366,13 @@ const Inventory = () => {
             }
           }
           
+          // Get SKU from CSV if available, otherwise let backend auto-generate
+          const skuFromCsv = values[headers.indexOf('SKU')]?.trim();
+          
           const product = {
-            sku: values[headers.indexOf('SKU')] || generateSKU('Foods', ''),
             itemName: values[headers.indexOf('Item Name')] || '',
             category: values[headers.indexOf('Category')] || 'Foods',
-            brandName: values[headers.indexOf('Brand')] || 'Brandless',
+            brandName: values[headers.indexOf('Brand')] || 'Default',
             variant: values[headers.indexOf('Variant')] || '',
             itemPrice: parseFloat(values[headers.indexOf('Item Price')]) || 0,
             costPrice: parseFloat(values[headers.indexOf('Cost Price')]) || 0,
@@ -1286,6 +1383,11 @@ const Inventory = () => {
             itemImage: values[headers.indexOf('Image URL')] || '',
             sizes: parsedSizes
           };
+          
+          // Only include SKU if it exists in CSV
+          if (skuFromCsv) {
+            product.sku = skuFromCsv;
+          }
 
           // Validate required fields
           if (!product.itemName || !product.itemPrice) {

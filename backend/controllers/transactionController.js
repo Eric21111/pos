@@ -58,35 +58,6 @@ const generateVoidId = async () => {
   return voidId;
 };
 
-// Get the next transaction number
-const getNextTransactionNumber = async () => {
-  // Find the maximum transaction number across ALL transactions (not just non-void/return)
-  const maxTransaction = await SalesTransaction.findOne(
-    { 
-      transactionNumber: { $exists: true, $ne: null, $type: 'number' }
-    },
-    { transactionNumber: 1 }
-  )
-  .sort({ transactionNumber: -1 })
-  .limit(1)
-  .lean();
-  
-  const nextNumber = (maxTransaction?.transactionNumber || 0) + 1;
-  
-  // Double-check that this number doesn't exist (race condition protection)
-  const existing = await SalesTransaction.findOne({ transactionNumber: nextNumber }).lean();
-  if (existing) {
-    // If it exists, find the actual max and add 1
-    const actualMax = await SalesTransaction.aggregate([
-      { $match: { transactionNumber: { $exists: true, $ne: null, $type: 'number' } } },
-      { $group: { _id: null, maxNum: { $max: '$transactionNumber' } } }
-    ]);
-    return (actualMax[0]?.maxNum || 0) + 1;
-  }
-  
-  return nextNumber;
-};
-
 exports.getAllTransactions = async (req, res) => {
   try {
     const transactions = await SalesTransaction.find({})
@@ -212,13 +183,9 @@ exports.createTransaction = async (req, res) => {
     }
 
     const receiptNo = providedReceiptNo || await generateUniqueReceiptNumber();
-    
-    // Only generate transaction number for non-return transactions
-    const transactionNumber = paymentMethod === 'return' ? null : await getNextTransactionNumber();
 
     const transactionData = {
       receiptNo,
-      transactionNumber,
       userId: userId || cashierId || performedById || 'system',
       performedById: performedById || cashierId || '',
       performedByName: performedByName || cashierName || '',
@@ -558,39 +525,6 @@ exports.getTransactionStats = async (req, res) => {
   }
 };
 
-// Recalculate transaction numbers
-exports.recalculateTransactionNumbers = async (req, res) => {
-  try {
-    const transactions = await SalesTransaction.find({
-      paymentMethod: { $nin: ['return', 'void'] }
-    }).sort({ createdAt: 1 });
-    
-    let updated = 0;
-    for (let i = 0; i < transactions.length; i++) {
-      const expectedNumber = i + 1;
-      if (transactions[i].transactionNumber !== expectedNumber) {
-        transactions[i].transactionNumber = expectedNumber;
-        await transactions[i].save();
-        updated++;
-      }
-    }
-    
-    res.json({
-      success: true,
-      message: `Recalculated ${updated} transaction numbers`,
-      totalTransactions: transactions.length
-    });
-  } catch (error) {
-    console.error('Error recalculating transaction numbers:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to recalculate transaction numbers',
-      error: error.message
-    });
-  }
-};
-
-
 // Get dashboard stats (sales, transactions, profit, low stock) with timeframe support
 exports.getDashboardStats = async (req, res) => {
   try {
@@ -692,15 +626,50 @@ exports.getDashboardStats = async (req, res) => {
 // Get top selling products based on transaction data
 exports.getTopSellingProducts = async (req, res) => {
   try {
-    const { sort = 'most', limit = 5 } = req.query;
+    const { sort = 'most', limit = 5, period = 'daily' } = req.query;
+    
+    // Calculate date range based on period
+    const now = new Date();
+    let startDate, endDate;
+    
+    switch (period.toLowerCase()) {
+      case 'daily':
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 1);
+        break;
+      case 'weekly':
+        startDate = new Date(now);
+        const dayOfWeek = startDate.getDay();
+        startDate.setDate(startDate.getDate() - dayOfWeek);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 7);
+        break;
+      case 'monthly':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        break;
+      default:
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 1);
+    }
     
     // Aggregate sales data from completed transactions
     const salesData = await SalesTransaction.aggregate([
-      // Only include completed transactions (not voided or returns)
+      // Only include completed transactions (not voided or returns) within the time period
       { 
         $match: { 
           status: { $nin: ['Voided', 'voided'] },
-          paymentMethod: { $nin: ['return', 'void'] }
+          paymentMethod: { $nin: ['return', 'void'] },
+          $or: [
+            { checkedOutAt: { $gte: startDate, $lt: endDate } },
+            { checkedOutAt: { $exists: false }, createdAt: { $gte: startDate, $lt: endDate } }
+          ]
         } 
       },
       // Unwind items array to get individual product sales

@@ -27,8 +27,8 @@ const STATUS_STYLES = {
   Voided: 'bg-red-100 text-red-600 border border-red-200'
 };
 
-const paymentOptions = ['All', 'cash', 'gcash', 'void'];
-const statusOptions = ['All', 'Completed', 'Returned', 'Partially Returned']; // Removed 'Voided' - voided transactions are shown in void logs
+const paymentOptions = ['All', 'cash', 'gcash'];
+const statusOptions = ['All', 'Completed', 'Returned', 'Partially Returned'];
 const userOptions = ['All'];
 const dateOptions = ['All', 'Today', 'Last 7 days', 'Last 30 days'];
 
@@ -142,7 +142,6 @@ const Transaction = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
-  const [selectedTransactionNumber, setSelectedTransactionNumber] = useState(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState({
@@ -245,7 +244,6 @@ const Transaction = () => {
         setCachedDataRef.current('transactions', payload);
         if (payload.length > 0) {
           setSelectedTransaction(payload[0]);
-          setSelectedTransactionNumber(payload[0].transactionNumber || null);
         }
       } else {
         setTransactions([]);
@@ -279,7 +277,6 @@ const Transaction = () => {
           setTransactions(sortedCached);
           if (sortedCached.length > 0) {
             setSelectedTransaction(sortedCached[0]);
-            setSelectedTransactionNumber(sortedCached[0].transactionNumber || null);
           }
           isInitialMount.current = false;
           isInitialLoading.current = false;
@@ -351,7 +348,28 @@ const Transaction = () => {
 
       const matchesUser = filters.user === 'All' || trx.performedByName === filters.user;
 
-      return matchesSearch && matchesMethod && matchesStatus && matchesUser;
+      // Date filter
+      let matchesDate = true;
+      if (filters.date !== 'All') {
+        const trxDate = new Date(trx.checkedOutAt || trx.createdAt);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        if (filters.date === 'Today') {
+          const trxDay = new Date(trxDate.getFullYear(), trxDate.getMonth(), trxDate.getDate());
+          matchesDate = trxDay.getTime() === today.getTime();
+        } else if (filters.date === 'Last 7 days') {
+          const sevenDaysAgo = new Date(today);
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          matchesDate = trxDate >= sevenDaysAgo;
+        } else if (filters.date === 'Last 30 days') {
+          const thirtyDaysAgo = new Date(today);
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          matchesDate = trxDate >= thirtyDaysAgo;
+        }
+      }
+
+      return matchesSearch && matchesMethod && matchesStatus && matchesUser && matchesDate;
     });
 
     // Sort by date and time (most recent first) after filtering
@@ -412,14 +430,18 @@ const Transaction = () => {
   }, [isExportSelectionMode, allVisibleTransactionsSelected, someVisibleTransactionsSelected]);
 
   // Memoize user options to avoid conditional hook usage
-  const userDropdownOptions = useMemo(() => [
-    ...userOptions,
-    ...new Set(transactions.map((t) => t.performedById || t.performedByName).filter(Boolean))
-  ], [transactions]);
+  const userDropdownOptions = useMemo(() => {
+    const uniqueUsers = new Set();
+    transactions.forEach((t) => {
+      if (t.performedByName) {
+        uniqueUsers.add(t.performedByName);
+      }
+    });
+    return ['All', ...Array.from(uniqueUsers).sort()];
+  }, [transactions]);
 
   const handleRowClick = (trx) => {
     setSelectedTransaction(trx);
-    setSelectedTransactionNumber(trx.transactionNumber || null);
   };
 
   const handleToggleTransactionSelection = (transactionId) => {
@@ -497,7 +519,6 @@ const Transaction = () => {
       }
 
       const headers = [
-        'Transaction No.',
         'Receipt No.',
         'Transaction ID',
         'Date',
@@ -553,7 +574,6 @@ const Transaction = () => {
         const itemSubtotals = trx.items?.map(item => (item.quantity || 0) * (item.price || 0)).join('; ') || '';
         
         return [
-          escapeCSV(trx.transactionNumber || ''),
           escapeCSV(trx.receiptNo || ''),
           escapeCSV(trx._id || ''),
           escapeCSV(checkoutDate.toLocaleDateString()),
@@ -974,6 +994,14 @@ const Transaction = () => {
                   setIsOpen={(value) => setDropdownOpen((prev) => ({ ...prev, method: value }))}
                 />
                 <Dropdown
+                  label="By User"
+                  options={userDropdownOptions}
+                  selected={filters.user}
+                  onSelect={(value) => setFilters((prev) => ({ ...prev, user: value }))}
+                  isOpen={dropdownOpen.user}
+                  setIsOpen={(value) => setDropdownOpen((prev) => ({ ...prev, user: value }))}
+                />
+                <Dropdown
                   label="By status"
                   options={statusOptions}
                   selected={filters.status}
@@ -1002,7 +1030,7 @@ const Transaction = () => {
                         </label>
                       </th>
                     )}
-                    {['Transaction No.', 'Receipt No.', 'Transaction ID', 'Date', 'Performed By', 'Payment Method', 'Total', 'Status', 'Quick Action'].map((col) => (
+                    {['Receipt No.', 'Transaction ID', 'Date', 'Performed By', 'Payment Method', 'Total', 'Status', 'Quick Action'].map((col) => (
                       <th key={col} className="px-4 py-3 font-semibold">
                         {col}
                       </th>
@@ -1026,9 +1054,6 @@ const Transaction = () => {
                   )}
                   {paginatedTransactions.map((trx, index) => {
                     const isActive = selectedTransaction?._id === trx._id;
-                    // Use stored transactionNumber from database (immutable, set at creation)
-                    // If not available (old transactions or return transactions), show '---'
-                    const transactionNumber = trx.transactionNumber || null;
                     return (
                       <tr
                         key={trx._id}
@@ -1047,9 +1072,6 @@ const Transaction = () => {
                             />
                           </td>
                         )}
-                        <td className="px-4 py-3 font-bold text-[#AD7F65]">
-                          {transactionNumber ? `#${transactionNumber}` : '---'}
-                        </td>
                         <td className="px-4 py-3 font-semibold text-gray-800">
                           {trx.receiptNo ? `#${trx.receiptNo}` : '---'}
                         </td>
@@ -1170,12 +1192,6 @@ const Transaction = () => {
               <div className="mb-4">
                 <p className="text-sm text-gray-400">Create Your Style</p>
                 <p className="text-xs text-gray-400">Pasonanca, Zamboanga City</p>
-              </div>
-              <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 mb-4 text-center">
-                <p className="text-xs tracking-[0.4em] text-gray-500 uppercase">Transaction No</p>
-                <p className="text-2xl font-bold tracking-widest mt-1 text-[#333]">
-                  {selectedTransactionNumber ? `#${selectedTransactionNumber}` : '---'}
-                </p>
               </div>
               <div className="font-mono text-xs space-y-2">
                 <div className="flex justify-between text-gray-500">

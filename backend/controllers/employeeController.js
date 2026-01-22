@@ -72,7 +72,8 @@ exports.createEmployee = async (req, res) => {
       profileImage,
       permissions,
       dateJoinedActual,
-      requiresPinReset
+      requiresPinReset,
+      sendPinEmail // Flag to send PIN via email
     } = req.body;
 
     // Validate required fields
@@ -92,6 +93,9 @@ exports.createEmployee = async (req, res) => {
       });
     }
 
+    // Store the raw PIN before it gets hashed (for email)
+    const rawPin = pin;
+
     // Don't hash PIN here - the model's pre-save hook will handle it
     const employeeData = {
       firstName: firstName || '',
@@ -106,17 +110,65 @@ exports.createEmployee = async (req, res) => {
       status: status || 'Active',
       profileImage: profileImage || '',
       permissions: permissions || {},
-      requiresPinReset: requiresPinReset || false
+      requiresPinReset: requiresPinReset !== undefined ? requiresPinReset : true // Default to true for new employees
     };
 
     const employee = await Employee.create(employeeData);
 
     const { pin: _, ...employeeWithoutPin } = employee.toObject();
 
+    // Send temporary PIN via email automatically
+    let emailSent = false;
+    console.log('[Employee] Attempting to send welcome email to:', email);
+    if (email && (sendPinEmail !== false)) {
+      try {
+        const storeName = process.env.STORE_NAME || 'Create Your Style';
+        console.log('[Employee] Sending PIN email with storeName:', storeName);
+        const emailResult = await sendEmail(
+          email,
+          `Welcome to ${storeName} - Your Temporary PIN`,
+          `Welcome to ${storeName}!\n\nYour temporary PIN is: ${rawPin}\n\nPlease change this PIN after your first login for security purposes.\n\nBest regards,\n${storeName} Team`,
+          `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #AD7F65 0%, #76462B 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
+                <h1 style="margin: 0;">Welcome to ${storeName}!</h1>
+              </div>
+              <div style="background: #f9f9f9; padding: 30px; border: 1px solid #ddd; border-top: none;">
+                <p style="font-size: 16px; color: #333;">Hello <strong>${firstName || name || 'Team Member'}</strong>,</p>
+                <p style="font-size: 16px; color: #333;">Your account has been created successfully. Here is your temporary PIN:</p>
+                <div style="background: white; border: 2px dashed #AD7F65; padding: 20px; text-align: center; margin: 20px 0; border-radius: 10px;">
+                  <p style="font-size: 32px; font-weight: bold; color: #AD7F65; margin: 0; letter-spacing: 8px;">${rawPin}</p>
+                </div>
+                <p style="font-size: 14px; color: #666;">⚠️ <strong>Important:</strong> Please change this PIN after your first login for security purposes.</p>
+                <p style="font-size: 14px; color: #666;">Your role: <strong>${role}</strong></p>
+              </div>
+              <div style="background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 10px 10px;">
+                <p style="margin: 0;">This is an automated message from ${storeName} POS System</p>
+              </div>
+            </div>
+          `
+        );
+        emailSent = emailResult.success;
+        console.log('[Employee] Email send result:', emailResult);
+        if (!emailResult.success) {
+          console.error('[Employee] Failed to send welcome email:', emailResult.error);
+        } else {
+          console.log('[Employee] Welcome email sent successfully to:', email);
+        }
+      } catch (emailError) {
+        console.error('[Employee] Error sending welcome email:', emailError);
+      }
+    } else {
+      console.log('[Employee] Skipping email - email:', email, 'sendPinEmail:', sendPinEmail);
+    }
+
     res.status(201).json({
       success: true,
-      message: 'Employee created successfully',
-      data: employeeWithoutPin
+      message: emailSent 
+        ? 'Employee created successfully. Temporary PIN sent to email.' 
+        : 'Employee created successfully.',
+      data: employeeWithoutPin,
+      emailSent
     });
   } catch (error) {
     if (error.code === 11000) {
@@ -390,14 +442,37 @@ exports.sendTemporaryPin = async (req, res) => {
     });
 
     // Send email with temporary PIN
+    let emailSent = false;
     if (employee.email) {
       try {
-        await sendEmail({
-          to: employee.email,
-          subject: 'Your Temporary PIN',
-          text: `Your temporary PIN is: ${tempPin}\n\nPlease change this PIN after logging in.`,
-          html: `<p>Your temporary PIN is: <strong>${tempPin}</strong></p><p>Please change this PIN after logging in.</p>`
-        });
+        const storeName = process.env.STORE_NAME || 'Create Your Style';
+        const emailResult = await sendEmail(
+          employee.email,
+          `${storeName} - Your New Temporary PIN`,
+          `Your new temporary PIN is: ${tempPin}\n\nPlease change this PIN after logging in for security purposes.\n\nBest regards,\n${storeName} Team`,
+          `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #AD7F65 0%, #76462B 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
+                <h1 style="margin: 0;">PIN Reset</h1>
+              </div>
+              <div style="background: #f9f9f9; padding: 30px; border: 1px solid #ddd; border-top: none;">
+                <p style="font-size: 16px; color: #333;">Hello <strong>${employee.firstName || employee.name || 'Team Member'}</strong>,</p>
+                <p style="font-size: 16px; color: #333;">Your PIN has been reset. Here is your new temporary PIN:</p>
+                <div style="background: white; border: 2px dashed #AD7F65; padding: 20px; text-align: center; margin: 20px 0; border-radius: 10px;">
+                  <p style="font-size: 32px; font-weight: bold; color: #AD7F65; margin: 0; letter-spacing: 8px;">${tempPin}</p>
+                </div>
+                <p style="font-size: 14px; color: #666;">⚠️ <strong>Important:</strong> Please change this PIN after logging in for security purposes.</p>
+              </div>
+              <div style="background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 10px 10px;">
+                <p style="margin: 0;">This is an automated message from ${storeName} POS System</p>
+              </div>
+            </div>
+          `
+        );
+        emailSent = emailResult.success;
+        if (!emailResult.success) {
+          console.error('Failed to send PIN reset email:', emailResult.error);
+        }
       } catch (emailError) {
         console.error('Error sending email:', emailError);
       }
@@ -405,8 +480,9 @@ exports.sendTemporaryPin = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Temporary PIN sent successfully',
-      tempPin // Include in response for testing/display purposes
+      message: emailSent ? 'Temporary PIN sent to email successfully' : 'Temporary PIN generated (email not sent)',
+      tempPin, // Include in response for testing/display purposes
+      emailSent
     });
   } catch (error) {
     console.error('Error sending temporary PIN:', error);
@@ -465,7 +541,7 @@ exports.searchEmployees = async (req, res) => {
 exports.updatePin = async (req, res) => {
   try {
     const { id } = req.params;
-    const { pin, newPin } = req.body;
+    const { pin, newPin, requiresPinReset } = req.body;
     
     const pinToSet = newPin || pin;
     
@@ -481,7 +557,11 @@ exports.updatePin = async (req, res) => {
     
     const employee = await Employee.findByIdAndUpdate(
       id,
-      { pin: hashedPin, requiresPinReset: false, lastUpdated: Date.now() },
+      { 
+        pin: hashedPin, 
+        requiresPinReset: requiresPinReset !== undefined ? requiresPinReset : false, 
+        lastUpdated: Date.now() 
+      },
       { new: true }
     );
     
@@ -492,9 +572,13 @@ exports.updatePin = async (req, res) => {
       });
     }
     
+    // Return employee data without PIN
+    const { pin: _, ...employeeWithoutPin } = employee.toObject();
+    
     res.json({
       success: true,
-      message: 'PIN updated successfully'
+      message: 'PIN updated successfully',
+      data: employeeWithoutPin
     });
   } catch (error) {
     console.error('Error updating PIN:', error);

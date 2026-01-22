@@ -4,9 +4,9 @@ let windowsPrinterDriver = null;
 let UsbAdapter = null;
 
 try {
-  // eslint-disable-next-line global-require
+
   windowsPrinterDriver = require('printer');
-  // Verify the module actually works by checking if it has required methods
+
   if (windowsPrinterDriver && typeof windowsPrinterDriver.getPrinters === 'function') {
     console.log('Windows printer driver module loaded successfully');
   } else {
@@ -20,14 +20,13 @@ try {
 }
 
 try {
-  // eslint-disable-next-line global-require
+
   const usb = require('usb');
-  // Workaround: escpos-usb expects usb.on() method which doesn't exist in usb@2.x
-  // Add EventEmitter methods to usb module for compatibility
+
   if (usb && typeof usb.on === 'undefined') {
     const EventEmitter = require('events');
     const usbEmitter = new EventEmitter();
-    // Add EventEmitter methods to usb module
+   
     usb.on = function(event, callback) {
       usbEmitter.on(event, callback);
     };
@@ -48,18 +47,17 @@ try {
   console.warn('Optional module "escpos-usb" is not installed. Run "npm install escpos escpos-usb" to enable direct USB thermal printing.');
 }
 
-// 58mm thermal paper standard: 32 characters per line (8 dots/mm × 58mm = 464 dots / 14.5 dots per char ≈ 32 chars)
-// For 80mm paper, use RECEIPT_CHAR_WIDTH=48
+
 const RECEIPT_CHAR_WIDTH = parseInt(process.env.RECEIPT_CHAR_WIDTH || '32', 10);
 
-// Validate and ensure 58mm paper width (32 chars)
+
 if (RECEIPT_CHAR_WIDTH !== 32) {
   console.warn(`⚠️  WARNING: RECEIPT_CHAR_WIDTH is set to ${RECEIPT_CHAR_WIDTH}, but 58mm paper requires 32 characters per line.`);
   console.warn(`   Current setting will work for ${RECEIPT_CHAR_WIDTH === 48 ? '80mm' : 'custom'} paper width.`);
 } else {
   console.log('✅ Receipt configured for 58mm thermal paper (32 characters per line)');
 }
-const DEFAULT_STORE_NAME = process.env.STORE_NAME || 'Create Your Style';
+const DEFAULT_STORE_NAME = process.env.STORE_NAME || 'CreateYourStyle';
 const DEFAULT_ADDRESS_LINES = (process.env.STORE_ADDRESS || 'TC USHS - #831100254488|Pasoanca, Zambonaga City').split('|');
 const CURRENCY_SYMBOL = process.env.PRINTER_CURRENCY_SYMBOL || '₱';
 
@@ -91,7 +89,7 @@ const printViaEscposUsb = (receiptData = {}) => new Promise((resolve, reject) =>
   const vendorId = parseUsbId(process.env.PRINTER_VENDOR_ID);
   const productId = parseUsbId(process.env.PRINTER_PRODUCT_ID);
 
-  // Log the IDs for debugging
+
   console.log('USB Printer Configuration:');
   console.log(`  Vendor ID: ${process.env.PRINTER_VENDOR_ID} -> ${vendorId} (${vendorId ? '0x' + vendorId.toString(16) : 'not set'})`);
   console.log(`  Product ID: ${process.env.PRINTER_PRODUCT_ID} -> ${productId} (${productId ? '0x' + productId.toString(16) : 'not set'})`);
@@ -121,7 +119,6 @@ const printViaEscposUsb = (receiptData = {}) => new Promise((resolve, reject) =>
     return;
   }
 
-  // Additional check: verify device has required methods
   if (!device || typeof device.open !== 'function') {
     reject(new Error('USB device object is invalid. The escpos-usb library may be incompatible. Try using the thermal printer interface instead.'));
     return;
@@ -155,7 +152,7 @@ const printViaEscposUsb = (receiptData = {}) => new Promise((resolve, reject) =>
     const issueTime = receiptData.time || new Date().toLocaleTimeString();
 
     try {
-      // Header: Business name (centered, slightly larger)
+      // Header: Business name
       printer
         .align('ct')
         .size(1, 0)
@@ -214,7 +211,7 @@ const printViaEscposUsb = (receiptData = {}) => new Promise((resolve, reject) =>
 
       // Payment summary
       printer.align('lt');
-      printer.text(padLine('Transaction/Reference', referenceNo || '-'));
+      // printer.text(padLine('Transaction/Reference', referenceNo || '-'));
       printer.text(padLine('Payment Method', paymentMethod));
       printer.text(padLine('Subtotal', `PHP ${(receiptData.subtotal || 0).toFixed(2)}`));
       printer.text(lineBreak());

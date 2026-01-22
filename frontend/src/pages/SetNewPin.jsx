@@ -167,12 +167,28 @@ const SetNewPin = () => {
     const newPin = newPinDigits.join('');
     const confirmPin = confirmPinDigits.join('');
 
+    // Get employee ID from employee object or pending data
+    // Use explicit null checks to avoid accessing properties on undefined
+    let employeeId = null;
+    if (employee && typeof employee === 'object') {
+      employeeId = employee._id || employee.id;
+    }
+    if (!employeeId && pendingEmployeeId) {
+      employeeId = pendingEmployeeId;
+    }
+
+    if (!employeeId) {
+      setError('Session expired. Please log in again.');
+      navigate('/');
+      return;
+    }
+
     if (!pendingTempPin || pendingTempPin.length !== PIN_LENGTH) {
       setError('Session expired. Please log in with your temporary PIN again.');
       return;
     }
 
-    if (pendingEmployeeId && employee?._id && pendingEmployeeId !== employee._id) {
+    if (pendingEmployeeId && employeeId && pendingEmployeeId !== employeeId) {
       setError('Selected account mismatch. Please log in again.');
       return;
     }
@@ -203,7 +219,7 @@ const SetNewPin = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(`http://localhost:5000/api/employees/${employee._id}/pin`, {
+      const response = await fetch(`http://localhost:5000/api/employees/${employeeId}/pin`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -217,11 +233,11 @@ const SetNewPin = () => {
 
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success && data.data) {
         const updatedEmployee = {
           ...data.data,
-          id: data.data._id,
-          image: data.data.profileImage || employee.image || defaultAvatar
+          id: data.data._id || data.data.id,
+          image: data.data.profileImage || employee?.image || defaultAvatar
         };
         login(updatedEmployee);
         setPinUpdated(true);

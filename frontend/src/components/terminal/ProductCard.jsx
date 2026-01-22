@@ -77,14 +77,14 @@ export default function ProductCard({
         <h3 className="font-medium text-sm mb-1 truncate">
           {product.itemName}{product.variant ? ` (${product.variant})` : ''}
         </h3>
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">
+        <div className="flex justify-between items-start gap-1 min-h-[36px]">
+          <span className={`text-gray-500 leading-tight ${priceRange.isRange ? 'text-[11px]' : 'text-sm'}`}>
             {priceRange.isRange
-              ? `PHP ${priceRange.min.toFixed(2)} - ${priceRange.max.toFixed(2)}`
+              ? `₱${priceRange.min.toFixed(0)} - ₱${priceRange.max.toFixed(0)}`
               : `PHP ${priceRange.min.toFixed(2)}`
             }
           </span>
-          <span className="text-xs text-gray-500 whitespace-nowrap">{displayStock} stocks left</span>
+          <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{displayStock} left</span>
         </div>
 
         <button

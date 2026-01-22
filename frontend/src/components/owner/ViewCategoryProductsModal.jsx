@@ -101,7 +101,7 @@ const ViewCategoryProductsModal = ({ isOpen, onClose, categoryName }) => {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center">{product.sku}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center">{product.itemName}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center">{product.brandName || 'Brandless'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center">{product.brandName || 'Default'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center">{product.variant || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 border border-gray-300 text-center">PHP {(product.itemPrice || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 border border-gray-300 text-center">

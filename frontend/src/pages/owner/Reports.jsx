@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import Header from '../../components/shared/header';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   BarChart,
   Bar,
@@ -19,6 +19,7 @@ import exportIcon from '../../assets/inventory-icons/Export.svg';
 
 const Reports = () => {
   const [activeTab, setActiveTab] = useState('sales');
+  const [timePeriod, setTimePeriod] = useState('daily'); // Global time period filter: daily, weekly, monthly
   const [metrics, setMetrics] = useState({
     totalSalesToday: 0,
     totalTransactions: 0,
@@ -47,10 +48,10 @@ const Reports = () => {
   const [brandPartnersStats, setBrandPartnersStats] = useState([]);
 
   useEffect(() => {
-    fetchMetrics();
+    fetchMetrics(timePeriod);
     fetchInventoryMetrics();
     fetchSalesOverTime(salesTimeframe);
-    fetchTopSellingProducts(topSellingFilter);
+    fetchTopSellingProducts(topSellingFilter, timePeriod);
   }, []);
 
   useEffect(() => {
@@ -58,23 +59,34 @@ const Reports = () => {
   }, [salesTimeframe]);
 
   useEffect(() => {
-    fetchTopSellingProducts(topSellingFilter);
+    fetchTopSellingProducts(topSellingFilter, timePeriod);
   }, [topSellingFilter]);
 
-  const fetchMetrics = async () => {
+  // Refetch data when time period changes
+  useEffect(() => {
+    fetchMetrics(timePeriod);
+    fetchTopSellingProducts(topSellingFilter, timePeriod);
+  }, [timePeriod]);
+
+  const fetchMetrics = async (period = 'daily') => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/transactions/dashboard/stats');
+      const response = await fetch(`http://localhost:5000/api/transactions/dashboard/stats?timeframe=${period}`);
       const data = await response.json();
-      
+
       if (data.success) {
-        const avgValue = data.data.totalTransactions > 0 
-          ? data.data.totalSalesToday / data.data.totalTransactions 
+        const avgValue = data.data.totalTransactions > 0
+          ? data.data.totalSalesToday / data.data.totalTransactions
           : 0;
+
+        // Update label based on period
+        const periodLabel = period === 'daily' ? 'Today' : period === 'weekly' ? 'This Week' : 'This Month';
+
         setMetrics({
           totalSalesToday: data.data.totalSalesToday || 0,
           totalTransactions: data.data.totalTransactions || 0,
-          averageTransactionValue: avgValue
+          averageTransactionValue: avgValue,
+          periodLabel
         });
       }
     } catch (error) {
@@ -88,7 +100,7 @@ const Reports = () => {
     try {
       const response = await fetch(`http://localhost:5000/api/transactions/sales-over-time?timeframe=${timeframe.toLowerCase()}`);
       const data = await response.json();
-      
+
       if (data.success && Array.isArray(data.data)) {
         setSalesOverTimeData(data.data);
       } else {
@@ -100,12 +112,12 @@ const Reports = () => {
     }
   };
 
-  const fetchTopSellingProducts = async (filter) => {
+  const fetchTopSellingProducts = async (filter, period = 'daily') => {
     try {
       const sortParam = filter === 'Most' ? 'most' : 'least';
-      const response = await fetch(`http://localhost:5000/api/transactions/top-selling?sort=${sortParam}&limit=10`);
+      const response = await fetch(`http://localhost:5000/api/transactions/top-selling?sort=${sortParam}&limit=10&period=${period}`);
       const data = await response.json();
-      
+
       if (data.success && Array.isArray(data.data)) {
         // Map backend field names to frontend expected names
         const mappedProducts = data.data.map(product => ({
@@ -139,9 +151,9 @@ const Reports = () => {
   }, [salesOverTimeData]);
 
   const formatCurrency = (amount) => {
-    return `₱${amount.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
+    return `₱${amount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     })}`;
   };
 
@@ -166,7 +178,7 @@ const Reports = () => {
       // Fetch products for inventory metrics
       const response = await fetch('http://localhost:5000/api/products');
       const data = await response.json();
-      
+
       if (data.success && Array.isArray(data.data)) {
         const products = data.data;
         const totalItems = products.length;
@@ -177,7 +189,7 @@ const Reports = () => {
         // Use itemPrice field from product model (not sellingPrice)
         const inventoryValue = products.reduce((sum, p) => sum + ((p.itemPrice || 0) * (p.currentStock || 0)), 0);
         const costOfGoodsSold = products.reduce((sum, p) => sum + ((p.costPrice || (p.itemPrice || 0) * 0.6) * (p.currentStock || 0)), 0);
-        
+
         setInventoryMetrics({
           inventoryValue,
           costOfGoodsSold,
@@ -206,19 +218,19 @@ const Reports = () => {
       const movementsData = await movementsResponse.json();
       if (movementsData.success && Array.isArray(movementsData.data)) {
         setStockMovements(movementsData.data.slice(0, 5));
-        
+
         // Process stock movements for charts
         const movements = movementsData.data;
-        
+
         // Group by week for Stock-In/Restock chart
         const stockInByWeek = {};
         const damagedByWeek = {};
-        
+
         movements.forEach(m => {
           const date = new Date(m.createdAt);
           const weekNum = Math.ceil((date.getDate()) / 7);
           const weekKey = `Week ${weekNum}`;
-          
+
           if (m.type === 'Stock-In' || m.reason === 'Restock') {
             stockInByWeek[weekKey] = (stockInByWeek[weekKey] || 0) + Math.abs(m.quantity);
           }
@@ -226,7 +238,7 @@ const Reports = () => {
             damagedByWeek[weekKey] = (damagedByWeek[weekKey] || 0) + Math.abs(m.quantity);
           }
         });
-        
+
         setStockInData(Object.entries(stockInByWeek).map(([name, value]) => ({ name, value })).slice(0, 4));
         setDamagedData(Object.entries(damagedByWeek).map(([name, value]) => ({ name, value })).slice(0, 4));
       }
@@ -278,38 +290,67 @@ const Reports = () => {
 
   return (
     <div className="p-8 min-h-screen" style={{ background: '#F5F5F5' }}>
-      <Header 
+      <Header
         pageName="Reports / Analytics"
         profileBackground=""
         showBorder={false}
       />
-      
+
       {/* Tab Navigation */}
       <div className="flex items-center justify-between mb-6 mt-6 w-full">
         <div className="flex gap-3">
           <button
             onClick={() => setActiveTab('sales')}
-            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${
-              activeTab === 'sales'
-                ? 'text-[#AD7F65] bg-white border-b-4 border-[#AD7F65]'
-                : 'bg-white text-gray-800 border border-gray-200'
-            }`}
+            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${activeTab === 'sales'
+              ? 'text-[#AD7F65] bg-white border-b-4 border-[#AD7F65]'
+              : 'bg-white text-gray-800 border border-gray-200'
+              }`}
           >
             Sales Performance
           </button>
           <button
             onClick={() => setActiveTab('inventory')}
-            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${
-              activeTab === 'inventory'
-                ? 'text-[#AD7F65] bg-white border-b-4 border-[#AD7F65]'
-                : 'bg-white text-gray-800 border border-gray-200'
-            }`}
+            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${activeTab === 'inventory'
+              ? 'text-[#AD7F65] bg-white border-b-4 border-[#AD7F65]'
+              : 'bg-white text-gray-800 border border-gray-200'
+              }`}
           >
             Inventory & Product
           </button>
+
+          {/* Time Period Filter */}
+          <div className="flex items-center gap-1 ml-4 bg-gray-100 rounded-xl p-1">
+            <button
+              onClick={() => setTimePeriod('daily')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${timePeriod === 'daily'
+                ? 'bg-[#AD7F65] text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-200'
+                }`}
+            >
+              Daily
+            </button>
+            <button
+              onClick={() => setTimePeriod('weekly')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${timePeriod === 'weekly'
+                ? 'bg-[#AD7F65] text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-200'
+                }`}
+            >
+              Weekly
+            </button>
+            <button
+              onClick={() => setTimePeriod('monthly')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${timePeriod === 'monthly'
+                ? 'bg-[#AD7F65] text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-200'
+                }`}
+            >
+              Monthly
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 ml-auto">
+        {/* <div className="flex items-center gap-3 ml-auto">
           <button className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
           </button>
@@ -319,7 +360,7 @@ const Reports = () => {
           <button className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <img src={exportIcon} alt="Export" className="w-5 h-5 object-contain" />
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* Content */}
@@ -328,12 +369,12 @@ const Reports = () => {
           <div className="space-y-6">
             {/* Section Title */}
             <h2 className="text-2xl font-bold text-gray-800">Sales Performance Section</h2>
-            
+
             {/* Top Row: KPI Cards + Chart */}
             <div className="flex gap-6">
               {/* Left Column: KPI Cards - 2x2 Grid */}
               <div className="grid grid-cols-2 gap-3" style={{ width: '530px' }}>
-                {/* Total Sales Today */}
+                {/* Total Sales */}
                 <div className="bg-white rounded-xl shadow-md px-4 relative overflow-hidden" style={{ height: '150px' }}>
                   <div className="absolute left-0 top-0 bottom-0 w-2 rounded-l-xl" style={{ background: 'linear-gradient(to bottom, #60A5FA, #3B82F6, #1D4ED8)' }}></div>
                   <div className="flex items-center justify-between pl-2 h-full">
@@ -341,9 +382,11 @@ const Reports = () => {
                       <p className="text-2xl font-bold text-blue-500">
                         {loading ? '...' : formatCurrency(metrics.totalSalesToday)}
                       </p>
-                      <p className="text-sm font-bold text-blue-500">Total Sales Today</p>
+                      <p className="text-sm font-bold text-blue-500">
+                        Total Sales {timePeriod === 'daily' ? 'Today' : timePeriod === 'weekly' ? 'This Week' : 'This Month'}
+                      </p>
                       <p className="text-xs text-gray-500">Total revenue from all transactions</p>
-                      <p className="text-xs text-green-500">+12% vs last period</p>
+                      {/* <p className="text-xs text-green-500">+12% vs last period</p> */}
                     </div>
                     <div className="bg-blue-100 rounded-full p-3">
                       <FaShoppingBag className="text-blue-500 w-5 h-5" />
@@ -360,8 +403,10 @@ const Reports = () => {
                         {loading ? '...' : metrics.totalTransactions}
                       </p>
                       <p className="text-sm font-bold text-purple-600">Total Transactions</p>
-                      <p className="text-xs text-gray-500">Number of sales made today</p>
-                      <p className="text-xs text-green-500">+8% vs last period</p>
+                      <p className="text-xs text-gray-500">
+                        Number of sales {timePeriod === 'daily' ? 'today' : timePeriod === 'weekly' ? 'this week' : 'this month'}
+                      </p>
+                      {/* <p className="text-xs text-green-500">+8% vs last period</p> */}
                     </div>
                     <div className="bg-purple-100 rounded-full p-3">
                       <FaHandHoldingUsd className="text-purple-600 w-5 h-5" />
@@ -379,7 +424,7 @@ const Reports = () => {
                       </p>
                       <p className="text-sm font-bold text-green-600">Average Transaction Value</p>
                       <p className="text-xs text-gray-500">Average amount per transaction</p>
-                      <p className="text-xs text-green-500">+5% vs last period</p>
+                      {/* <p className="text-xs text-green-500">+5% vs last period</p> */}
                     </div>
                     <div className="bg-green-100 rounded-full p-3">
                       <FaChartLine className="text-green-600 w-5 h-5" />
@@ -397,7 +442,7 @@ const Reports = () => {
                       </p>
                       <p className="text-sm font-bold text-amber-500">Profit</p>
                       <p className="text-xs text-gray-500">Estimated profit from sales</p>
-                      <p className="text-xs text-green-500">+15% vs last period</p>
+                      {/* <p className="text-xs text-green-500">+15% vs last period</p> */}
                     </div>
                     <div className="bg-amber-100 rounded-full p-3">
                       <FaMoneyBillWave className="text-amber-500 w-5 h-5" />
@@ -448,12 +493,12 @@ const Reports = () => {
                       <LineChart data={salesData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis dataKey="period" tick={{ fontSize: 11 }} stroke="#666" />
-                        <YAxis 
-                          tick={{ fontSize: 11 }} 
+                        <YAxis
+                          tick={{ fontSize: 11 }}
                           stroke="#666"
                           tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
                         />
-                        <Tooltip 
+                        <Tooltip
                           contentStyle={{ backgroundColor: 'white', border: '1px solid #e0e0e0', borderRadius: '8px' }}
                           formatter={(value, name) => {
                             return [`₱${value.toLocaleString()}`, name];
@@ -476,21 +521,19 @@ const Reports = () => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setTopSellingFilter('Most')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      topSellingFilter === 'Most'
-                        ? 'bg-[#AD7F65] text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${topSellingFilter === 'Most'
+                      ? 'bg-[#AD7F65] text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
                   >
                     Most
                   </button>
                   <button
                     onClick={() => setTopSellingFilter('Least')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      topSellingFilter === 'Least'
-                        ? 'bg-[#AD7F65] text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${topSellingFilter === 'Least'
+                      ? 'bg-[#AD7F65] text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
                   >
                     Least
                   </button>
@@ -535,12 +578,11 @@ const Reports = () => {
                             </div>
                           )}
                         </div>
-                        
+
                         {/* Product Info */}
                         <div className="flex items-start gap-2">
-                          <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                            productScrollIndex + index < 3 ? 'bg-[#AD7F65]' : 'bg-gray-400'
-                          }`}>
+                          <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${productScrollIndex + index < 3 ? 'bg-[#AD7F65]' : 'bg-gray-400'
+                            }`}>
                             {productScrollIndex + index + 1}
                           </span>
                           <div className="min-w-0">

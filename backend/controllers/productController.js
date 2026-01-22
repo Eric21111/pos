@@ -84,6 +84,37 @@ exports.createProduct = async (req, res) => {
       productData.dateAdded = Date.now();
     }
     
+    // Auto-generate unique SKU if not provided
+    if (!productData.sku) {
+      const category = productData.category || 'Foods';
+      const variant = productData.variant || '';
+      const categoryCode = category.substring(0, 3).toUpperCase();
+      const variantCode = variant ? `-${variant.substring(0, 3).toUpperCase()}` : '';
+      
+      // Generate random alphanumeric string (6 characters)
+      const generateRandomCode = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 6; i++) {
+          result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+      };
+      
+      // Keep generating until we find a unique SKU
+      let attempts = 0;
+      let uniqueSku = '';
+      while (attempts < 10) {
+        const randomCode = generateRandomCode();
+        uniqueSku = `${categoryCode}-${randomCode}${variantCode}`;
+        const existing = await Product.findOne({ sku: uniqueSku });
+        if (!existing) break;
+        attempts++;
+      }
+      
+      productData.sku = uniqueSku;
+    }
+    
     const product = await Product.create(productData);
     
     const productResponse = {

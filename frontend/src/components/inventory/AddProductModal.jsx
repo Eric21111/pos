@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const AddProductModal = ({
   showAddModal,
@@ -19,6 +19,21 @@ const AddProductModal = ({
 }) => {
   // Built-in categories that have specific size options
   const builtInCategories = ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods'];
+  const [showDraftNotice, setShowDraftNotice] = useState(false);
+
+  // Check if there's a recovered draft when modal opens
+  useEffect(() => {
+    if (showAddModal && !editingProduct) {
+      const hasData = newProduct.itemName || newProduct.variant || 
+                      newProduct.itemPrice || newProduct.costPrice || 
+                      newProduct.currentStock || newProduct.itemImage ||
+                      (newProduct.selectedSizes && newProduct.selectedSizes.length > 0);
+      setShowDraftNotice(hasData);
+    } else {
+      setShowDraftNotice(false);
+    }
+  }, [showAddModal, editingProduct]);
+
   if (!showAddModal) return null;
 
   const partnerNames = Array.from(
@@ -31,7 +46,7 @@ const AddProductModal = ({
 
   const legacyBrandSelected =
     newProduct.brandName &&
-    newProduct.brandName !== 'Brandless' &&
+    newProduct.brandName !== 'Default' &&
     !partnerNames.includes(newProduct.brandName);
 
   return (
@@ -42,13 +57,35 @@ const AddProductModal = ({
           <button
             onClick={() => {
               setShowAddModal(false);
-              resetProductForm();
+              // Don't clear storage when closing - keep the draft
             }}
             className="text-gray-400 hover:text-gray-600 text-2xl"
           >
             ×
           </button>
         </div>
+        
+        {/* Draft Recovery Notice */}
+        {showDraftNotice && !editingProduct && (
+          <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-sm text-amber-800">Draft recovered from your previous session</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                resetProductForm();
+                setShowDraftNotice(false);
+              }}
+              className="text-xs text-amber-700 hover:text-amber-900 underline"
+            >
+              Clear Draft
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleAddProduct}>
           <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(95vh - 80px)' }}>
@@ -96,11 +133,11 @@ const AddProductModal = ({
                         <label className="block text-xs text-gray-600 mb-1">Brand</label>
                         <select
                           name="brandName"
-                          value={newProduct.brandName || 'Brandless'}
+                          value={newProduct.brandName || 'Default'}
                           onChange={handleInputChange}
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
                         >
-                          <option value="Brandless">Brandless</option>
+                          <option value="Default">Default</option>
                           {partnerNames.map((name) => (
                             <option key={name} value={name}>
                               {name}

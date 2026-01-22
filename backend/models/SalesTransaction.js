@@ -61,12 +61,6 @@ const salesTransactionSchema = new mongoose.Schema({
   changeGiven: Number,
   referenceNo: String,
   receiptNo: String,
-  transactionNumber: {
-    type: Number,
-    unique: true,
-    sparse: true, // Allow null values but ensure uniqueness when present
-    index: true
-  },
   totalAmount: {
     type: Number,
     required: true
@@ -112,10 +106,9 @@ const salesTransactionSchema = new mongoose.Schema({
 });
 
 // Indexes for faster queries
-salesTransactionSchema.index({ checkedOutAt: -1 }); // Most common sort
+salesTransactionSchema.index({ checkedOutAt: -1 });
 salesTransactionSchema.index({ status: 1 });
 salesTransactionSchema.index({ receiptNo: 1 });
-salesTransactionSchema.index({ transactionNumber: -1 }); // For getting highest transaction number
 salesTransactionSchema.index({ userId: 1 });
 salesTransactionSchema.index({ paymentMethod: 1 });
 salesTransactionSchema.index({ referenceNo: 1 });

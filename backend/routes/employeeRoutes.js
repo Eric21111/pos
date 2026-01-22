@@ -8,7 +8,8 @@ const {
   deleteEmployee,
   verifyPin,
   searchEmployees,
-  updatePin
+  updatePin,
+  sendTemporaryPin
 } = require('../controllers/employeeController');
 
 router.route('/')
@@ -25,6 +26,8 @@ router.route('/:id')
   .delete(deleteEmployee);
 
 router.put('/:id/pin', updatePin);
+
+router.post('/:id/send-temporary-pin', sendTemporaryPin);
 
 module.exports = router;
 

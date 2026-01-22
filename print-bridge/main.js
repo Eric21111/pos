@@ -1,8 +1,4 @@
-/**
- * Electron entry point for the Bluetooth print bridge.
- * Spins up an Express server (via printService) and shows a small renderer UI
- * so operators can see that the bridge is running.
- */
+
 
 const path = require('path');
 const { app, BrowserWindow, dialog } = require('electron');

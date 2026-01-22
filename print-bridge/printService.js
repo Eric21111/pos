@@ -1,11 +1,4 @@
-/**
- * Standalone Express service that exposes POST /print and pipes the provided
- * lines to a Bluetooth ESC/POS printer.
- *
- * Supports both `escpos-bluetooth` and a fallback that writes raw data using
- * `bluetooth-serial-port`, so installations without WinUSB/libusb support can
- * still send receipts.
- */
+
 
 const express = require('express');
 const cors = require('cors');
@@ -31,9 +24,7 @@ const DEFAULT_BT_ADDRESS = process.env.PRINTER_BT_ADDRESS || '00:00:00:00:00:00'
 const DEFAULT_BT_CHANNEL = Number(process.env.PRINTER_BT_CHANNEL || 1);
 const MAX_LINE_CHARS = Number(process.env.PRINTER_LINE_CHARS || 32); // 58 mm = ~32 ASCII chars
 
-/**
- * Breaks a string into chunks that fit the printer width.
- */
+
 const normalizeLines = rawLines => {
   const expandedLines = [];
   rawLines.forEach(line => {
@@ -49,9 +40,7 @@ const normalizeLines = rawLines => {
   return expandedLines;
 };
 
-/**
- * Opens a connection using escpos-bluetooth and prints the provided lines.
- */
+
 const printViaEscpos = (lines, { address, channel }) =>
   new Promise((resolve, reject) => {
     if (!BluetoothAdapter) {

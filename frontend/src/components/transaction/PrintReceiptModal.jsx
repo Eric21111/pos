@@ -147,9 +147,6 @@ const PrintReceiptModal = ({ isOpen, onClose, transaction }) => {
               <h2 className="text-2xl font-bold text-gray-800 mb-1">
                 Print Receipt
               </h2>
-              <p className="text-sm text-gray-600">
-                Transaction #{transaction.referenceNo || transaction._id?.substring(0, 12)}
-              </p>
             </div>
             <button
               onClick={onClose}

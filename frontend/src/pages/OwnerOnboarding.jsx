@@ -702,4 +702,3 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
 };
 
 export default memo(OwnerOnboarding);
-
