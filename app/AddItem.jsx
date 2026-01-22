@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as ExpoFileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -19,13 +20,94 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { productAPI, brandPartnerAPI } from '../services/api';
+
+const categoryCodeMap = {
+  Tops: 'TOP',
+  Bottoms: 'BTM',
+  Dresses: 'DRS',
+  Makeup: 'MKP',
+  Accessories: 'ACC',
+  Shoes: 'SHO',
+  'Head Wear': 'HDW',
+  Foods: 'FOD'
+};
+
+// Get variant code from variant string (first 3 chars uppercase)
+const getVariantCode = (variant) => {
+  if (!variant || variant.trim() === '') {
+    return '';
+  }
+
+  // Clean and uppercase the variant, take first 3 characters
+  const cleaned = variant.replace(/\s+/g, '').toUpperCase();
+  return cleaned.substring(0, 3);
+};
+
+// Generate SKU format: CATEGORY-00001-VARIANT (e.g., TOP-00001-RED)
+// Generate SKU format: CATEGORY-RANDOM-VARIANT (e.g., TOP-A1B2C-RED)
+const generateMobileSKU = (category = 'Others', variant = '') => {
+  const categoryCode = categoryCodeMap[category] || 'OTH';
+
+  // Generate 5 random alphanumeric characters
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let randomCode = '';
+  for (let i = 0; i < 5; i++) {
+    randomCode += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  // Build SKU: CATEGORY-RANDOM or CATEGORY-RANDOM-VARIANT
+  if (!variant || variant.trim() === '') {
+    return `${categoryCode}-${randomCode}`;
+  }
+
+  const variantCode = getVariantCode(variant);
+  return `${categoryCode}-${randomCode}-${variantCode}`;
+};
+
+// Convert image URI to base64 for storage
+const convertImageToBase64 = async (uri) => {
+  try {
+    if (!uri) return '';
+    // If already base64, return as is
+    if (uri.startsWith('data:image')) return uri;
+
+    // Check if ExpoFileSystem is available and has the required method
+    if (!ExpoFileSystem || typeof ExpoFileSystem.readAsStringAsync !== 'function') {
+      console.warn('ExpoFileSystem not available, returning URI as-is');
+      return uri;
+    }
+
+    // Read file as base64 - use the EncodingType enum if available, otherwise use string
+    const encodingOptions = ExpoFileSystem.EncodingType
+      ? { encoding: ExpoFileSystem.EncodingType.Base64 }
+      : { encoding: 'base64' };
+
+    const base64 = await ExpoFileSystem.readAsStringAsync(uri, encodingOptions);
+
+    // Determine image type from URI
+    const extension = uri.split('.').pop()?.toLowerCase() || 'jpeg';
+    const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
+
+    return `data:${mimeType};base64,${base64}`;
+  } catch (error) {
+    console.error('Error converting image to base64:', error);
+    // Return the original URI as fallback so the image can still be used
+    return uri || '';
+  }
+};
 
 function AddItem({ onBack, item, isEditing = false }) {
   // State declarations with initial values from item prop if in edit mode
   const [itemImage, setItemImage] = useState(item?.image || null);
-  const [itemName, setItemName] = useState(item?.name || "");
-  const [itemCategory, setItemCategory] = useState(item?.category || "");
+  const [itemName, setItemName] = useState(item?.itemName || item?.name || "");
+  const [itemCategory, setItemCategory] = useState(item?.category || "Tops");
   const [itemSize, setItemSize] = useState(item?.size || "");
+  const [selectedSizes, setSelectedSizes] = useState([]);
+  const [sizeQuantities, setSizeQuantities] = useState({});
+  const [differentPricesPerSize, setDifferentPricesPerSize] = useState(false);
+  const [sizePrices, setSizePrices] = useState({});
+  const [sizeCostPrices, setSizeCostPrices] = useState({});
   const [waistSize, setWaistSize] = useState(item?.waistSize || "");
   const [accessoryType, setAccessoryType] = useState(item?.accessoryType || "");
   const [makeupBrand, setMakeupBrand] = useState(item?.makeupBrand || "");
@@ -33,9 +115,32 @@ function AddItem({ onBack, item, isEditing = false }) {
   const [shoeSize, setShoeSize] = useState(item?.shoeSize || "");
   const [essentialType, setEssentialType] = useState(item?.essentialType || "");
   const [customEssentialType, setCustomEssentialType] = useState(item?.customEssentialType || "");
-  const [itemPrice, setItemPrice] = useState(item?.price ? item.price.toString() : "");
-  const [itemStock, setItemStock] = useState(item?.stock ? item.stock.toString() : "");
-  const [brand, setBrand] = useState(item?.brand || "");
+  const [costPrice, setCostPrice] = useState(
+    item?.costPrice !== undefined ? item.costPrice.toString() : ""
+  );
+  const [sellingPrice, setSellingPrice] = useState(
+    item?.itemPrice !== undefined
+      ? item.itemPrice.toString()
+      : item?.price
+        ? item.price.toString()
+        : ""
+  );
+  const [itemPrice, setItemPrice] = useState(
+    item?.itemPrice !== undefined
+      ? item.itemPrice.toString()
+      : item?.price
+        ? item.price.toString()
+        : ""
+  );
+  const [itemStock, setItemStock] = useState(
+    item?.currentStock !== undefined
+      ? item.currentStock.toString()
+      : item?.stock
+        ? item.stock.toString()
+        : ""
+  );
+  const [brand, setBrand] = useState(item?.brandName || item?.brand || "Brandless");
+  const [brandsList, setBrandsList] = useState([]);
   const [expirationDate, setExpirationDate] = useState(item?.expirationDate || "");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [essentialExpirationDate, setEssentialExpirationDate] = useState(item?.essentialExpirationDate || "");
@@ -48,11 +153,11 @@ function AddItem({ onBack, item, isEditing = false }) {
   const [successMessage, setSuccessMessage] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isForPOS, setIsForPOS] = useState(item?.isForPOS || false);
-  
+
   // Animation refs
   const toastTranslate = useRef(new Animated.Value(-60)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
-  
+
   // Handle toast animation
   useEffect(() => {
     if (showSuccess) {
@@ -69,12 +174,12 @@ function AddItem({ onBack, item, isEditing = false }) {
           useNativeDriver: true,
         }),
       ]).start();
-      
+
       // Auto hide after delay
       const timer = setTimeout(() => {
         setShowSuccess(false);
       }, 2000);
-      
+
       return () => clearTimeout(timer);
     } else {
       // Fade out
@@ -100,6 +205,8 @@ function AddItem({ onBack, item, isEditing = false }) {
       itemName ||
       itemCategory ||
       itemSize ||
+      selectedSizes.length > 0 ||
+      Object.keys(sizeQuantities).length > 0 ||
       waistSize ||
       accessoryType ||
       makeupBrand ||
@@ -109,7 +216,7 @@ function AddItem({ onBack, item, isEditing = false }) {
       customEssentialType ||
       itemPrice ||
       itemStock ||
-      brand ||
+      brand !== "Brandless" ||
       expirationDate ||
       essentialExpirationDate ||
       foodType ||
@@ -149,13 +256,15 @@ function AddItem({ onBack, item, isEditing = false }) {
       }
     }
   };
-  
+
   // Initialize all form fields with default values
   const initializeForm = () => {
     setItemImage(null);
     setItemName('');
-    setItemCategory('');
+    setItemCategory('Tops');
     setItemSize('');
+    setSelectedSizes([]);
+    setSizeQuantities({});
     setWaistSize('');
     setAccessoryType('');
     setMakeupBrand('');
@@ -163,23 +272,40 @@ function AddItem({ onBack, item, isEditing = false }) {
     setShoeSize('');
     setEssentialType('');
     setCustomEssentialType('');
+    setCostPrice('');
+    setSellingPrice('');
     setItemPrice('');
     setItemStock('');
-    setBrand('');
+    setBrand('Brandless');
     setExpirationDate('');
     setEssentialExpirationDate('');
     setFoodType('');
     setCustomFoodType('');
     setIsForPOS(false);
   };
-  
+
+  // Fetch brands from database on component mount
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        const response = await brandPartnerAPI.getAll();
+        if (response.success && response.data) {
+          setBrandsList(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching brands:', error);
+      }
+    };
+    fetchBrands();
+  }, []);
+
   // Initialize form on component mount or when item prop changes
   useEffect(() => {
     if (isEditing && item) {
       // Pre-fill form with item data when in edit mode
-      setItemImage(item.image || null);
-      setItemName(item.name || '');
-      setItemCategory(item.category || '');
+      setItemImage(item.itemImage || item.image || null);
+      setItemName(item.itemName || item.name || '');
+      setItemCategory(item.category || 'Tops');
       setItemSize(item.size || '');
       setWaistSize(item.waistSize || '');
       setAccessoryType(item.accessoryType || '');
@@ -188,9 +314,29 @@ function AddItem({ onBack, item, isEditing = false }) {
       setShoeSize(item.shoeSize || '');
       setEssentialType(item.essentialType || '');
       setCustomEssentialType(item.customEssentialType || '');
-      setItemPrice(item.price ? item.price.toString() : '');
-      setItemStock(item.stock ? item.stock.toString() : '');
-      setBrand(item.brand || '');
+      setCostPrice(item.costPrice !== undefined ? item.costPrice.toString() : '');
+      setSellingPrice(
+        item.itemPrice !== undefined
+          ? item.itemPrice.toString()
+          : item.price
+            ? item.price.toString()
+            : ''
+      );
+      setItemPrice(
+        item.itemPrice !== undefined
+          ? item.itemPrice.toString()
+          : item.price
+            ? item.price.toString()
+            : ''
+      );
+      setItemStock(
+        item.currentStock !== undefined
+          ? item.currentStock.toString()
+          : item.stock
+            ? item.stock.toString()
+            : ''
+      );
+      setBrand(item.brandName || item.brand || 'Brandless');
       setExpirationDate(item.expirationDate || '');
       setEssentialExpirationDate(item.essentialExpirationDate || '');
       setFoodType(item.foodType || '');
@@ -262,7 +408,7 @@ function AddItem({ onBack, item, isEditing = false }) {
   };
 
   const router = useRouter();
-  
+
   const validateForm = () => {
     if (!itemName || !itemCategory || !itemPrice || !itemStock) {
       Alert.alert('Error', 'Please fill in all required fields');
@@ -279,72 +425,140 @@ function AddItem({ onBack, item, isEditing = false }) {
     return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (isLoading) return;
-    
-    // Basic validation
-    if (!itemName || !itemCategory || !itemPrice || !itemStock) {
+
+    // Basic validation - check if sizes are selected but no quantities entered
+    const hasSizesSelected = selectedSizes.length > 0;
+    const hasValidSizeQuantities = hasSizesSelected && selectedSizes.some(size => {
+      const qty = parseInt(sizeQuantities[size]) || 0;
+      return qty > 0;
+    });
+
+    // Calculate total stock from size quantities if sizes are selected
+    const totalSizeStock = hasSizesSelected
+      ? selectedSizes.reduce((sum, size) => sum + (parseInt(sizeQuantities[size]) || 0), 0)
+      : 0;
+
+    // Validation
+    if (!itemName || !itemCategory || !sellingPrice) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-    
-    if (parseFloat(itemPrice) <= 0) {
-      Alert.alert('Error', 'Price must be greater than 0');
+
+    // If sizes are selected, validate quantities; otherwise validate single stock
+    if (hasSizesSelected && !hasValidSizeQuantities) {
+      Alert.alert('Error', 'Please enter quantity for at least one selected size');
       return;
     }
-    
-    if (parseInt(itemStock) < 0) {
-      Alert.alert('Error', 'Stock cannot be negative');
+
+    if (!hasSizesSelected && !itemStock) {
+      Alert.alert('Error', 'Please enter stock quantity');
       return;
     }
-    
+
+    if (parseFloat(sellingPrice) <= 0) {
+      Alert.alert('Error', 'Selling price must be greater than 0');
+      return;
+    }
+
+    if (costPrice && parseFloat(costPrice) < 0) {
+      Alert.alert('Error', 'Cost price cannot be negative');
+      return;
+    }
+
     setIsLoading(true);
-    
-    // Prepare the item data
-    const itemData = {
-      ...(isEditing && { id: item.id }), // Include ID if editing
-      name: itemName.trim(),
-      category: itemCategory,
-      size: itemSize,
-      waistSize: waistSize,
-      accessoryType: accessoryType,
-      makeupBrand: makeupBrand,
-      makeupShade: makeupShade,
-      shoeSize: shoeSize,
-      essentialType: essentialType,
-      customEssentialType: customEssentialType,
-      price: parseFloat(itemPrice) || 0,
-      stock: parseInt(itemStock) || 0,
-      brand: brand.trim(),
-      expirationDate: expirationDate,
-      essentialExpirationDate: essentialExpirationDate,
-      foodType: foodType,
-      customFoodType: customFoodType,
-      isForPOS: isForPOS,
-      image: itemImage,
-      // Keep the original SKU and date added when editing
-      ...(isEditing && { 
-        sku: item.sku,
-        dateAdded: item.dateAdded
-      })
-    };
-    
-    console.log(isEditing ? 'Updating item:' : 'Adding new item:', itemData);
-    
-    // Here you would typically make an API call to save the item
-    // For now, we'll just simulate an API call with a timeout
-    setTimeout(() => {
+
+    try {
+      const normalizedCategory = itemCategory || 'Tops';
+
+      const skuValue = item?.sku || generateMobileSKU(normalizedCategory, itemSize || customEssentialType || '');
+
+      // Convert image to base64 for proper storage
+      let imageBase64 = '';
+      if (itemImage) {
+        imageBase64 = await convertImageToBase64(itemImage);
+      }
+
+      // Build sizes object for backend (matching web format)
+      let sizesObject = {};
+      if (hasSizesSelected) {
+        selectedSizes.forEach(size => {
+          sizesObject[size] = {
+            quantity: parseInt(sizeQuantities[size]) || 0,
+            price: differentPricesPerSize
+              ? (parseFloat(sizePrices[size]) || 0)
+              : (parseFloat(sellingPrice) || 0),
+            costPrice: differentPricesPerSize
+              ? (parseFloat(sizeCostPrices[size]) || 0)
+              : (parseFloat(costPrice) || 0)
+          };
+        });
+      }
+
+      // Prepare the item data aligned with backend schema
+      const itemData = {
+        sku: skuValue,
+        itemName: itemName.trim(),
+        category: normalizedCategory,
+        brandName: brand,
+        itemPrice: parseFloat(sellingPrice) || 0,
+        currentStock: hasSizesSelected ? totalSizeStock : (parseInt(itemStock) || 0),
+        costPrice: parseFloat(costPrice) || 0,
+        variant: customEssentialType || itemSize || '',
+        size: itemSize,
+        sizes: hasSizesSelected ? sizesObject : {},
+        waistSize,
+        accessoryType,
+        makeupBrand,
+        makeupShade,
+        shoeSize,
+        essentialType,
+        customEssentialType,
+        foodSubtype: foodType,
+        customFoodType,
+        expirationDate: expirationDate || null,
+        essentialExpirationDate: essentialExpirationDate || null,
+        displayInTerminal: isForPOS,
+        itemImage: imageBase64,
+        dateAdded: item?.dateAdded || new Date().toISOString(),
+        isForPOS
+      };
+
+      console.log(isEditing ? 'Updating item:' : 'Adding new item:', itemData);
+
+      let response;
+      if (isEditing && (item._id || item.id)) {
+        // Update existing product
+        const productId = item._id || item.id;
+        response = await productAPI.update(productId, itemData);
+      } else {
+        // Create new product
+        response = await productAPI.create(itemData);
+      }
+
+      if (response.success) {
+        setIsLoading(false);
+        setSuccessMessage(isEditing ? 'Item updated successfully!' : 'Item added successfully!');
+        setShowSuccess(true);
+
+        // Hide success message after 2 seconds and go back
+        setTimeout(() => {
+          setShowSuccess(false);
+          // Navigate back after a short delay
+          setTimeout(() => onBack(), 500);
+        }, 2000);
+      } else {
+        throw new Error(response.message || 'Failed to save item');
+      }
+    } catch (error) {
+      console.error('Error saving item:', error);
       setIsLoading(false);
-      setSuccessMessage(isEditing ? 'Item updated successfully!' : 'Item added successfully!');
-      setShowSuccess(true);
-      
-      // Hide success message after 2 seconds and go back
-      setTimeout(() => {
-        setShowSuccess(false);
-        // Navigate back after a short delay
-        setTimeout(() => onBack(), 500);
-      }, 2000);
-    }, 1000);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to save item. Please check your connection and try again.'
+      );
+    }
   };
 
   const handleSearch = (query) => {
@@ -377,7 +591,7 @@ function AddItem({ onBack, item, isEditing = false }) {
         <Text style={styles.headerTitle}>{isEditing ? 'Edit Item' : 'Add New Item'}</Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
@@ -406,22 +620,22 @@ function AddItem({ onBack, item, isEditing = false }) {
                   style={[styles.modalButton, styles.confirmButton]}
                   onPress={handleSubmit}
                 >
-                  <Text style={[styles.buttonText, {color: 'white'}]}>Add Item</Text>
+                  <Text style={[styles.buttonText, { color: 'white' }]}>Add Item</Text>
                 </Pressable>
               </View>
             </View>
           </View>
         </Modal>
         {/* Image Upload */}
-        <TouchableOpacity 
-          style={styles.imageUploadContainer} 
+        <TouchableOpacity
+          style={styles.imageUploadContainer}
           onPress={showImagePickerOptions}
         >
           {itemImage ? (
             <View style={styles.imageContainer}>
-              <Image 
-                source={{ uri: itemImage }} 
-                style={styles.image} 
+              <Image
+                source={{ uri: itemImage }}
+                style={styles.image}
                 resizeMode="cover"
                 onError={(error) => {
                   console.log('Image load error:', error);
@@ -434,173 +648,233 @@ function AddItem({ onBack, item, isEditing = false }) {
             <View style={styles.imagePlaceholder}>
               <View style={styles.cameraIconContainer}>
                 <Ionicons name="camera" size={32} color="#6b7280" />
-                <Ionicons name="images" size={32} color="#6b7280" style={{marginLeft: 10}} />
+                <Ionicons name="images" size={32} color="#6b7280" style={{ marginLeft: 10 }} />
               </View>
               <Text style={styles.imagePlaceholderText}>Tap to take a photo or select from gallery</Text>
             </View>
           )}
         </TouchableOpacity>
 
-      {/* Item Name */}
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Item Name *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter item name"
-          value={itemName}
-          onChangeText={setItemName}
-        />
-      </View>
-
-      {/* Brand */}
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Brand</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter brand name (optional)"
-          value={brand}
-          onChangeText={setBrand}
-        />
-      </View>
-
-      {/* Item Category */}
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Category *</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={itemCategory}
-            onValueChange={(itemValue) => setItemCategory(itemValue)}
-            style={styles.picker}
-            dropdownIconColor="#6b7280"
-            mode="dropdown"
-          >
-            <Picker.Item label="Select a category" value="" />
-            <Picker.Item label="Tops" value="tops" />
-            <Picker.Item label="Bottoms" value="bottoms" />
-            <Picker.Item label="Dresses" value="dresses" />
-            <Picker.Item label="Headwear" value="headwear" />
-            <Picker.Item label="Makeup" value="makeup" />
-            <Picker.Item label="Accessories" value="accessories" />
-            <Picker.Item label="Shoes" value="shoes" />
-            <Picker.Item label="Food" value="food" />
-          </Picker>
-        </View>
-      </View>
-
-      {/* Size Selection - For tops and dresses */}
-      {['tops', 'dresses'].includes(itemCategory) && (
+        {/* Item Name */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Size *</Text>
+          <Text style={styles.label}>Item Name *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter item name"
+            value={itemName}
+            onChangeText={setItemName}
+          />
+        </View>
+
+        {/* Brand */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Brand</Text>
           <View style={styles.pickerContainer}>
             <Picker
-              selectedValue={itemSize}
-              onValueChange={(itemValue) => setItemSize(itemValue)}
+              selectedValue={brand}
+              onValueChange={(itemValue) => setBrand(itemValue)}
               style={styles.picker}
               dropdownIconColor="#6b7280"
               mode="dropdown"
             >
-              <Picker.Item label="Select size" value="" />
-              <Picker.Item label="Free Size" value="Free Size" />
-              <Picker.Item label="XS" value="XS" />
-              <Picker.Item label="S" value="S" />
-              <Picker.Item label="M" value="M" />
-              <Picker.Item label="L" value="L" />
-              <Picker.Item label="XL" value="XL" />
-              <Picker.Item label="XXL" value="XXL" />
-              <Picker.Item label="XXXL" value="XXXL" />
+              <Picker.Item label="Brandless" value="Brandless" />
+              {brandsList.map((brandItem) => (
+                <Picker.Item
+                  key={brandItem._id}
+                  label={brandItem.brandName}
+                  value={brandItem.brandName}
+                />
+              ))}
             </Picker>
           </View>
         </View>
-      )}
 
-      {/* Makeup Fields - For makeup */}
-      {itemCategory === 'makeup' && (
+        {/* Item Category */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Variant *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., Nude, Ruby, etc."
-            value={makeupShade}
-            onChangeText={setMakeupShade}
-          />
-          <Text style={[styles.label, {marginTop: 10}]}>Expiration Date *</Text>
-          <TouchableOpacity 
-            style={styles.input} 
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={{color: expirationDate ? '#000' : '#6b7280'}}>
-              {expirationDate ? new Date(expirationDate).toLocaleDateString() : 'Select expiration date'}
-            </Text>
-          </TouchableOpacity>
-          {showDatePicker && (
-            <DateTimePicker
-              value={expirationDate ? new Date(expirationDate) : new Date()}
-              mode="date"
-              display="default"
-              minimumDate={new Date()}
-              onChange={(event, selectedDate) => {
-                setShowDatePicker(false);
-                if (selectedDate) {
-                  setExpirationDate(selectedDate.toISOString().split('T')[0]);
-                }
+          <Text style={styles.label}>Category *</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={itemCategory}
+              onValueChange={(itemValue) => {
+                setItemCategory(itemValue);
+                // Reset size selections when category changes
+                setSelectedSizes([]);
+                setSizeQuantities({});
               }}
-            />
-          )}
-        </View>
-      )}
-
-      {/* Shoe Size - For shoes */}
-      {itemCategory === 'shoes' && (
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Shoe Size *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., 7, 8, 9, etc."
-            keyboardType="numeric"
-            value={shoeSize}
-            onChangeText={setShoeSize}
-          />
-        </View>
-      )}
-
-      {/* Food Type - For food */}
-      {itemCategory === 'food' && (
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Food Type *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={foodType}
-              onValueChange={(itemValue) => setFoodType(itemValue)}
               style={styles.picker}
               dropdownIconColor="#6b7280"
               mode="dropdown"
             >
-              <Picker.Item label="Select food type" value="" />
-              <Picker.Item label="Meals" value="meals" />
-              <Picker.Item label="Desserts" value="desserts" />
-              <Picker.Item label="Beverages" value="beverages" />
-              <Picker.Item label="Snacks" value="snacks" />
-              <Picker.Item label="Others: Please specify" value="other" />
+              <Picker.Item label="Select a category" value="" />
+              <Picker.Item label="Tops" value="Tops" />
+              <Picker.Item label="Bottoms" value="Bottoms" />
+              <Picker.Item label="Dresses" value="Dresses" />
+              <Picker.Item label="Head Wear" value="Head Wear" />
+              <Picker.Item label="Makeup" value="Makeup" />
+              <Picker.Item label="Accessories" value="Accessories" />
+              <Picker.Item label="Shoes" value="Shoes" />
+              <Picker.Item label="Foods" value="Foods" />
             </Picker>
           </View>
-          {foodType === 'other' && (
-            <View style={[styles.inputContainer, {marginTop: 10}]}>
-              <Text style={styles.label}>Please specify *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter food type"
-                value={customFoodType}
-                onChangeText={setCustomFoodType}
-              />
+        </View>
+
+        {/* Size Selection - For tops, dresses, and bottoms */}
+        {['Tops', 'Dresses', 'Bottoms'].includes(itemCategory) && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Sizes (Select multiple)</Text>
+            <View style={styles.sizeCheckboxGrid}>
+              {['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Free Size'].map((size) => (
+                <TouchableOpacity
+                  key={size}
+                  style={styles.sizeCheckboxItem}
+                  onPress={() => {
+                    setSelectedSizes(prev => {
+                      if (prev.includes(size)) {
+                        // Remove size and its quantity
+                        setSizeQuantities(prevQty => {
+                          const newQty = { ...prevQty };
+                          delete newQty[size];
+                          return newQty;
+                        });
+                        return prev.filter(s => s !== size);
+                      } else {
+                        return [...prev, size];
+                      }
+                    });
+                  }}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    selectedSizes.includes(size) && styles.checkboxChecked
+                  ]}>
+                    {selectedSizes.includes(size) && (
+                      <Ionicons name="checkmark" size={14} color="#fff" />
+                    )}
+                  </View>
+                  <Text style={styles.sizeCheckboxLabel}>{size}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-          <View style={[styles.inputContainer, {marginTop: 10}]}>
-            <Text style={styles.label}>Expiration Date *</Text>
-            <TouchableOpacity 
-              style={styles.input} 
+
+            {/* Quantity inputs for selected sizes */}
+            {selectedSizes.length > 0 && (
+              <>
+                {/* Different prices per size checkbox */}
+                <TouchableOpacity
+                  style={styles.differentPricesRow}
+                  onPress={() => {
+                    setDifferentPricesPerSize(!differentPricesPerSize);
+                    if (!differentPricesPerSize) {
+                      // Initialize prices for all selected sizes
+                      const newSizePrices = {};
+                      const newSizeCostPrices = {};
+                      selectedSizes.forEach(size => {
+                        newSizePrices[size] = sellingPrice || '';
+                        newSizeCostPrices[size] = costPrice || '';
+                      });
+                      setSizePrices(newSizePrices);
+                      setSizeCostPrices(newSizeCostPrices);
+                    } else {
+                      setSizePrices({});
+                      setSizeCostPrices({});
+                    }
+                  }}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    differentPricesPerSize && styles.checkboxChecked
+                  ]}>
+                    {differentPricesPerSize && (
+                      <Ionicons name="checkmark" size={14} color="#fff" />
+                    )}
+                  </View>
+                  <Text style={styles.differentPricesLabel}>Different prices each size?</Text>
+                </TouchableOpacity>
+
+                <View style={styles.sizeQuantityContainer}>
+                  <Text style={styles.sizeQuantityTitle}>Quantity per Size:</Text>
+                  <View style={styles.sizeQuantityGrid}>
+                    {selectedSizes.map((size) => (
+                      <View key={size} style={styles.sizeQuantityItem}>
+                        <Text style={styles.sizeQuantityLabel}>{size}</Text>
+                        <TextInput
+                          style={styles.sizeQuantityInput}
+                          placeholder="0"
+                          keyboardType="numeric"
+                          value={sizeQuantities[size]?.toString() || ''}
+                          onChangeText={(value) => {
+                            setSizeQuantities(prev => ({
+                              ...prev,
+                              [size]: value
+                            }));
+                          }}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Pricing per size - only show when differentPricesPerSize is true */}
+                {differentPricesPerSize && (
+                  <View style={styles.sizeQuantityContainer}>
+                    <Text style={styles.sizeQuantityTitle}>Pricing per Size:</Text>
+                    {selectedSizes.map((size) => (
+                      <View key={size} style={styles.sizePriceRow}>
+                        <View style={styles.sizePriceItem}>
+                          <Text style={styles.sizeQuantityLabel}>{size} Cost Price</Text>
+                          <TextInput
+                            style={styles.sizeQuantityInput}
+                            placeholder="0.00"
+                            keyboardType="numeric"
+                            value={sizeCostPrices[size]?.toString() || ''}
+                            onChangeText={(value) => {
+                              setSizeCostPrices(prev => ({
+                                ...prev,
+                                [size]: value
+                              }));
+                            }}
+                          />
+                        </View>
+                        <View style={styles.sizePriceItem}>
+                          <Text style={styles.sizeQuantityLabel}>{size} Selling Price</Text>
+                          <TextInput
+                            style={styles.sizeQuantityInput}
+                            placeholder="0.00"
+                            keyboardType="numeric"
+                            value={sizePrices[size]?.toString() || ''}
+                            onChangeText={(value) => {
+                              setSizePrices(prev => ({
+                                ...prev,
+                                [size]: value
+                              }));
+                            }}
+                          />
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Makeup Fields - For makeup */}
+        {itemCategory === 'Makeup' && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Variant *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., Nude, Ruby, etc."
+              value={makeupShade}
+              onChangeText={setMakeupShade}
+            />
+            <Text style={[styles.label, { marginTop: 10 }]}>Expiration Date *</Text>
+            <TouchableOpacity
+              style={styles.input}
               onPress={() => setShowDatePicker(true)}
             >
-              <Text style={{color: expirationDate ? '#000' : '#6b7280'}}>
+              <Text style={{ color: expirationDate ? '#000' : '#6b7280' }}>
                 {expirationDate ? new Date(expirationDate).toLocaleDateString() : 'Select expiration date'}
               </Text>
             </TouchableOpacity>
@@ -618,187 +892,374 @@ function AddItem({ onBack, item, isEditing = false }) {
                 }}
               />
             )}
-            {expirationDate && (
-              <Text style={styles.helperText}>
-                {new Date(expirationDate) > new Date()
-                  ? `Expires in ${Math.ceil((new Date(expirationDate) - new Date()) / (1000 * 60 * 60 * 24))} days`
-                  : 'Expired'}
-              </Text>
-            )}
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Essential Type - For essentials */}
-      {itemCategory === 'essentials' && (
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Essential Type *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={essentialType}
-              onValueChange={(itemValue) => setEssentialType(itemValue)}
-              style={styles.picker}
-              dropdownIconColor="#6b7280"
-              mode="dropdown"
-            >
-              <Picker.Item label="Select essential type" value="" />
-              <Picker.Item label="Acne Cleaner" value="Acne Cleaner" />
-              <Picker.Item label="Face Wash" value="Face Wash" />
-              <Picker.Item label="Moisturizer" value="Moisturizer" />
-              <Picker.Item label="Sunscreen" value="Sunscreen" />
-              <Picker.Item label="Toner" value="Toner" />
-              <Picker.Item label="Serum" value="Serum" />
-              <Picker.Item label="Face Mask" value="Face Mask" />
-              <Picker.Item label="Body Lotion" value="Body Lotion" />
-              <Picker.Item label="Food" value="Food" />
-              <Picker.Item label="Other" value="Other" />
-            </Picker>
-          </View>
-          {essentialType === 'Other' && (
-            <View style={[styles.inputContainer, {marginTop: 10}]}>
-              <Text style={styles.label}>Please specify *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter essential type"
-                value={customEssentialType}
-                onChangeText={setCustomEssentialType}
-              />
+        {/* Shoe Size - For shoes */}
+        {itemCategory === 'Shoes' && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Shoe Sizes (Select multiple)</Text>
+            <View style={styles.sizeCheckboxGrid}>
+              {['5', '6', '7', '8', '9', '10', '11', '12'].map((size) => (
+                <TouchableOpacity
+                  key={size}
+                  style={styles.sizeCheckboxItem}
+                  onPress={() => {
+                    setSelectedSizes(prev => {
+                      if (prev.includes(size)) {
+                        setSizeQuantities(prevQty => {
+                          const newQty = { ...prevQty };
+                          delete newQty[size];
+                          return newQty;
+                        });
+                        return prev.filter(s => s !== size);
+                      } else {
+                        return [...prev, size];
+                      }
+                    });
+                  }}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    selectedSizes.includes(size) && styles.checkboxChecked
+                  ]}>
+                    {selectedSizes.includes(size) && (
+                      <Ionicons name="checkmark" size={14} color="#fff" />
+                    )}
+                  </View>
+                  <Text style={styles.sizeCheckboxLabel}>{size}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-          <View style={[styles.inputContainer, {marginTop: 10}]}>
-            <Text style={styles.label}>Expiration Date (optional)</Text>
-            <TouchableOpacity 
-              style={styles.input} 
-              onPress={() => setShowEssentialDatePicker(true)}
-            >
-              <Text style={{color: essentialExpirationDate ? '#000' : '#6b7280'}}>
-                {essentialExpirationDate ? new Date(essentialExpirationDate).toLocaleDateString() : 'Select expiration date (optional)'}
-              </Text>
-            </TouchableOpacity>
-            {showEssentialDatePicker && (
-              <DateTimePicker
-                value={essentialExpirationDate ? new Date(essentialExpirationDate) : new Date()}
-                mode="date"
-                display="default"
-                minimumDate={new Date()}
-                onChange={(event, selectedDate) => {
-                  setShowEssentialDatePicker(false);
-                  if (selectedDate) {
-                    setEssentialExpirationDate(selectedDate.toISOString().split('T')[0]);
-                  }
-                }}
-              />
+
+            {selectedSizes.length > 0 && (
+              <>
+                {/* Different prices per size checkbox */}
+                <TouchableOpacity
+                  style={styles.differentPricesRow}
+                  onPress={() => {
+                    setDifferentPricesPerSize(!differentPricesPerSize);
+                    if (!differentPricesPerSize) {
+                      const newSizePrices = {};
+                      const newSizeCostPrices = {};
+                      selectedSizes.forEach(size => {
+                        newSizePrices[size] = sellingPrice || '';
+                        newSizeCostPrices[size] = costPrice || '';
+                      });
+                      setSizePrices(newSizePrices);
+                      setSizeCostPrices(newSizeCostPrices);
+                    } else {
+                      setSizePrices({});
+                      setSizeCostPrices({});
+                    }
+                  }}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    differentPricesPerSize && styles.checkboxChecked
+                  ]}>
+                    {differentPricesPerSize && (
+                      <Ionicons name="checkmark" size={14} color="#fff" />
+                    )}
+                  </View>
+                  <Text style={styles.differentPricesLabel}>Different prices each size?</Text>
+                </TouchableOpacity>
+
+                <View style={styles.sizeQuantityContainer}>
+                  <Text style={styles.sizeQuantityTitle}>Quantity per Size:</Text>
+                  <View style={styles.sizeQuantityGrid}>
+                    {selectedSizes.map((size) => (
+                      <View key={size} style={styles.sizeQuantityItem}>
+                        <Text style={styles.sizeQuantityLabel}>{size}</Text>
+                        <TextInput
+                          style={styles.sizeQuantityInput}
+                          placeholder="0"
+                          keyboardType="numeric"
+                          value={sizeQuantities[size]?.toString() || ''}
+                          onChangeText={(value) => {
+                            setSizeQuantities(prev => ({
+                              ...prev,
+                              [size]: value
+                            }));
+                          }}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {differentPricesPerSize && (
+                  <View style={styles.sizeQuantityContainer}>
+                    <Text style={styles.sizeQuantityTitle}>Pricing per Size:</Text>
+                    {selectedSizes.map((size) => (
+                      <View key={size} style={styles.sizePriceRow}>
+                        <View style={styles.sizePriceItem}>
+                          <Text style={styles.sizeQuantityLabel}>{size} Cost Price</Text>
+                          <TextInput
+                            style={styles.sizeQuantityInput}
+                            placeholder="0.00"
+                            keyboardType="numeric"
+                            value={sizeCostPrices[size]?.toString() || ''}
+                            onChangeText={(value) => {
+                              setSizeCostPrices(prev => ({
+                                ...prev,
+                                [size]: value
+                              }));
+                            }}
+                          />
+                        </View>
+                        <View style={styles.sizePriceItem}>
+                          <Text style={styles.sizeQuantityLabel}>{size} Selling Price</Text>
+                          <TextInput
+                            style={styles.sizeQuantityInput}
+                            placeholder="0.00"
+                            keyboardType="numeric"
+                            value={sizePrices[size]?.toString() || ''}
+                            onChangeText={(value) => {
+                              setSizePrices(prev => ({
+                                ...prev,
+                                [size]: value
+                              }));
+                            }}
+                          />
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
             )}
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Accessory Type - For accessories */}
-      {itemCategory === 'accessories' && (
+        {/* Food Type - For food */}
+        {itemCategory === 'Foods' && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Food Type *</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={foodType}
+                onValueChange={(itemValue) => setFoodType(itemValue)}
+                style={styles.picker}
+                dropdownIconColor="#6b7280"
+                mode="dropdown"
+              >
+                <Picker.Item label="Select food type" value="" />
+                <Picker.Item label="Beverages" value="Beverages" />
+                <Picker.Item label="Snacks" value="Snacks" />
+                <Picker.Item label="Meals" value="Meals" />
+                <Picker.Item label="Desserts" value="Desserts" />
+                <Picker.Item label="Ingredients" value="Ingredients" />
+                <Picker.Item label="Other" value="Other" />
+              </Picker>
+            </View>
+            {foodType === 'Other' && (
+              <View style={[styles.inputContainer, { marginTop: 10 }]}>
+                <Text style={styles.label}>Please specify *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter food type"
+                  value={customFoodType}
+                  onChangeText={setCustomFoodType}
+                />
+              </View>
+            )}
+            <View style={[styles.inputContainer, { marginTop: 10 }]}>
+              <Text style={styles.label}>Expiration Date *</Text>
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={{ color: expirationDate ? '#000' : '#6b7280' }}>
+                  {expirationDate ? new Date(expirationDate).toLocaleDateString() : 'Select expiration date'}
+                </Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={expirationDate ? new Date(expirationDate) : new Date()}
+                  mode="date"
+                  display="default"
+                  minimumDate={new Date()}
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(false);
+                    if (selectedDate) {
+                      setExpirationDate(selectedDate.toISOString().split('T')[0]);
+                    }
+                  }}
+                />
+              )}
+              {expirationDate && (
+                <Text style={styles.helperText}>
+                  {new Date(expirationDate) > new Date()
+                    ? `Expires in ${Math.ceil((new Date(expirationDate) - new Date()) / (1000 * 60 * 60 * 24))} days`
+                    : 'Expired'}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Essential Type - For essentials */}
+        {itemCategory === 'Essentials' && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Essential Type *</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={essentialType}
+                onValueChange={(itemValue) => setEssentialType(itemValue)}
+                style={styles.picker}
+                dropdownIconColor="#6b7280"
+                mode="dropdown"
+              >
+                <Picker.Item label="Select essential type" value="" />
+                <Picker.Item label="Acne Cleaner" value="Acne Cleaner" />
+                <Picker.Item label="Face Wash" value="Face Wash" />
+                <Picker.Item label="Moisturizer" value="Moisturizer" />
+                <Picker.Item label="Sunscreen" value="Sunscreen" />
+                <Picker.Item label="Toner" value="Toner" />
+                <Picker.Item label="Serum" value="Serum" />
+                <Picker.Item label="Face Mask" value="Face Mask" />
+                <Picker.Item label="Body Lotion" value="Body Lotion" />
+                <Picker.Item label="Food" value="Food" />
+                <Picker.Item label="Other" value="Other" />
+              </Picker>
+            </View>
+            {essentialType === 'Other' && (
+              <View style={[styles.inputContainer, { marginTop: 10 }]}>
+                <Text style={styles.label}>Please specify *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter essential type"
+                  value={customEssentialType}
+                  onChangeText={setCustomEssentialType}
+                />
+              </View>
+            )}
+            <View style={[styles.inputContainer, { marginTop: 10 }]}>
+              <Text style={styles.label}>Expiration Date (optional)</Text>
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setShowEssentialDatePicker(true)}
+              >
+                <Text style={{ color: essentialExpirationDate ? '#000' : '#6b7280' }}>
+                  {essentialExpirationDate ? new Date(essentialExpirationDate).toLocaleDateString() : 'Select expiration date (optional)'}
+                </Text>
+              </TouchableOpacity>
+              {showEssentialDatePicker && (
+                <DateTimePicker
+                  value={essentialExpirationDate ? new Date(essentialExpirationDate) : new Date()}
+                  mode="date"
+                  display="default"
+                  minimumDate={new Date()}
+                  onChange={(event, selectedDate) => {
+                    setShowEssentialDatePicker(false);
+                    if (selectedDate) {
+                      setEssentialExpirationDate(selectedDate.toISOString().split('T')[0]);
+                    }
+                  }}
+                />
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Accessory Type - For accessories */}
+        {itemCategory === 'Accessories' && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Accessory Type *</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={accessoryType}
+                onValueChange={(itemValue) => setAccessoryType(itemValue)}
+                style={styles.picker}
+                dropdownIconColor="#6b7280"
+                mode="dropdown"
+              >
+                <Picker.Item label="Select accessory type" value="" />
+                <Picker.Item label="Keychains / Anik-anik" value="Keychains / Anik-anik" />
+                <Picker.Item label="Rings" value="Rings" />
+                <Picker.Item label="Necklace" value="Necklace" />
+                <Picker.Item label="Bracelet" value="Bracelet" />
+              </Picker>
+            </View>
+          </View>
+        )}
+
+        {/* Cost Price */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Accessory Type *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={accessoryType}
-              onValueChange={(itemValue) => setAccessoryType(itemValue)}
-              style={styles.picker}
-              dropdownIconColor="#6b7280"
-              mode="dropdown"
-            >
-              <Picker.Item label="Select accessory type" value="" />
-              <Picker.Item label="Keychains / Anik-anik" value="Keychains / Anik-anik" />
-              <Picker.Item label="Rings" value="Rings" />
-              <Picker.Item label="Necklace" value="Necklace" />
-              <Picker.Item label="Bracelet" value="Bracelet" />
-            </Picker>
+          <Text style={styles.label}>Cost Price (₱)</Text>
+          <View style={styles.priceInputContainer}>
+            <Text style={styles.currencySymbol}>₱</Text>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="0.00"
+              keyboardType="numeric"
+              value={costPrice}
+              onChangeText={setCostPrice}
+            />
           </View>
         </View>
-      )}
 
-      {/* Size Selection - For bottoms */}
-      {itemCategory === 'bottoms' && (
+        {/* Selling Price */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Size *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={itemSize}
-              onValueChange={(itemValue) => setItemSize(itemValue)}
-              style={styles.picker}
-              dropdownIconColor="#6b7280"
-              mode="dropdown"
-            >
-              <Picker.Item label="Select size" value="" />
-              <Picker.Item label="Free Size" value="Free Size" />
-              <Picker.Item label="XS" value="XS" />
-              <Picker.Item label="S" value="S" />
-              <Picker.Item label="M" value="M" />
-              <Picker.Item label="L" value="L" />
-              <Picker.Item label="XL" value="XL" />
-              <Picker.Item label="XXL" value="XXL" />
-              <Picker.Item label="XXXL" value="XXXL" />
-            </Picker>
+          <Text style={styles.label}>Selling Price (₱) *</Text>
+          <View style={styles.priceInputContainer}>
+            <Text style={styles.currencySymbol}>₱</Text>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="0.00"
+              keyboardType="numeric"
+              value={sellingPrice}
+              onChangeText={setSellingPrice}
+            />
           </View>
         </View>
-      )}
 
-      {/* Item Price */}
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Price (₱) *</Text>
-        <View style={styles.priceInputContainer}>
-          <Text style={styles.currencySymbol}>₱</Text>
-          <TextInput
-            style={[styles.input, {flex: 1}]}
-            placeholder="0.00"
-            keyboardType="numeric"
-            value={itemPrice}
-            onChangeText={setItemPrice}
-          />
+        {/* Item Stock - Only show when no sizes are selected */}
+        {selectedSizes.length === 0 && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Stock Quantity *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter stock quantity"
+              keyboardType="numeric"
+              value={itemStock}
+              onChangeText={setItemStock}
+            />
+          </View>
+        )}
+
+        {/* POS Toggle */}
+        <View style={styles.inputContainer}>
+          <View style={styles.switchContainer}>
+            <Text style={styles.switchLabel}>Available in POS</Text>
+            <Switch
+              value={isForPOS}
+              onValueChange={setIsForPOS}
+              trackColor={{ false: "#767577", true: "#4CAF50" }}
+              thumbColor={isForPOS ? "#fff" : "#f4f3f4"}
+            />
+          </View>
         </View>
-      </View>
-
-      {/* Item Stock */}
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Stock Quantity *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter stock quantity"
-          keyboardType="numeric"
-          value={itemStock}
-          onChangeText={setItemStock}
-        />
-      </View>
-
-      {/* POS Toggle */}
-      <View style={styles.inputContainer}>
-        <View style={styles.switchContainer}>
-          <Text style={styles.switchLabel}>Available in POS</Text>
-          <Switch
-            value={isForPOS}
-            onValueChange={setIsForPOS}
-            trackColor={{ false: "#767577", true: "#4CAF50" }}
-            thumbColor={isForPOS ? "#fff" : "#f4f3f4"}
-          />
-        </View>
-      </View>
 
         {/* Submit Button */}
-      <TouchableOpacity 
-        style={[
-          styles.addButton, 
-          isLoading && styles.disabledButton,
-          { marginBottom: 20 }
-        ]} 
-        onPress={handleSubmit}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.addButtonText}>
-            {isEditing ? 'Update Item' : 'Add Item'}
-          </Text>
-        )}
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.addButton,
+            isLoading && styles.disabledButton,
+            { marginBottom: 20 }
+          ]}
+          onPress={handleSubmit}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.addButtonText}>
+              {isEditing ? 'Update Item' : 'Add Item'}
+            </Text>
+          )}
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -934,16 +1395,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingContainer: {
-  flex: 1,
-  justifyContent: 'center',
-  alignItems: 'center',
-  backgroundColor: '#fff',
-},
-loadingText: {
-  marginTop: 16,
-  fontSize: 16,
-  color: '#666',
-},
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -1039,7 +1500,7 @@ loadingText: {
     color: '#6b7280',
   },
   addButton: {
-    backgroundColor: '#8B4513', 
+    backgroundColor: '#8B4513',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
@@ -1052,7 +1513,7 @@ loadingText: {
     shadowRadius: 3,
   },
   addButtonText: {
-    color: '#FFF8DC', 
+    color: '#FFF8DC',
     fontSize: 16,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -1068,6 +1529,78 @@ loadingText: {
     fontSize: 14,
     color: '#374151',
     fontWeight: '500',
+  },
+  // Multi-size selection styles
+  sizeCheckboxGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  sizeCheckboxItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '50%',
+    paddingVertical: 8,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  checkboxChecked: {
+    backgroundColor: '#AD7F65',
+    borderColor: '#AD7F65',
+  },
+  sizeCheckboxLabel: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  sizeQuantityContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+  },
+  sizeQuantityTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  sizeQuantityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  sizeQuantityItem: {
+    width: '50%',
+    paddingHorizontal: 6,
+    marginBottom: 12,
+  },
+  sizeQuantityLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  sizeQuantityInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 6,
+    padding: 10,
+    fontSize: 14,
+    backgroundColor: '#fff',
+  },
+  differentPricesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 4,
   },
 });
 

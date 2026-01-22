@@ -1,175 +1,332 @@
 import Header from "@/components/shared/header";
+import { useData } from "@/context/DataContext";
 import { Buffer } from "buffer";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
-  Image, LayoutAnimation, ScrollView,
+  Image,
+  LayoutAnimation,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { BarChart, LineChart } from "react-native-chart-kit";
 import * as XLSX from "xlsx";
+import { transactionAPI, productAPI, stockMovementAPI } from "../../services/api";
+import { useFocusEffect } from "@react-navigation/native";
+
 global.Buffer = Buffer;
 
+// Sample data for products (fallback)
+const sampleData = [
+  { item: "Product A", quantity: 120, total: 5000, image: require("./iconz/profile3.png") },
+  { item: "Product B", quantity: 95, total: 3800, image: require("./iconz/profile3.png") },
+  { item: "Product C", quantity: 80, total: 3200, image: require("./iconz/profile3.png") },
+  { item: "Product D", quantity: 65, total: 2600, image: require("./iconz/profile3.png") },
+  { item: "Product E", quantity: 50, total: 2000, image: require("./iconz/profile3.png") },
+];
+
+// Sample low stock data (fallback)
+const sampleLowStock = [
+  { id: 1, name: "Hair Serum", stocks: 5, status: "Low Stock" },
+  { id: 2, name: "Shampoo 500ml", stocks: 0, status: "Out of Stock" },
+  { id: 3, name: "Conditioner", stocks: 3, status: "Low Stock" },
+  { id: 4, name: "Hair Gel", stocks: 0, status: "Out of Stock" },
+  { id: 5, name: "Hair Spray", stocks: 2, status: "Low Stock" },
+];
+
 export default function Analytics() {
-  const [search, setSearch] = useState("");
+  const { transactions: cachedTransactions, products: cachedProducts, fetchTransactions, fetchProducts, invalidateCache } = useData();
+
   const [expanded, setExpanded] = useState(false);
-  
-  const lowStockData = [
-    {
-      id: 1,
-      name: "Beige Crop Top",
-      stocks: 12,
-      reorder: 15,
-      status: "Low Stock",
-    },
-    {
-      id: 2,
-      name: "White Blouse",
-      stocks: 8,
-      reorder: 10,
-      status: "Low Stock",
-    },
-    { id: 3, name: "Brown Pants", stocks: 4, reorder: 10, status: "Low Stock" },
-    { id: 4, name: "Blue Dress", stocks: 3, reorder: 8, status: "Low Stock" },
-    { id: 5, name: "Black Skirt", stocks: 2, reorder: 10, status: "Low Stock" },
-    { id: 6, name: "Eric Shirt", stocks: 1, reorder: 10, status: "Low Stock" },
-  ];
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [chartType, setChartType] = useState("daily");
+  const [initialLoad, setInitialLoad] = useState(true);
+  const analyticsCalculated = useRef(false);
 
-  const visibleData = expanded ? lowStockData : lowStockData.slice(0, 3);
+  // Real-time data states
+  const [dashboardStats, setDashboardStats] = useState({
+    totalSalesToday: 0,
+    totalTransactions: 0,
+    averageTransactionValue: 0,
+    salesGrowthRate: 0,
+    previousPeriodSales: 0,
+    previousPeriodTransactions: 0,
+  });
 
+  const [chartData, setChartData] = useState({
+    daily: { labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], datasets: [{ data: [0] }] },
+    monthly: { labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"], datasets: [{ data: [0] }] },
+    yearly: { labels: ["2023", "2024", "2025"], datasets: [{ data: [0] }] },
+  });
+
+  const [topProducts, setTopProducts] = useState(sampleData);
+  const [lowStockItems, setLowStockItems] = useState(sampleLowStock);
+  const [stockInData, setStockInData] = useState([50, 60, 70, 80, 65, 75]);
+  const [stockOutData, setStockOutData] = useState([30, 40, 35, 45, 40, 50]);
+
+  // Fetch all analytics data
+  const fetchAnalyticsData = async () => {
+    try {
+      console.log("Starting analytics data fetch...");
+      setLoading(true);
+      await Promise.all([
+        fetchDashboardStats(),
+        fetchSalesOverTime(),
+        fetchLowStockItems(),
+        fetchStockMovements(),
+      ]);
+      console.log("Analytics data fetch complete");
+    } catch (error) {
+      console.warn("Failed to fetch analytics:", error?.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Fetch dashboard stats
+  const fetchDashboardStats = async () => {
+    try {
+      console.log("Fetching dashboard stats...");
+      const response = await transactionAPI.getDashboardStats();
+      console.log("Dashboard stats response:", JSON.stringify(response));
+
+      if (response?.success && response.data) {
+        const { totalSalesToday, totalTransactions, profit, lowStockItems } = response.data;
+        const avgValue = totalTransactions > 0 ? totalSalesToday / totalTransactions : 0;
+
+        // For growth rate, we'll calculate based on profit margin or set a default
+        const growthRate = totalSalesToday > 0 && profit > 0
+          ? ((profit / totalSalesToday) * 100)
+          : 0;
+
+        setDashboardStats({
+          totalSalesToday: totalSalesToday || 0,
+          totalTransactions: totalTransactions || 0,
+          averageTransactionValue: avgValue,
+          salesGrowthRate: growthRate,
+          previousPeriodSales: 0,
+          previousPeriodTransactions: 0,
+        });
+        console.log("Dashboard stats updated:", totalSalesToday, totalTransactions);
+      } else {
+        console.warn("Invalid dashboard response:", response);
+      }
+    } catch (error) {
+      console.warn("Failed to fetch dashboard stats:", error?.message);
+    }
+  };
+
+  // Fetch sales over time for charts
+  const fetchSalesOverTime = async () => {
+    try {
+      console.log("Fetching sales over time...");
+      const [dailyRes, monthlyRes] = await Promise.all([
+        transactionAPI.getSalesOverTime("daily"),
+        transactionAPI.getSalesOverTime("monthly"),
+      ]);
+      console.log("Daily sales response:", JSON.stringify(dailyRes));
+      console.log("Monthly sales response:", JSON.stringify(monthlyRes));
+
+      const newChartData = { ...chartData };
+
+      // Process daily data
+      if (dailyRes?.success && dailyRes.data?.length > 0) {
+        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const labels = dailyRes.data.map(d => {
+          const date = new Date(d.date || d._id);
+          return dayNames[date.getDay()] || d.label || "Day";
+        }).slice(-7);
+        const data = dailyRes.data.map(d => d.totalSales || 0).slice(-7);
+        newChartData.daily = { labels, datasets: [{ data: data.length > 0 ? data : [0] }] };
+      }
+
+      // Process monthly data
+      if (monthlyRes?.success && monthlyRes.data?.length > 0) {
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const labels = monthlyRes.data.map(d => monthNames[d.month - 1] || d.label || "Month").slice(-6);
+        const data = monthlyRes.data.map(d => d.totalSales || 0).slice(-6);
+        newChartData.monthly = { labels, datasets: [{ data: data.length > 0 ? data : [0] }] };
+      }
+
+      // Yearly - aggregate from monthly
+      if (monthlyRes?.success && monthlyRes.data?.length > 0) {
+        const yearlyAgg = {};
+        monthlyRes.data.forEach(d => {
+          const year = d.year || new Date().getFullYear();
+          yearlyAgg[year] = (yearlyAgg[year] || 0) + (d.totalSales || 0);
+        });
+        const years = Object.keys(yearlyAgg).sort();
+        newChartData.yearly = {
+          labels: years.slice(-5),
+          datasets: [{ data: years.slice(-5).map(y => yearlyAgg[y] || 0) }]
+        };
+      }
+
+      setChartData(newChartData);
+    } catch (error) {
+      console.warn("Failed to fetch sales over time:", error?.message);
+    }
+  };
+
+  // Fetch low stock items
+  const fetchLowStockItems = async () => {
+    try {
+      console.log("Fetching low stock items...");
+      const response = await productAPI.getAll();
+      console.log("Products response:", response?.success, "Count:", response?.data?.length);
+
+      if (response?.success && response.data?.length > 0) {
+        // Filter products with low or zero stock
+        // Product model uses: itemName, currentStock, reorderNumber
+        const items = response.data
+          .filter(p => {
+            const stock = p.currentStock ?? p.stock ?? p.quantity ?? 0;
+            const reorderLevel = p.reorderNumber ?? p.lowStockThreshold ?? 10;
+            return stock <= reorderLevel;
+          })
+          .map((p, idx) => {
+            const stock = p.currentStock ?? p.stock ?? p.quantity ?? 0;
+            return {
+              id: p._id || p.id || idx,
+              name: p.itemName || p.name || p.productName || "Unknown Product",
+              stocks: stock,
+              status: stock === 0 ? "Out of Stock" : "Low Stock",
+            };
+          })
+          .slice(0, 10);
+
+        console.log("Low stock items found:", items.length);
+        if (items.length > 0) {
+          setLowStockItems(items);
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to fetch low stock items:", error?.message);
+    }
+  };
+
+  // Fetch stock movements for charts
+  const fetchStockMovements = async () => {
+    try {
+      const response = await stockMovementAPI.getAll({ limit: 30 });
+      if (response?.success && response.data?.length > 0) {
+        // Group by day and type
+        const stockIn = [0, 0, 0, 0, 0, 0];
+        const stockOut = [0, 0, 0, 0, 0, 0];
+
+        response.data.forEach(movement => {
+          const date = new Date(movement.createdAt || movement.date);
+          const dayIndex = date.getDay();
+          if (dayIndex < 6) {
+            if (movement.type === "in" || movement.movementType === "stock-in") {
+              stockIn[dayIndex] += movement.quantity || 1;
+            } else if (movement.type === "out" || movement.movementType === "stock-out" || movement.movementType === "sale") {
+              stockOut[dayIndex] += movement.quantity || 1;
+            }
+          }
+        });
+
+        if (stockIn.some(v => v > 0)) setStockInData(stockIn);
+        if (stockOut.some(v => v > 0)) setStockOutData(stockOut);
+      }
+    } catch (error) {
+      console.warn("Failed to fetch stock movements:", error?.message);
+    }
+  };
+
+  // Load data on mount and focus - uses cached data when available
+  useFocusEffect(
+    useCallback(() => {
+      const loadData = async () => {
+        // Use cached data if available, only fetch if needed
+        if (!analyticsCalculated.current || cachedTransactions.length === 0) {
+          await Promise.all([fetchTransactions(false), fetchProducts(false)]);
+        }
+        await fetchAnalyticsData();
+        analyticsCalculated.current = true;
+        setInitialLoad(false);
+      };
+      loadData();
+    }, [fetchTransactions, fetchProducts])
+  );
+
+  // Pull to refresh - force fetch new data
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    invalidateCache('all');
+    analyticsCalculated.current = false;
+    await Promise.all([fetchTransactions(true), fetchProducts(true)]);
+    await fetchAnalyticsData();
+    setRefreshing(false);
+  }, [invalidateCache, fetchTransactions, fetchProducts]);
+
+  // Toggle expand for low stock table
   const toggleExpand = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(!expanded);
   };
 
-  const sampleData = [
-    {
-      item: "Dress 1",
-      quantity: 3,
-      total: 450,
-      image: require("../(tabs)/iconz/dress-carousel.png"),
-    },
-    {
-      item: "Dress Red",
-      quantity: 23,
-      total: 1200,
-      image: require("../(tabs)/iconz/dress-carousel.png"),
-    },
-    {
-      item: "Dress White",
-      quantity: 23,
-      total: 1200,
-      image: require("../(tabs)/iconz/dress-carousel.png"),
-    },
-    {
-      item: "Dress Black",
-      quantity: 23,
-      total: 1200,
-      image: require("../(tabs)/iconz/dress-carousel.png"),
-    },
-    {
-      item: "Dress Green",
-      quantity: 245,
-      total: 1200,
-      image: require("../(tabs)/iconz/dress-carousel.png"),
-    },
-  ];
+  const visibleData = expanded ? lowStockItems : lowStockItems.slice(0, 3);
 
-  const [chartType, setChartType] = useState("daily");
+  // Format currency
+  const formatCurrency = (value) => {
+    return `₱${(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
 
-  const chartData = useMemo(() => ({
-    daily: {
-      labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-      datasets: [{ data: [30, 45, 28, 80, 99, 43, 50] }],
-      legend: ["Daily Sales"]
-    },
-    monthly: {
-      labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"],
-      datasets: [{ data: [300, 450, 280, 800, 990, 430, 500, 650] }],
-      legend: ["Monthly Sales"]
-    },
-    yearly: {
-      labels: ["2024", "2025", "2026", "2027", "2028"],
-      datasets: [{ data: [6000, 7000, 6500, 5000, 9000] }],
-      legend: ["Yearly Sales"]
-    },
-  }), []);
-  
+  // Format percentage
+  const formatPercentage = (value) => {
+    const sign = value >= 0 ? "+" : "";
+    return `${sign}${(value || 0).toFixed(1)}%`;
+  };
+
+  // Calculate comparison text
+  const getComparisonText = (current, previous) => {
+    if (previous === 0 || !previous) return "Today's data";
+    const change = ((current - previous) / previous) * 100;
+    return `${change >= 0 ? "+" : ""}${change.toFixed(0)}% vs last period`;
+  };
 
   const handleExportExcel = async () => {
     try {
-      const mostSold = sampleData
-        .sort((a, b) => b.quantity - a.quantity)
-        .slice(0, 5)
-        .map((d) => ({
-          "Most Sold Product": d.item,
-          "Quantity Sold": d.quantity,
-          "Total Sales (₱)": d.total,
-        }));
-
-      const leastSold = sampleData
-        .sort((a, b) => a.quantity - b.quantity)
-        .slice(0, 5)
-        .map((d) => ({
-          "Least Sold Product": d.item,
-          "Quantity Sold": d.quantity,
-          "Total Sales (₱)": d.total,
-        }));
-
       const daily = chartData.daily.datasets[0].data.map((val, i) => ({
-        Day: chartData.daily.labels[i],
+        Day: chartData.daily.labels[i] || `Day ${i + 1}`,
         Sales: val,
       }));
 
-      const weekly = [
-        { Week: "Week 1", TotalSales: 2300 },
-        { Week: "Week 2", TotalSales: 3500 },
-        { Week: "Week 3", TotalSales: 4100 },
-        { Week: "Week 4", TotalSales: 3900 },
-      ];
+      const monthly = chartData.monthly.datasets[0].data.map((val, i) => ({
+        Month: chartData.monthly.labels[i] || `Month ${i + 1}`,
+        Sales: val,
+      }));
 
       const yearly = chartData.yearly.datasets[0].data.map((val, i) => ({
-        Year: chartData.yearly.labels[i],
+        Year: chartData.yearly.labels[i] || `Year ${i + 1}`,
         Sales: val,
+      }));
+
+      const lowStock = lowStockItems.map(item => ({
+        Product: item.name,
+        Stock: item.stocks,
+        Status: item.status,
       }));
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(mostSold),
-        "Most Sold"
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(leastSold),
-        "Least Sold"
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(daily),
-        "Daily Sales"
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(weekly),
-        "Weekly Sales"
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(yearly),
-        "Yearly Sales"
-      );
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(daily), "Daily Sales");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthly), "Monthly Sales");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(yearly), "Yearly Sales");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lowStock), "Low Stock");
 
-      // ✅ Correct export method for Expo
       const wbout = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
-
       const fileUri = FileSystem.cacheDirectory + "Analytics_Report.xlsx";
 
       await FileSystem.writeAsStringAsync(fileUri, wbout, {
@@ -177,16 +334,12 @@ export default function Analytics() {
       });
 
       await Sharing.shareAsync(fileUri, {
-        mimeType:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         dialogTitle: "Export Analytics Report",
         UTI: "com.microsoft.excel.xlsx",
       });
 
-      Alert.alert(
-        "✅ Success",
-        "Analytics (Most/Least/Daily/Weekly/Yearly) exported!"
-      );
+      Alert.alert("Success", "Analytics report exported!");
     } catch (error) {
       console.error("Export Error:", error);
       Alert.alert("Error", "Failed to export Excel: " + error.message);
@@ -195,75 +348,39 @@ export default function Analytics() {
 
   const handlePrint = async () => {
     try {
-      const mostSold = sampleData
-        .sort((a, b) => b.quantity - a.quantity)
-        .slice(0, 5);
-      const leastSold = sampleData
-        .sort((a, b) => a.quantity - b.quantity)
-        .slice(0, 5);
-
       const html = `
-    <html>
-      <body style="font-family: Arial; padding: 20px;">
-        <h2 style="text-align:center;">Create Your Style Analytics Report</h2>
+        <html>
+          <body style="font-family: Arial; padding: 20px;">
+            <h2 style="text-align:center;">Create Your Style Analytics Report</h2>
+            
+            <h3>Dashboard Summary</h3>
+            <table border="1" style="width:100%;border-collapse:collapse;">
+              <tr><td>Total Sales Today</td><td>${formatCurrency(dashboardStats.totalSalesToday)}</td></tr>
+              <tr><td>Total Transactions</td><td>${dashboardStats.totalTransactions}</td></tr>
+              <tr><td>Average Transaction</td><td>${formatCurrency(dashboardStats.averageTransactionValue)}</td></tr>
+              <tr><td>Growth Rate</td><td>${formatPercentage(dashboardStats.salesGrowthRate)}</td></tr>
+            </table>
 
-        <h3>Most Sold Products</h3>
-        <table border="1" style="width:100%;border-collapse:collapse;">
-          <tr><th>Item</th><th>Quantity</th><th>Total (₱)</th></tr>
-          ${mostSold
-            .map(
-              (d) =>
-                `<tr><td>${d.item}</td><td>${d.quantity}</td><td>₱${d.total}</td></tr>`
-            )
-            .join("")}
-        </table>
+            <h3 style="margin-top:25px;">Daily Sales</h3>
+            <table border="1" style="width:100%;border-collapse:collapse;">
+              <tr><th>Day</th><th>Sales</th></tr>
+              ${chartData.daily.labels.map((day, i) =>
+        `<tr><td>${day}</td><td>${formatCurrency(chartData.daily.datasets[0].data[i])}</td></tr>`
+      ).join("")}
+            </table>
 
-        <h3 style="margin-top:25px;">Least Sold Products</h3>
-        <table border="1" style="width:100%;border-collapse:collapse;">
-          <tr><th>Item</th><th>Quantity</th><th>Total (₱)</th></tr>
-          ${leastSold
-            .map(
-              (d) =>
-                `<tr><td>${d.item}</td><td>${d.quantity}</td><td>₱${d.total}</td></tr>`
-            )
-            .join("")}
-        </table>
+            <h3 style="margin-top:25px;">Low Stock Items</h3>
+            <table border="1" style="width:100%;border-collapse:collapse;">
+              <tr><th>Product</th><th>Stock</th><th>Status</th></tr>
+              ${lowStockItems.map(item =>
+        `<tr><td>${item.name}</td><td>${item.stocks}</td><td>${item.status}</td></tr>`
+      ).join("")}
+            </table>
 
-        <h3 style="margin-top:25px;">Daily Sales</h3>
-        <table border="1" style="width:100%;border-collapse:collapse;">
-          <tr><th>Day</th><th>Sales</th></tr>
-          ${chartData.daily.labels
-            .map(
-              (day, i) =>
-                `<tr><td>${day}</td><td>${chartData.daily.datasets[0].data[i]}</td></tr>`
-            )
-            .join("")}
-        </table>
-
-        <h3 style="margin-top:25px;">Weekly Sales</h3>
-        <table border="1" style="width:100%;border-collapse:collapse;">
-          <tr><th>Week</th><th>Total Sales</th></tr>
-          <tr><td>Week 1</td><td>2300</td></tr>
-          <tr><td>Week 2</td><td>3500</td></tr>
-          <tr><td>Week 3</td><td>4100</td></tr>
-          <tr><td>Week 4</td><td>3900</td></tr>
-        </table>
-
-        <h3 style="margin-top:25px;">Yearly Sales</h3>
-        <table border="1" style="width:100%;border-collapse:collapse;">
-          <tr><th>Year</th><th>Sales</th></tr>
-          ${chartData.yearly.labels
-            .map(
-              (year, i) =>
-                `<tr><td>${year}</td><td>${chartData.yearly.datasets[0].data[i]}</td></tr>`
-            )
-            .join("")}
-        </table>
-
-        <p style="text-align:center;margin-top:30px;">Generated on ${new Date().toLocaleString()}</p>
-      </body>
-    </html>
-  `;
+            <p style="text-align:center;margin-top:30px;">Generated on ${new Date().toLocaleString()}</p>
+          </body>
+        </html>
+      `;
 
       await Print.printAsync({ html });
     } catch (error) {
@@ -272,60 +389,66 @@ export default function Analytics() {
     }
   };
 
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.container}>
+        <Header />
+        <View style={[styles.whitecard, styles.loadingContainer]}>
+          <ActivityIndicator size="large" color="#AD7F65" />
+          <Text style={styles.loadingText}>Loading analytics...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* HEADER */}
       <Header />
       <View style={styles.whitecard}>
-        <ScrollView style={styles.main}>
+        <ScrollView
+          style={styles.main}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#AD7F65"]} />
+          }
+        >
           {/* SEARCH BAR + BUTTONS */}
           <View style={styles.searchContainer}>
             <Text style={styles.anafont}>Analytics</Text>
-            {/*<TouchableOpacity
-              style={styles.exportButton}
-              onPress={handleExportExcel}
-            >
-              <Image
-                source={require("../(tabs)/iconz/export.png")}
-                style={{ width: 21, height: 21 }}
-              />
-            </TouchableOpacity>*/}
             <TouchableOpacity style={styles.printButton} onPress={handlePrint}>
-              <Image
-                source={require("../(tabs)/iconz/print.png")}
-                style={{ width: 21, height: 21 }}
-              />
+              <Image source={require("./iconz/print.png")} style={{ width: 21, height: 21 }} />
             </TouchableOpacity>
           </View>
 
           {/* DASHBOARD STATS */}
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>₱25,430</Text>
+              <Text style={styles.statValue}>{formatCurrency(dashboardStats.totalSalesToday)}</Text>
               <Text style={styles.statLabel}>Total Sales Today</Text>
-              <Text style={styles.statLabel1}>
-                Total sales from all transactions today
+              <Text style={styles.statLabel1}>Total sales from all transactions today</Text>
+              <Text style={styles.statLabel2}>
+                {getComparisonText(dashboardStats.totalSalesToday, dashboardStats.previousPeriodSales)}
               </Text>
-              <Text style={styles.statLabel2}>+12% vs last period</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>42</Text>
+              <Text style={styles.statValue}>{dashboardStats.totalTransactions}</Text>
               <Text style={styles.statLabel}>Total Transactions</Text>
               <Text style={styles.statLabel1}>Number of sales made today</Text>
-              <Text style={styles.statLabel2}>+12% vs last period</Text>
+              <Text style={styles.statLabel2}>
+                {getComparisonText(dashboardStats.totalTransactions, dashboardStats.previousPeriodTransactions)}
+              </Text>
             </View>
           </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>₱300</Text>
+              <Text style={styles.statValue}>{formatCurrency(dashboardStats.averageTransactionValue)}</Text>
               <Text style={styles.statLabel}>Average Transaction Value</Text>
-              <Text style={styles.statLabel1}>
-                Average amount spent per transaction.
-              </Text>
+              <Text style={styles.statLabel1}>Average amount spent per transaction.</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statValueG}>+12.3%</Text>
+              <Text style={[styles.statValue, dashboardStats.salesGrowthRate >= 0 ? styles.statValuePositive : styles.statValueNegative]}>
+                {formatPercentage(dashboardStats.salesGrowthRate)}
+              </Text>
               <Text style={styles.statLabel}>Sales Growth Rate</Text>
               <Text style={styles.statLabel1}>Month-over-month growth</Text>
             </View>
@@ -339,18 +462,10 @@ export default function Analytics() {
                 {["daily", "monthly", "yearly"].map((type) => (
                   <TouchableOpacity
                     key={type}
-                    style={[
-                      styles.button,
-                      chartType === type && styles.activeButton,
-                    ]}
+                    style={[styles.chartButton, chartType === type && styles.activeButton]}
                     onPress={() => setChartType(type)}
                   >
-                    <Text
-                      style={[
-                        styles.buttonText,
-                        chartType === type && styles.activeButtonText,
-                      ]}
-                    >
+                    <Text style={[styles.buttonText, chartType === type && styles.activeButtonText]}>
                       {type.charAt(0).toUpperCase() + type.slice(1)}
                     </Text>
                   </TouchableOpacity>
@@ -358,10 +473,7 @@ export default function Analytics() {
               </View>
             </View>
             <LineChart
-              data={{
-                ...chartData[chartType],
-                legend: []
-              }}
+              data={{ ...chartData[chartType], legend: [] }}
               width={350}
               height={220}
               chartConfig={{
@@ -371,14 +483,8 @@ export default function Analytics() {
                 decimalPlaces: 0,
                 color: (opacity = 1) => `rgba(173, 127, 101, ${opacity})`,
                 labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                style: {
-                  borderRadius: 16,
-                },
-                propsForDots: {
-                  r: "4",
-                  strokeWidth: "2",
-                  stroke: "#fff"
-                }
+                style: { borderRadius: 16 },
+                propsForDots: { r: "4", strokeWidth: "2", stroke: "#fff" }
               }}
               bezier
               style={styles.chart}
@@ -395,11 +501,7 @@ export default function Analytics() {
             <BarChart
               data={{
                 labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-                datasets: [
-                  {
-                    data: [50, 60, 70, 80, 65, 75],
-                  },
-                ],
+                datasets: [{ data: stockInData }],
               }}
               width={350}
               height={220}
@@ -411,17 +513,10 @@ export default function Analytics() {
                 decimalPlaces: 0,
                 color: (opacity = 1) => `rgba(173, 127, 101, ${opacity})`,
                 barPercentage: 0.6,
-                useShadowColorFromDataset: false,
-                style: {
-                  borderRadius: 16,
-                },
-                propsForBackgroundLines: {
-                  strokeWidth: 0.5,
-                  stroke: "#e0e0e0",
-                },
+                style: { borderRadius: 16 },
+                propsForBackgroundLines: { strokeWidth: 0.5, stroke: "#e0e0e0" },
               }}
               style={{ marginTop: 8, marginBottom: 8 }}
-              verticalLabelRotation={0}
               fromZero
               showBarTops={false}
             />
@@ -433,11 +528,7 @@ export default function Analytics() {
             <BarChart
               data={{
                 labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-                datasets: [
-                  {
-                    data: [30, 40, 35, 45, 40, 50],
-                  },
-                ],
+                datasets: [{ data: stockOutData }],
               }}
               width={350}
               height={220}
@@ -449,28 +540,21 @@ export default function Analytics() {
                 decimalPlaces: 0,
                 color: (opacity = 1) => `rgba(173, 127, 101, ${opacity})`,
                 barPercentage: 0.6,
-                useShadowColorFromDataset: false,
-                style: {
-                  borderRadius: 16,
-                },
-                propsForBackgroundLines: {
-                  strokeWidth: 0.5,
-                  stroke: "#e0e0e0",
-                },
+                style: { borderRadius: 16 },
+                propsForBackgroundLines: { strokeWidth: 0.5, stroke: "#e0e0e0" },
               }}
               style={{ marginTop: 8, marginBottom: 8 }}
-              verticalLabelRotation={0}
               fromZero
               showBarTops={false}
             />
           </View>
 
-          {/* Most and Least Sell Products */}
+          {/* Products Performance */}
           <View style={[styles.chartContainer, { height: 190 }]}>
             <Text style={styles.chartTitle}>Products Performance</Text>
             <FlatList
-              data={sampleData}
-              keyExtractor={(item) => item.item}
+              data={topProducts}
+              keyExtractor={(item, index) => item.item + index}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 10 }}
@@ -489,52 +573,29 @@ export default function Analytics() {
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
                 <Text style={styles.sectionTitle}>Low & Out-of-Stock Items</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Inventory items that need attention
-                </Text>
+                <Text style={styles.sectionSubtitle}>Inventory items that need attention</Text>
               </View>
-              <TouchableOpacity 
-                onPress={toggleExpand}
-                style={styles.viewMoreButton}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.viewMoreText}>
-                  {expanded ? "Show Less" : "View All"}
-                </Text>
+              <TouchableOpacity onPress={toggleExpand} style={styles.viewMoreButton} activeOpacity={0.7}>
+                <Text style={styles.viewMoreText}>{expanded ? "Show Less" : "View All"}</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.tableContainer}>
               <View style={styles.tableHeader}>
-                <Text style={[styles.headerText, { flex: 3, textAlign: 'left' }]}>Product</Text>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>Stocks</Text>
-                <Text style={[styles.headerText, { flex: 1.5, textAlign: 'right' }]}>Status</Text>
+                <Text style={[styles.headerText, { flex: 3, textAlign: "left" }]}>Product</Text>
+                <Text style={[styles.headerText, { flex: 1, textAlign: "center" }]}>Stocks</Text>
+                <Text style={[styles.headerText, { flex: 1.5, textAlign: "right" }]}>Status</Text>
               </View>
 
               <View style={styles.tableBody}>
                 {visibleData.map((item, index) => (
-                  <View 
-                    key={item.id.toString()} 
-                    style={[
-                      styles.tableRow, 
-                      index % 2 === 0 && styles.evenRow
-                    ]}
-                  >
-                    <Text 
-                      style={[styles.rowText, { flex: 3, textAlign: 'left', fontWeight: '500' }]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                    >
+                  <View key={item.id.toString()} style={[styles.tableRow, index % 2 === 0 && styles.evenRow]}>
+                    <Text style={[styles.rowText, { flex: 3, textAlign: "left", fontWeight: "500" }]} numberOfLines={1}>
                       {item.name}
                     </Text>
-                    <Text style={[styles.rowText, { flex: 1, textAlign: 'center' }]}>
-                      {item.stocks}
-                    </Text>
+                    <Text style={[styles.rowText, { flex: 1, textAlign: "center" }]}>{item.stocks}</Text>
                     <View style={[styles.statusCell, { flex: 1.5 }]}>
-                      <Text style={[
-                        styles.statusText,
-                        item.status === 'Out of Stock' ? styles.statusTextCritical : styles.statusTextLow
-                      ]}>
+                      <Text style={[styles.statusText, item.status === "Out of Stock" ? styles.statusTextCritical : styles.statusTextLow]}>
                         {item.status}
                       </Text>
                     </View>
@@ -549,26 +610,35 @@ export default function Analytics() {
   );
 }
 
+
 const styles = StyleSheet.create({
-  // New styles for the inventory section
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#666",
+  },
   sectionContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     marginTop: 16,
-    marginBottom: 10,
+    marginBottom: 30,
     padding: 16,
-    width: '100%',
-    alignSelf: 'center',
-    shadowColor: '#000',
+    width: "100%",
+    alignSelf: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3
+    elevation: 3,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   sectionTitleContainer: {
@@ -576,104 +646,84 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
+    fontWeight: "700",
+    color: "#333",
     marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 13,
-    color: '#888',
+    color: "#888",
   },
   viewMoreButton: {
     padding: 8,
     borderRadius: 6,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
   },
   viewMoreText: {
-    color: '#666',
+    color: "#666",
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   tableContainer: {
     borderRadius: 8,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f8f8f8',
+    flexDirection: "row",
+    backgroundColor: "#f8f8f8",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   headerText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    color: "#666",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   tableBody: {
-    backgroundColor: '#fff',
-    width: '100%',
+    backgroundColor: "#fff",
+    width: "100%",
   },
   tableRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingVertical: 14,
     paddingHorizontal: 16,
-    alignItems: 'center',
+    alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
-    width: '100%',
+    borderBottomColor: "#f5f5f5",
+    width: "100%",
   },
   evenRow: {
-    backgroundColor: '#fcfcfc',
+    backgroundColor: "#fcfcfc",
   },
   rowText: {
     fontSize: 14,
-    color: '#444',
+    color: "#444",
   },
   statusCell: {
-    justifyContent: 'center',
-    alignItems: 'flex-end',
+    justifyContent: "center",
+    alignItems: "flex-end",
     paddingRight: 4,
   },
   statusText: {
     fontSize: 13,
-    fontWeight: '500',
-    textAlign: 'right',
-    width: '100%',
+    fontWeight: "500",
+    textAlign: "right",
+    width: "100%",
     paddingRight: 8,
   },
   statusTextLow: {
-    color: '#E6A23C',
+    color: "#E6A23C",
   },
   statusTextCritical: {
-    color: '#F56C6C',
+    color: "#F56C6C",
   },
   container: {
     flex: 1,
     backgroundColor: "#53321c",
-  },
-  headerBackground: {
-    height: 120,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 40,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#fff",
-  },
-  button: {
-    padding: 10,
-  },
-  buttonImage: {
-    width: 22,
-    height: 22,
-    resizeMode: "contain",
   },
   main: {
     width: "100%",
@@ -698,18 +748,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#333",
     flex: 1,
-  },
-  exportButton: {
-    backgroundColor: "#f5f5f5",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginLeft: 8,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   printButton: {
     backgroundColor: "#f5f5f5",
@@ -742,16 +780,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#53321c",
   },
+  statValuePositive: {
+    color: "#09A046",
+  },
+  statValueNegative: {
+    color: "#F56C6C",
+  },
   statLabel: {
     fontSize: 13,
     marginTop: 4,
     fontWeight: "600",
     color: "#7c5a43",
-  },
-  statDesc: {
-    fontSize: 12,
-    marginTop: 2,
-    color: "#8b776a",
   },
   statLabel1: {
     fontSize: 11,
@@ -759,17 +798,38 @@ const styles = StyleSheet.create({
     textAlign: "left",
     lineHeight: 13,
   },
+  statLabel2: {
+    fontSize: 11,
+    color: "#09A046",
+    marginTop: 4,
+    fontWeight: "500",
+  },
+  chartContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  chartHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    width: "100%",
+    paddingHorizontal: 2,
+  },
   chartTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: "#53321c",
-    marginBottom: 4,
   },
-
-  buttonContainer: { 
-    flexDirection: "row" 
+  chart: {
+    borderRadius: 16,
   },
-  button: {
+  buttonContainer: {
+    flexDirection: "row",
+  },
+  chartButton: {
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
@@ -787,47 +847,6 @@ const styles = StyleSheet.create({
   activeButtonText: {
     color: "#fff",
   },
-
-  growthStatsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-    marginHorizontal: 10,
-  },
-  growthCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    marginHorizontal: 5,
-    borderRadius: 10,
-    paddingVertical: 20,
-    paddingHorizontal: 10,
-    elevation: 2,
-    alignItems: "center",
-  },
-  growthValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#030303",
-  },
-  growthValueG: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#09A046",
-  },
-  growthLabel: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#53321c",
-    marginTop: 5,
-    textAlign: "center",
-  },
-  growthImage: {
-    width: 40,
-    height: 40,
-    marginBottom: 5,
-    resizeMode: "contain",
-  },
-
   carouselCard: {
     width: 110,
     height: 130,
@@ -850,39 +869,5 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: "center",
     color: "#333",
-  },
-  chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    width: '100%',
-    paddingHorizontal: 2
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#53321c'
-  },
-
-  // Chart buttons
-  buttonContainer: { flexDirection: "row" },
-  button: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    marginLeft: 6,
-    backgroundColor: "#e4d7ce",
-  },
-  activeButton: {
-    backgroundColor: "#AD7F65",
-  },
-  buttonText: {
-    fontSize: 13,
-    color: "#53321c",
-    fontWeight: "600",
-  },
-  activeButtonText: {
-    color: "#fff",
   },
 });

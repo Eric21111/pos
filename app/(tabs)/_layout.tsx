@@ -5,6 +5,7 @@ import { Image, useWindowDimensions } from "react-native";
 import { HapticTab } from "@/components/haptic-tab";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { DataProvider } from "@/context/DataContext";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -12,6 +13,7 @@ export default function TabLayout() {
   const isLandscape = width > height;
 
   return (
+    <DataProvider>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
@@ -118,5 +120,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </DataProvider>
   );
 }

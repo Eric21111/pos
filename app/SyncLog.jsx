@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { syncAPI } from '../services/api';
 
 const SYNC_LOGS_KEY = '@sync_logs';
 
@@ -17,53 +18,6 @@ const SyncLog = () => {
     loadSyncLogs();
   }, []);
 
-  const createSampleLogs = () => {
-    const now = Date.now();
-    const oneHour = 60 * 60 * 1000;
-    const oneDay = 24 * oneHour;
-    
-    return [
-      {
-        timestamp: now - oneHour, // 1 hour ago
-        status: 'success',
-        itemsSynced: [
-          { name: 'Products', status: 'success' },
-          { name: 'Inventory', status: 'success' },
-          { name: 'Customers', status: 'success' },
-          { name: 'Orders', status: 'success' },
-        ]
-      },
-      {
-        timestamp: now - 3 * oneHour, // 3 hours ago
-        status: 'failed',
-        itemsSynced: [
-          { name: 'Products', status: 'success' },
-          { name: 'Inventory', status: 'failed' },
-          { name: 'Customers', status: 'success' },
-          { name: 'Orders', status: 'pending' },
-        ]
-      },
-      {
-        timestamp: now - oneDay, // 1 day ago
-        status: 'success',
-        itemsSynced: [
-          { name: 'Products', status: 'success' },
-          { name: 'Inventory', status: 'success' },
-          { name: 'Customers', status: 'success' },
-        ]
-      },
-      {
-        timestamp: now - 2 * oneDay, // 2 days ago
-        status: 'success',
-        itemsSynced: [
-          { name: 'Products', status: 'success' },
-          { name: 'Inventory', status: 'success' },
-          { name: 'Price List', status: 'success' },
-        ]
-      }
-    ];
-  };
-
   const loadSyncLogs = async () => {
     try {
       let logsJson = await AsyncStorage.getItem(SYNC_LOGS_KEY);
@@ -71,10 +25,6 @@ const SyncLog = () => {
       
       if (logsJson) {
         logs = JSON.parse(logsJson);
-      } else {
-        // If no logs exist, create sample logs
-        logs = createSampleLogs();
-        await AsyncStorage.setItem(SYNC_LOGS_KEY, JSON.stringify(logs));
       }
       
       setSyncLogs(logs);
@@ -110,6 +60,9 @@ const SyncLog = () => {
       <Text style={styles.logSummary}>
         {item.itemsSynced?.length || 0} items synced
       </Text>
+      {item.message ? (
+        <Text style={styles.logMessage}>{item.message}</Text>
+      ) : null}
     </TouchableOpacity>
   );
 
@@ -134,6 +87,13 @@ const SyncLog = () => {
           {selectedLog.status === 'success' ? 'Success' : 'Failed'}
         </Text>
       </Text>
+
+      {selectedLog.message ? (
+        <Text style={styles.detailText}>
+          <Text style={styles.detailLabel}>Message: </Text>
+          {selectedLog.message}
+        </Text>
+      ) : null}
       
       <Text style={styles.detailLabel}>Items Synced ({selectedLog.itemsSynced?.length || 0}):</Text>
       
@@ -153,27 +113,46 @@ const SyncLog = () => {
   const handleSyncNow = async () => {
     setIsSyncing(true);
     try {
-      // Simulate sync operation (replace with your actual sync logic)
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Create a new sync log entry
+      // Call real sync API
+      const response = await syncAPI.syncAll();
+
+      const success = response?.success !== false;
+
+      // Create a new sync log entry with exact time
       const newLog = {
         timestamp: Date.now(),
-        status: 'success',
+        status: success ? 'success' : 'failed',
+        message: response?.message || (success ? 'Sync completed successfully' : 'Sync failed'),
+        hasChanges: typeof response?.hasChanges === 'boolean' ? response.hasChanges : true,
         itemsSynced: [
           { name: 'Products', status: 'success' },
           { name: 'Inventory', status: 'success' },
-          { name: 'Customers', status: 'success' },
-        ]
+          { name: 'Transactions', status: 'success' },
+        ],
       };
-      
-      // Save the new log
-      const updatedLogs = [newLog, ...syncLogs];
+
+      // Save the new log (newest first)
+      const updatedLogs = [newLog, ...(syncLogs || [])];
       await AsyncStorage.setItem(SYNC_LOGS_KEY, JSON.stringify(updatedLogs));
       setSyncLogs(updatedLogs);
-      
+
+      // OPTIONAL: clear any temporary/offline data here if you add keys for it
+      // await AsyncStorage.removeItem('@offline_queue');
+
     } catch (error) {
       console.error('Sync failed:', error);
+
+      // Log failed sync attempt with time
+      const failedLog = {
+        timestamp: Date.now(),
+        status: 'failed',
+        message: error?.message || 'Sync failed. Please check your connection.',
+        itemsSynced: [],
+      };
+
+      const updatedLogs = [failedLog, ...(syncLogs || [])];
+      await AsyncStorage.setItem(SYNC_LOGS_KEY, JSON.stringify(updatedLogs));
+      setSyncLogs(updatedLogs);
     } finally {
       setIsSyncing(false);
     }
@@ -264,6 +243,11 @@ const styles = StyleSheet.create({
   logSummary: {
     color: '#666',
     fontSize: 14,
+  },
+  logMessage: {
+    marginTop: 4,
+    color: '#555',
+    fontSize: 13,
   },
   detailsContainer: {
     backgroundColor: 'white',

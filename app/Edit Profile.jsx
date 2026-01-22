@@ -1,6 +1,7 @@
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect, useState } from "react";
 import {
     Alert,
     Image,
@@ -10,6 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { employeeAPI } from "../services/api";
 
 export default function EditProfile() {
   const navigation = useNavigation();
@@ -18,6 +20,45 @@ export default function EditProfile() {
   const [contactNumber, setContactNumber] = useState("");
   const [bio, setBio] = useState("");
   const [profilePicture, setProfilePicture] = useState(null);
+  const [employeeId, setEmployeeId] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  // Load current profile from storage/API
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const stored = await AsyncStorage.getItem("currentEmployee");
+        if (!stored) return;
+        const parsed = JSON.parse(stored);
+
+        let latest = parsed;
+        if (parsed._id || parsed.id) {
+          try {
+            const res = await employeeAPI.getById(parsed._id || parsed.id);
+            if (res?.success && res.data) {
+              latest = res.data;
+              await AsyncStorage.setItem("currentEmployee", JSON.stringify(latest));
+            }
+          } catch {
+            // keep parsed if API fails
+          }
+        }
+
+        setEmployeeId(latest._id || latest.id || null);
+        setName(
+          latest.name ||
+            `${latest.firstName || ""} ${latest.lastName || ""}`.trim()
+        );
+        setEmail(latest.email || "");
+        setContactNumber(latest.contactNo || "");
+        setProfilePicture(latest.profileImage || latest.image || null);
+      } catch (error) {
+        console.warn("Failed to load profile for editing:", error?.message);
+      }
+    };
+
+    loadProfile();
+  }, []);
 
   // -------- PICK FROM GALLERY WITH CROP --------
   const pickImageFromGallery = async () => {
@@ -72,9 +113,54 @@ export default function EditProfile() {
     ]);
   };
 
-  const handleSave = () => {
-    console.log({ name, email, contactNumber, bio, profilePicture });
-    navigation.goBack();
+  const handleSave = async () => {
+    if (!employeeId) {
+      Alert.alert("Error", "Cannot update profile. Employee ID is missing.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      // Split name into first and last for backend compatibility
+      const parts = (name || "").trim().split(" ");
+      const firstName = parts[0] || "";
+      const lastName = parts.slice(1).join(" ");
+
+      const updatePayload = {
+        name: name.trim(),
+        firstName,
+        lastName,
+        email: email.trim(),
+        contactNo: contactNumber.trim(),
+        profileImage: profilePicture || "",
+      };
+
+      const res = await employeeAPI.update(employeeId, updatePayload);
+
+      if (res?.success && res.data) {
+        await AsyncStorage.setItem(
+          "currentEmployee",
+          JSON.stringify(res.data)
+        );
+        Alert.alert("Success", "Profile updated successfully.", [
+          { text: "OK", onPress: () => navigation.goBack() },
+        ]);
+      } else {
+        Alert.alert(
+          "Error",
+          res?.message || "Failed to update profile. Please try again."
+        );
+      }
+    } catch (error) {
+      console.log("Error saving profile:", error);
+      Alert.alert(
+        "Error",
+        error?.message || "Failed to update profile. Please try again."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -150,8 +236,14 @@ export default function EditProfile() {
 
         {/* Buttons */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.buttonText}>Save</Text>
+          <TouchableOpacity
+            style={styles.saveButton}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            <Text style={styles.buttonText}>
+              {saving ? "Saving..." : "Save"}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
             <Text style={styles.buttonText}>Cancel</Text>

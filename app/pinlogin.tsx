@@ -7,15 +7,18 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
+import { employeeAPI } from "../services/api";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function PinLogin() {
   const [pin, setPin] = useState("");
   const PIN_LENGTH = 6;
   const [showModal, setShowModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const router = useRouter();
-
-  const correctPin = "123456";
 
   const handleKeyPress = (value: string) => {
     if (value === "del") {
@@ -25,12 +28,32 @@ export default function PinLogin() {
     }
   };
 
-  const handleLogin = () => {
-    if (pin === correctPin) {
-      router.replace("/(tabs)");
-    } else {
-      setShowModal(true); // open modal
+  const handleLogin = async () => {
+    if (pin.length !== PIN_LENGTH) return;
+    
+    setIsLoading(true);
+    setErrorMessage("");
+    
+    try {
+      // Use verifyOwnerPin which only accepts owner accounts
+      const response = await employeeAPI.verifyOwnerPin(pin);
+      
+      if (response.success && response.data) {
+        // Store owner employee data for later use
+        await AsyncStorage.setItem('currentEmployee', JSON.stringify(response.data));
+        router.replace("/(tabs)");
+      } else {
+        setErrorMessage(response.message || "Invalid PIN. Only owner account can access the mobile app.");
+        setShowModal(true);
+        setPin("");
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setErrorMessage(error.message || "Failed to verify PIN. Please check your connection.");
+      setShowModal(true);
       setPin("");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -89,12 +112,16 @@ export default function PinLogin() {
         <TouchableOpacity
           style={[
             styles.loginButton,
-            pin.length !== 6 && styles.loginButtonDisabled,
+            (pin.length !== 6 || isLoading) && styles.loginButtonDisabled,
           ]}
-          disabled={pin.length !== 6}
+          disabled={pin.length !== 6 || isLoading}
           onPress={handleLogin}
         >
-          <Text style={styles.loginButtonText}>LOGIN</Text>
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.loginButtonText}>LOGIN</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -103,7 +130,7 @@ export default function PinLogin() {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Incorrect PIN</Text>
             <Text style={styles.modalMessage}>
-              The PIN you entered is incorrect. Please try again.
+              {errorMessage || "The PIN you entered is incorrect. Please try again."}
             </Text>
 
             <TouchableOpacity
