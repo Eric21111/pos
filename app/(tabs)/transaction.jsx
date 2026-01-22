@@ -1,7 +1,8 @@
 import Header from "@/components/shared/header";
+import { useData } from "@/context/DataContext";
 import { Ionicons } from "@expo/vector-icons";
 import * as Print from "expo-print";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     FlatList,
     Modal,
@@ -11,8 +12,11 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    ActivityIndicator,
+    RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 
 // Function to format date and time
 const formatDateTime = (date = new Date()) => {
@@ -28,133 +32,127 @@ const formatDateTime = (date = new Date()) => {
 };
 
 export default function Transaction() {
+  const { transactions: cachedTransactions, transactionsLoading, fetchTransactions: fetchCachedTransactions, invalidateCache } = useData();
+  
   const [search, setSearch] = useState("");
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(formatDateTime());
+  const [refreshing, setRefreshing] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  // Filter transactions based on search and exclude voided/return transactions
+  const transactions = useMemo(() => {
+    const filtered = cachedTransactions.filter(t =>
+      (t.paymentMethod !== 'return' || !t.originalTransactionId) &&
+      t.status !== 'Voided'
+    );
+    
+    if (!search) return filtered;
+    
+    const searchLower = search.toLowerCase();
+    return filtered.filter(t => 
+      t.transactionId?.toLowerCase().includes(searchLower) ||
+      t.customerName?.toLowerCase().includes(searchLower) ||
+      t.items?.some(item => item.name?.toLowerCase().includes(searchLower))
+    );
+  }, [cachedTransactions, search]);
+
+  const loading = transactionsLoading && initialLoad;
 
   // Update current time every minute
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentDateTime(formatDateTime());
-    }, 60000); // Update every minute
+    }, 60000);
     
     return () => clearInterval(timer);
   }, []);
-  
-  // Void logs data - moved to VoidLog.jsx
 
-  // Function to get cashier name based on transaction ID (odd/even)
-  const getCashierName = (transactionId) => {
-    const idNum = parseInt(transactionId.split('-')[1]);
-    return idNum % 2 === 0 ? 'Ferrose Marie Obias' : 'Pia Pendergat';
-  };
+  // Load transactions on focus (uses cached data)
+  useFocusEffect(
+    useCallback(() => {
+      const loadData = async () => {
+        await fetchCachedTransactions(false); // Uses cache if valid
+        setInitialLoad(false);
+      };
+      loadData();
+    }, [fetchCachedTransactions])
+  );
 
-  // Default cashier name (can be used when no transaction is selected)
-  const defaultCashier = 'Ferrose Marie Obias';
+  // Handle manual refresh - force fetch new data
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      invalidateCache('transactions');
+      await fetchCachedTransactions(true);
+    } catch (error) {
+      console.error('Error refreshing transactions:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [invalidateCache, fetchCachedTransactions]);
 
-  const [transactions, setTransactions] = useState([
-    { 
-      id: "TRX-101", 
-      date: "October 1, 2027, 10:30 AM", 
-      status: "Paid",
-      timestamp: new Date(2027, 9, 1, 10, 30).getTime()
-    },
-    { 
-      id: "TRX-103", 
-      date: "October 5, 2027, 2:15 PM", 
-      status: "Returned",
-      timestamp: new Date(2027, 9, 5, 14, 15).getTime()
-    },
-    { 
-      id: "TRX-104", 
-      date: "October 7, 2027, 9:45 AM", 
-      status: "Paid",
-      timestamp: new Date(2027, 9, 7, 9, 45).getTime()
-    },
-    { 
-      id: "TRX-105", 
-      date: "October 9, 2027, 3:20 PM", 
-      status: "Paid",
-      timestamp: new Date(2027, 9, 9, 15, 20).getTime()
-    },
-    { 
-      id: "TRX-106", 
-      date: "October 10, 2027, 11:10 AM", 
-      status: "Paid",
-      timestamp: new Date(2027, 9, 10, 11, 10).getTime()
-    },
-    { 
-      id: "TRX-107", 
-      date: "October 11, 2027, 4:30 PM", 
-      status: "Returned",
-      timestamp: new Date(2027, 9, 11, 16, 30).getTime()
-    },
-  ]);
-
-  const transactionDetails = {
-    "TRX-101": [
-      { item: "Protein Shake", qty: 2, price: 150 },
-      { item: "Workout Gloves", qty: 1, price: 250 },
-    ],
-    "TRX-103": [
-      { item: "Shoes", qty: 1, price: 1800 },
-      { item: "Cap", qty: 1, price: 300 },
-    ],
-    "TRX-104": [
-      { item: "Whey Protein", qty: 1, price: 1200 },
-      { item: "Shaker Bottle", qty: 1, price: 250 },
-    ],
-    "TRX-105": [
-      { item: "Resistance Band", qty: 2, price: 200 },
-      { item: "Floral Dress", qty: 1, price: 150 },
-      { item: "Checker Dress", qty: 1, price: 150 },
-    ],
-    "TRX-106": [
-      { item: "Running Shoes", qty: 1, price: 2500 },
-      { item: "Socks", qty: 2, price: 100 },
-    ],
-    "TRX-107": [
-      { item: "Yoga Mat", qty: 1, price: 800 },
-      { item: "Water Bottle", qty: 1, price: 300 },
-    ],
+  // Function to get cashier name from transaction
+  const getCashierName = (transaction) => {
+    return transaction.performedByName || 
+           transaction.userName || 
+           transaction.user?.name || 
+           'Unknown';
   };
 
   const filteredTransactions = transactions
     .filter(
-      (t) =>
-        t.id.toLowerCase().includes(search.toLowerCase()) ||
-        t.date.toLowerCase().includes(search.toLowerCase()) ||
-        t.status.toLowerCase().includes(search.toLowerCase())
+      (t) => {
+        const searchLower = search.toLowerCase();
+        const receiptNo = t.receiptNo || t._id || '';
+        const date = t.createdAt || t.date || '';
+        const status = t.status || '';
+        return (
+          receiptNo.toLowerCase().includes(searchLower) ||
+          date.toLowerCase().includes(searchLower) ||
+          status.toLowerCase().includes(searchLower)
+        );
+      }
     )
-    .sort((a, b) => b.timestamp - a.timestamp); // Sort by timestamp in descending order
+    .sort((a, b) => {
+      const dateA = new Date(a.createdAt || a.date || 0).getTime();
+      const dateB = new Date(b.createdAt || b.date || 0).getTime();
+      return dateB - dateA;
+    });
 
   const handleView = (item) => {
     setSelectedTransaction(item);
     setModalVisible(true);
   };
 
-  const calculateTotals = (details) => {
-    const subtotal = details.reduce((sum, d) => sum + d.qty * d.price, 0);
-    const discount = subtotal * 0.1;
-    const total = subtotal - discount;
+  const calculateTotals = (transaction) => {
+    const items = transaction.items || [];
+    const subtotal = items.reduce((sum, item) => {
+      const qty = item.quantity || item.qty || 0;
+      const price = item.price || item.unitPrice || 0;
+      return sum + (qty * price);
+    }, 0);
+    const discount = transaction.discountAmount || transaction.discount || 0;
+    const total = transaction.totalAmount || transaction.total || subtotal - discount;
     return { subtotal, discount, total };
   };
 
   const handlePrint = async () => {
     if (!selectedTransaction) return;
 
-    const details = transactionDetails[selectedTransaction.id] || [];
-    const totals = calculateTotals(details);
+    const items = selectedTransaction.items || [];
+    const totals = calculateTotals(selectedTransaction);
 
     let htmlContent = `
       <div style="width:220px; font-family: monospace; padding:10px;">
         <h2 style="text-align:center; margin:0; font-size: 18px;">CREATE YOUR STYLE</h2>
         <p style="text-align:center; margin:2px 0; font-size: 10px;">KM 7 Pasonanca, Zamboanga City</p>
-        <p style="text-align:center; margin:0;">Cashier: ${getCashierName(selectedTransaction.id)}</p>
+        <p style="text-align:center; margin:0;">Cashier: ${getCashierName(selectedTransaction)}</p>
         <p style="text-align:center; margin:0;">Date & Time: ${
-          selectedTransaction.date
+          new Date(selectedTransaction.createdAt || selectedTransaction.date).toLocaleString()
         }</p>
+        <p style="text-align:center; margin:0;">Receipt No: ${selectedTransaction.receiptNo || selectedTransaction._id}</p>
         <p style="text-align:center; margin:0;">Status: ${
           selectedTransaction.status
         }</p>
@@ -168,14 +166,18 @@ export default function Transaction() {
             </tr>
           </thead>
           <tbody>
-            ${details
+            ${items
               .map(
-                (d) =>
-                  `<tr>
-                    <td>${d.item}</td>
-                    <td style="text-align:center;">${d.qty}</td>
-                    <td style="text-align:right;">₱${d.price}</td>
-                  </tr>`
+                (item) => {
+                  const name = item.name || item.productName || 'Unknown';
+                  const qty = item.quantity || item.qty || 0;
+                  const price = item.price || item.unitPrice || 0;
+                  return `<tr>
+                    <td>${name}</td>
+                    <td style="text-align:center;">${qty}</td>
+                    <td style="text-align:right;">₱${price.toFixed(2)}</td>
+                  </tr>`;
+                }
               )
               .join("")}
           </tbody>
@@ -204,14 +206,23 @@ export default function Transaction() {
   };
 
   const renderItem = ({ item }) => {
-    const statusColor = item.status === "Paid"
+    const status = item.status || 'Completed';
+    const statusColor = status === "Completed" || status === "Paid"
       ? "#09A046"
-      : item.status === "Returned"
+      : status === "Returned"
         ? "#FF8C00"
         : "#C80000";
 
-    const details = transactionDetails[item.id] || [];
-    const totals = calculateTotals(details);
+    const totals = calculateTotals(item);
+    const receiptNo = item.receiptNo || item._id || 'N/A';
+    const date = new Date(item.createdAt || item.date || Date.now()).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const items = item.items || [];
 
     return (
       <TouchableOpacity
@@ -219,26 +230,32 @@ export default function Transaction() {
         onPress={() => handleView(item)}
       >
         <View style={styles.logHeader}>
-          <Text style={styles.transactionId}>{item.id}</Text>
+          <Text style={styles.transactionId}>{receiptNo}</Text>
           <Text style={styles.date}>
-              {getCashierName(item.id)}
+              {getCashierName(item)}
           </Text>
         </View>
 
         <View style={styles.logDetails}>
-          <Text style={styles.items}>
-            {details.map(d => `${d.qty}x ${d.item}`).join(', ')}
-          </Text>
+          {items.length > 0 && (
+            <Text style={styles.items}>
+              {items.map((d, idx) => {
+                const name = d.itemName || d.name || d.productName || 'Unknown';
+                const qty = d.quantity || d.qty || 0;
+                return `${qty}x ${name}`;
+              }).join(', ')}
+            </Text>
+          )}
           <View style={[styles.statusBadge, { backgroundColor: `${statusColor}20` }]}>
             <Text style={[styles.statusText, { color: statusColor }]}>
-              {item.status}
+              {status}
             </Text>
           </View>
         </View>
 
         <View style={styles.logFooter}>
           <Text style={styles.total}>₱{totals.total.toFixed(2)}</Text>
-          <Text style={styles.transactionDate}>{item.date}</Text>
+          <Text style={styles.transactionDate}>{date}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -274,17 +291,32 @@ export default function Transaction() {
             )}
           </View>
           <View style={styles.listWrapper}>
-            <FlatList
-              data={filteredTransactions}
-              keyExtractor={(item) => item.id}
-              renderItem={renderItem}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>— No transaction found —</Text>
-                </View>
-              }
-            />
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#AD7F65" />
+                <Text style={styles.loadingText}>Loading transactions...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredTransactions}
+                keyExtractor={(item) => item._id || item.id || Math.random().toString()}
+                renderItem={renderItem}
+                contentContainerStyle={styles.listContent}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    colors={['#AD7F65']}
+                    tintColor="#AD7F65"
+                  />
+                }
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyText}>— No transaction found —</Text>
+                  </View>
+                }
+              />
+            )}
           </View>
         </SafeAreaView>
       </View>
@@ -306,30 +338,34 @@ export default function Transaction() {
                 <Text style={styles.receiptHeader}>CREATE YOUR STYLE</Text>
                 <Text style={styles.locationText}>KM 7 Pasonanca, Zamboanga City</Text>
                 <Text style={styles.receiptDate}>
-                  {selectedTransaction.date}
+                  {new Date(selectedTransaction.createdAt || selectedTransaction.date).toLocaleString()}
                 </Text>
                 <Text style={styles.receiptStatus}>
                   Status: {selectedTransaction.status}
                 </Text>
-                <Text style={styles.cashierLabel}>Cashier: {getCashierName(selectedTransaction.id)}</Text>
+                <Text style={styles.cashierLabel}>Receipt No: {selectedTransaction.receiptNo || selectedTransaction._id}</Text>
+                <Text style={styles.cashierLabel}>Cashier: {getCashierName(selectedTransaction)}</Text>
 
                 <ScrollView style={{ marginVertical: 10, maxHeight: 250 }}>
-                  {(transactionDetails[selectedTransaction.id] || []).map(
-                    (d, i) => (
-                      <View key={i} style={styles.receiptRow}>
-                        <Text style={styles.receiptItem}>{d.item}</Text>
-                        <Text style={styles.receiptQty}>{d.qty}</Text>
-                        <Text style={styles.receiptPrice}>₱{d.price}</Text>
-                      </View>
-                    )
+                  {(selectedTransaction.items || []).map(
+                    (item, i) => {
+                      const name = item.itemName || item.name || item.productName || 'Unknown';
+                      const qty = item.quantity || item.qty || 0;
+                      const price = item.price || item.unitPrice || 0;
+                      return (
+                        <View key={i} style={styles.receiptRow}>
+                          <Text style={styles.receiptItem}>{name}</Text>
+                          <Text style={styles.receiptQty}>{qty}</Text>
+                          <Text style={styles.receiptPrice}>₱{price.toFixed(2)}</Text>
+                        </View>
+                      );
+                    }
                   )}
                 </ScrollView>
 
                 <View style={styles.receiptTotals}>
                   {(() => {
-                    const totals = calculateTotals(
-                      transactionDetails[selectedTransaction.id] || []
-                    );
+                    const totals = calculateTotals(selectedTransaction);
                     return (
                       <>
                         <Text>Subtotal: ₱{totals.subtotal.toFixed(2)}</Text>
@@ -618,6 +654,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#95a5a6',
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 14,
   },
   receiptPrice: {
     width: 60,

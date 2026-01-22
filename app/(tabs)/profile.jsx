@@ -1,5 +1,6 @@
 import Header from "@/components/shared/header";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -11,35 +12,82 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import React from "react";
+import { employeeAPI } from "../../services/api";
 
 const AccountSettings = () => {
   const router = useRouter();
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [syncModalVisible, setSyncModalVisible] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
   const [toastIcon, setToastIcon] = useState("sync");
   const toastTranslate = useRef(new Animated.Value(-60)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
-  // Handle refresh
-  const onRefresh = () => {
-    setRefreshing(true);
-    setSyncMessage("Syncing your data...");
-    setToastIcon("sync");
-    setSyncModalVisible(true);
+  const [profile, setProfile] = useState({
+    name: "",
+    role: "",
+    status: "",
+    contactNo: "",
+    email: "",
+    ownerOf: "Owner of Create Your Style",
+    image: null,
+  });
 
-    // Simulate network request
-    setTimeout(() => {
-      setRefreshing(false);
-      setSyncMessage("Sync completed successfully!");
-      setToastIcon("check-circle");
+  const loadProfile = async () => {
+    try {
+      setSyncMessage("Loading profile...");
+      setSyncModalVisible(true);
 
-      // Hide toast after delay
-      setTimeout(() => setSyncModalVisible(false), 2000);
-    }, 1500);
+      const stored = await AsyncStorage.getItem("currentEmployee");
+      if (!stored) {
+        setSyncMessage("No current employee found");
+        return;
+      }
+      const parsed = JSON.parse(stored);
+
+      let latest = parsed;
+      if (parsed._id || parsed.id) {
+        try {
+          const res = await employeeAPI.getById(parsed._id || parsed.id);
+          if (res?.success && res.data) {
+            latest = res.data;
+            await AsyncStorage.setItem("currentEmployee", JSON.stringify(latest));
+          }
+        } catch {
+          // keep using parsed if API fails
+        }
+      }
+
+      setProfile({
+        name: latest.name || `${latest.firstName || ""} ${latest.lastName || ""}`.trim(),
+        role: latest.role || "",
+        status: latest.status || "Active",
+        contactNo: latest.contactNo || "",
+        email: latest.email || "",
+        ownerOf: "Owner of Create Your Style",
+        image: latest.profileImage || latest.image || null,
+        id: latest._id || latest.id,
+      });
+
+      setSyncMessage("Profile up to date");
+    } catch (error) {
+      setSyncMessage("Failed to load profile");
+      console.warn("Failed to load profile:", error?.message);
+    } finally {
+      setTimeout(() => setSyncModalVisible(false), 1200);
+    }
   };
+
+  // Load once and whenever screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProfile();
+      return () => { };
+    }, [])
+  );
 
   useEffect(() => {
     if (syncModalVisible) {
@@ -131,26 +179,29 @@ const AccountSettings = () => {
           {/* PROFILE CARD */}
           <View style={styles.profileCard}>
             <View style={styles.flexprofile}>
-              <Image
-                source={require("../(tabs)/iconz/profile3.png")}
-                style={styles.profileImageLarge}
-              />
+              {profile.image ? (
+                <Image
+                  source={{ uri: profile.image }}
+                  style={styles.profileImageLarge}
+                />
+              ) : (
+                <Image
+                  source={require("../(tabs)/iconz/default.jpeg")}
+                  style={styles.profileImageLarge}
+                />
+              )}
               <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>Barbie Dela Cruz</Text>
-                <Text style={styles.profileJob}>Cashier</Text>
+                <Text style={styles.profileName}>{profile.name}</Text>
+                <Text style={styles.profileJob}>{profile.role}</Text>
                 <View style={styles.activeBadge}>
                   <Text style={styles.activeText}>Active</Text>
                 </View>
               </View>
             </View>
             <View>
-              <Text style={styles.profileDetails}>09263482655</Text>
-              <Text style={styles.profileDetails}>
-                yourname.yourname123@gmail.com
-              </Text>
-              <Text style={styles.profileDetails}>
-                Owner of Create Your Style
-              </Text>
+              <Text style={styles.profileDetails}>{profile.contactNo}</Text>
+              <Text style={styles.profileDetails}>{profile.email}</Text>
+              <Text style={styles.profileDetails}>{profile.ownerOf}</Text>
             </View>
           </View>
 
@@ -277,7 +328,7 @@ const AccountSettings = () => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Logout</Text>
             </View>
-            
+
             <View style={styles.modalBody}>
               <Image
                 source={require("../(tabs)/iconz/logout.png")}
@@ -288,7 +339,7 @@ const AccountSettings = () => {
                 Are you sure you want to log out of your account?
               </Text>
             </View>
-            
+
             <View style={styles.modalFooter}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
@@ -297,7 +348,7 @@ const AccountSettings = () => {
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.modalButton, styles.logoutButton]}
                 onPress={handleLogout}

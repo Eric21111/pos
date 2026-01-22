@@ -11,14 +11,19 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
+    ActivityIndicator,
+    RefreshControl
 } from 'react-native';
+import { voidLogAPI } from '../services/api';
 
 export default function VoidLog() {
   const [search, setSearch] = useState("");
   const [voidLogs, setVoidLogs] = useState([]);
   const [selectedVoid, setSelectedVoid] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
   const handleVoidPress = (voidItem) => {
@@ -31,81 +36,89 @@ export default function VoidLog() {
     setSelectedVoid(null);
   };
 
-  // Sample void logs data - in a real app, this would come from your database
-  useEffect(() => {
-    // Simulate API call
-    const fetchVoidLogs = async () => {
-      // Replace with actual API call
-      const mockData = [
-        {
-          id: "VL-001",
-          transactionId: "TRX-107",
-          date: "2025-11-28T10:30:00",
-          items: [
-            { name: "Dumbbells Set", qty: 1, price: 1500 }
-          ],
-          total: 1500,
-          reason: "Cashier Input wrong item",
-          approvedBy: "Ferrose Obias",
-          status: "Completed"
-        },
-        {
-          id: "VL-002",
-          transactionId: "TRX-106",
-          date: "2025-11-27T14:15:00",
-          items: [
-            { name: "Yoga Mat", qty: 1, price: 800 },
-            { name: "Water Bottle", qty: 1, price: 300 }
-          ],
-          total: 1100,
-          reason: "Customer changed mind",
-          approvedBy: "Pia Pendergat",
-          status: "Completed"
-        }
-      ];
-      setVoidLogs(mockData);
-    };
+  const fetchVoidLogs = async () => {
+    try {
+      const response = await voidLogAPI.getAll();
+      if (response.success && response.data) {
+        setVoidLogs(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching void logs:', error);
+      // Keep empty array on error
+      setVoidLogs([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     fetchVoidLogs();
   }, []);
 
-  const filteredLogs = voidLogs.filter(log => 
-    log.transactionId.toLowerCase().includes(search.toLowerCase()) ||
-    log.reason.toLowerCase().includes(search.toLowerCase()) ||
-    log.approvedBy.toLowerCase().includes(search.toLowerCase())
-  );
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchVoidLogs();
+  };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.logItem}
-      onPress={() => handleVoidPress(item)}
-    >
-      <View style={styles.logHeader}>
-        <Text style={styles.transactionId}>{item.transactionId}</Text>
-        <Text style={styles.date}>
-          {new Date(item.date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
-        </Text>
-      </View>
-      
-      <View style={styles.logDetails}>
-        <Text style={styles.reason}>{item.reason}</Text>
-        <Text style={styles.items}>
-          {item.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
-        </Text>
-      </View>
-      
-      <View style={styles.logFooter}>
-        <Text style={styles.total}>₱{item.total.toFixed(2)}</Text>
-        <Text style={styles.approvedBy}>Approved by: {item.approvedBy}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const filteredLogs = voidLogs.filter(log => {
+    const transactionId = log.transactionId || log.transaction?.receiptNo || '';
+    const reason = log.reason || '';
+    const approvedBy = log.approvedBy || log.approvedByName || '';
+    const searchLower = search.toLowerCase();
+    return (
+      transactionId.toLowerCase().includes(searchLower) ||
+      reason.toLowerCase().includes(searchLower) ||
+      approvedBy.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const renderItem = ({ item }) => {
+    const transactionId = item.transactionId || item.transaction?.receiptNo || item._id || 'N/A';
+    const date = item.date || item.createdAt || item.timestamp || new Date();
+    const reason = item.reason || 'No reason provided';
+    const items = item.items || [];
+    const total = item.total || item.totalAmount || 0;
+    const approvedBy = item.approvedBy || item.approvedByName || 'N/A';
+    
+    return (
+      <TouchableOpacity 
+        style={styles.logItem}
+        onPress={() => handleVoidPress(item)}
+      >
+        <View style={styles.logHeader}>
+          <Text style={styles.transactionId}>{transactionId}</Text>
+          <Text style={styles.date}>
+            {new Date(date).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </Text>
+        </View>
+        
+        <View style={styles.logDetails}>
+          <Text style={styles.reason}>{reason}</Text>
+          {items.length > 0 && (
+            <Text style={styles.items}>
+              {items.map((i, idx) => {
+                const qty = i.quantity || i.qty || 1;
+                const name = i.name || i.productName || 'Unknown';
+                return `${qty}x ${name}`;
+              }).join(', ')}
+            </Text>
+          )}
+        </View>
+        
+        <View style={styles.logFooter}>
+          <Text style={styles.total}>₱{parseFloat(total).toFixed(2)}</Text>
+          <Text style={styles.approvedBy}>Approved by: {approvedBy}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -127,18 +140,33 @@ export default function VoidLog() {
         )}
       </View>
 
-      <FlatList
-        data={filteredLogs}
-        renderItem={renderItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="receipt-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyText}>No void logs found</Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#AD7F65" />
+          <Text style={styles.loadingText}>Loading void logs...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredLogs}
+          renderItem={renderItem}
+          keyExtractor={item => item._id || item.id || Math.random().toString()}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#AD7F65']}
+              tintColor="#AD7F65"
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="receipt-outline" size={48} color="#ccc" />
+              <Text style={styles.emptyText}>No void logs found</Text>
+            </View>
+          }
+        />
+      )}
 
       {/* Void Details Modal */}
       <Modal
@@ -157,73 +185,90 @@ export default function VoidLog() {
             </View>
             
             <ScrollView style={styles.modalContent}>
-              {selectedVoid && (
-                <>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Transaction ID:</Text>
-                    <Text style={styles.detailValue}>{selectedVoid.transactionId}</Text>
-                  </View>
-                  
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Date & Time:</Text>
-                    <Text style={styles.detailValue}>
-                      {new Date(selectedVoid.date).toLocaleString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Items Voided</Text>
-                    {selectedVoid.items.map((item, index) => (
-                      <View key={index} style={styles.itemRow}>
-                        <Text style={styles.itemName}>{item.qty}x {item.name}</Text>
-                        <Text style={styles.itemPrice}>₱{(item.qty * item.price).toFixed(2)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.section}>
-                    <View style={styles.totalRow}>
-                      <Text style={styles.totalLabel}>Total Voided:</Text>
-                      <Text style={styles.totalAmount}>₱{selectedVoid.total.toFixed(2)}</Text>
+              {selectedVoid && (() => {
+                const transactionId = selectedVoid.transactionId || selectedVoid.transaction?.receiptNo || selectedVoid._id || 'N/A';
+                const date = selectedVoid.date || selectedVoid.createdAt || selectedVoid.timestamp || new Date();
+                const reason = selectedVoid.reason || 'No reason provided';
+                const items = selectedVoid.items || [];
+                const total = selectedVoid.total || selectedVoid.totalAmount || 0;
+                const approvedBy = selectedVoid.approvedBy || selectedVoid.approvedByName || 'N/A';
+                const status = selectedVoid.status || 'Completed';
+                
+                return (
+                  <>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Transaction ID:</Text>
+                      <Text style={styles.detailValue}>{transactionId}</Text>
                     </View>
-                  </View>
-                  
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Reason for Void</Text>
-                    <View style={styles.reasonBox}>
-                      <Text style={styles.reasonText}>{selectedVoid.reason}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Approved By:</Text>
-                    <Text style={[styles.detailValue, { color: '#2E7D32' }]}>
-                      {selectedVoid.approvedBy}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Status:</Text>
-                    <View style={[
-                      styles.statusBadge,
-                      { backgroundColor: selectedVoid.status === 'Completed' ? '#E8F5E9' : '#FFF3E0' }
-                    ]}>
-                      <Text style={[
-                        styles.statusText,
-                        { color: selectedVoid.status === 'Completed' ? '#2E7D32' : '#E65100' }
-                      ]}>
-                        {selectedVoid.status}
+                    
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Date & Time:</Text>
+                      <Text style={styles.detailValue}>
+                        {new Date(date).toLocaleString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
                       </Text>
                     </View>
-                  </View>
-                </>
-              )}
+                    
+                    {items.length > 0 && (
+                      <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Items Voided</Text>
+                        {items.map((item, index) => {
+                          const qty = item.quantity || item.qty || 1;
+                          const name = item.name || item.productName || 'Unknown';
+                          const price = item.price || 0;
+                          return (
+                            <View key={index} style={styles.itemRow}>
+                              <Text style={styles.itemName}>{qty}x {name}</Text>
+                              <Text style={styles.itemPrice}>₱{(qty * price).toFixed(2)}</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                    
+                    <View style={styles.section}>
+                      <View style={styles.totalRow}>
+                        <Text style={styles.totalLabel}>Total Voided:</Text>
+                        <Text style={styles.totalAmount}>₱{parseFloat(total).toFixed(2)}</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.section}>
+                      <Text style={styles.sectionTitle}>Reason for Void</Text>
+                      <View style={styles.reasonBox}>
+                        <Text style={styles.reasonText}>{reason}</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Approved By:</Text>
+                      <Text style={[styles.detailValue, { color: '#2E7D32' }]}>
+                        {approvedBy}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Status:</Text>
+                      <View style={[
+                        styles.statusBadge,
+                        { backgroundColor: status === 'Completed' ? '#E8F5E9' : '#FFF3E0' }
+                      ]}>
+                        <Text style={[
+                          styles.statusText,
+                          { color: status === 'Completed' ? '#2E7D32' : '#E65100' }
+                        ]}>
+                          {status}
+                        </Text>
+                      </View>
+                    </View>
+                  </>
+                );
+              })()}
             </ScrollView>
           </View>
         </View>
@@ -464,5 +509,16 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 16,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 14,
   },
 });
