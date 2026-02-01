@@ -1,14 +1,16 @@
 import { FaBell, FaSearch, FaExclamationTriangle, FaTimes, FaTimesCircle } from 'react-icons/fa';
 import { createPortal } from 'react-dom';
+import toast from 'react-hot-toast';
 import filterIcon from '../../assets/filter.svg';
 import { useContext, useEffect, useState, useRef } from 'react';
 import { SidebarContext } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 
-const Header = ({ 
-  pageName, 
-  showSearch = false, 
+const Header = ({
+  pageName,
+  showSearch = false,
   showFilter = false,
   searchValue = '',
   onSearchChange = null,
@@ -33,6 +35,7 @@ const Header = ({
 }) => {
   const { isExpanded: sidebarExpanded } = useContext(SidebarContext) || { isExpanded: false };
   const { currentUser } = useAuth();
+  const { theme } = useTheme();
   const [internalSearch, setInternalSearch] = useState(searchValue);
   const [lowStockItems, setLowStockItems] = useState([]);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -51,6 +54,26 @@ const Header = ({
   const notificationRef = useRef(null);
   const buttonRef = useRef(null);
   const navigate = useNavigate();
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success('You are back online');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.error('You are offline. Some features may be unavailable.');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // 5 hours in milliseconds (matching cron 0 */5 * * *)
   const DISMISS_COOLDOWN_MS = 5 * 60 * 60 * 1000;
@@ -82,7 +105,7 @@ const Header = ({
         if (data.success) {
           const items = data.data || [];
           setLowStockItems(items);
-          
+
           // Clean up dismissed items:
           // 1. Remove items that are no longer low stock (stock replenished)
           // 2. Remove items whose 5-hour cooldown has expired
@@ -142,11 +165,11 @@ const Header = ({
       // Check if click is outside both the dropdown and the button
       const isOutsideDropdown = notificationRef.current && !notificationRef.current.contains(event.target);
       const isOutsideButton = buttonRef.current && !buttonRef.current.contains(event.target);
-      
+
       if (isOutsideDropdown && isOutsideButton) {
         setShowNotifications(false);
       }
-      
+
       // Close sort dropdown if clicking outside
       if (showSortDropdown && sortButtonRef.current && !sortButtonRef.current.contains(event.target)) {
         setShowSortDropdown(false);
@@ -184,12 +207,12 @@ const Header = ({
   )}&background=AD7F65&color=fff`;
   const profileImageSrc = profileImage || fallbackAvatarUrl;
   return (
-    <div className={`relative flex items-center justify-between z-[100] ${showBorder ? 'mb-6 pb-4 border-b' : ''} ${className}`}>
-   
+    <div className={`relative flex items-center justify-between z-[100] ${showBorder ? `mb-6 pb-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}` : ''} ${className}`}>
+
       <div className="flex items-center gap-4">
         {showSearch ? (
           <>
-            {!hidePageName && <h1 className="text-3xl font-bold">{pageName}</h1>}
+            {!hidePageName && <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{pageName}</h1>}
             <div className={`relative transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-[472px]' : 'w-178'}`}>
               <div className="absolute left-1 top-1/2 transform -translate-y-1/2 w-10 h-9 flex items-center justify-center text-white rounded-xl" style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}>
                 <FaSearch className="text-sm" />
@@ -199,21 +222,27 @@ const Header = ({
                 placeholder="Search For..."
                 value={resolvedSearchValue}
                 onChange={handleSearchChange}
-                className="w-full h-11 pl-14 pr-4 border border-gray-300 bg-white rounded-xl shadow-md focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                className={`w-full h-11 pl-14 pr-4 border rounded-xl shadow-md focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent transition-colors ${theme === 'dark'
+                  ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-400'
+                  : 'bg-white border-gray-300 text-gray-900'
+                  }`}
               />
             </div>
             {filterNextToSearch && showFilter && (
-              <button className="ml-2 w-12 h-10 bg-white rounded-2xl flex items-center justify-center border border-gray-100 shadow-[0_8px_16px_rgba(0,0,0,0.12)] hover:shadow-[0_12px_22px_rgba(0,0,0,0.16)]">
+              <button className={`ml-2 w-12 h-10 rounded-2xl flex items-center justify-center border shadow-[0_8px_16px_rgba(0,0,0,0.12)] hover:shadow-[0_12px_22px_rgba(0,0,0,0.16)] transition-colors ${theme === 'dark'
+                ? 'bg-[#2A2724] border-gray-600'
+                : 'bg-white border-gray-100'
+                }`}>
                 <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
               </button>
             )}
           </>
         ) : (
           <>
-            {!hidePageName && <h1 className="text-3xl font-bold">{pageName}</h1>}
+            {!hidePageName && <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{pageName}</h1>}
             {/* Timeframe Filter for Dashboard */}
             {showTimeframeFilter && (
-              <div 
+              <div
                 className="flex gap-2 ml-4"
                 role="tablist"
                 aria-label="Dashboard timeframe filter"
@@ -224,11 +253,12 @@ const Header = ({
                     onClick={() => onTimeframeChange && onTimeframeChange(option)}
                     role="tab"
                     aria-selected={timeframeValue === option}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:ring-offset-2 ${
-                      timeframeValue === option
-                        ? 'bg-[#AD7F65] text-white'
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:ring-offset-2 ${timeframeValue === option
+                      ? 'bg-[#AD7F65] text-white'
+                      : theme === 'dark'
+                        ? 'bg-[#2A2724] text-gray-300 hover:bg-[#352F2A]'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                      }`}
                   >
                     {option}
                   </button>
@@ -239,31 +269,35 @@ const Header = ({
         )}
       </div>
 
-    
+
       {centerProfile && (
         <div className="absolute left-1/2 -translate-x-1/2">
           <div className="flex items-center gap-4">
             <div className="relative">
-              <button 
+              <button
                 ref={buttonRef}
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] relative transition-all"
+                className={`w-12 h-12 rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] relative transition-all`}
+                style={theme === 'dark' ? { backgroundColor: '#2A2521' } : {}}
               >
-                <FaBell className="text-gray-800 text-2xl" />
+                <FaBell className={`text-2xl ${theme === 'dark' ? 'text-gray-300' : 'text-gray-800'}`} />
                 {visibleLowStockItems.length > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
                     {visibleLowStockItems.length > 99 ? '99+' : visibleLowStockItems.length}
                   </span>
                 )}
               </button>
-              
+
               {/* Notification Dropdown for centered profile - Using Portal */}
               {showNotifications && createPortal(
-                <div 
+                <div
                   ref={notificationRef}
-                  className="fixed w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden"
-                  style={{ 
-                    top: dropdownPosition.top, 
+                  className={`fixed w-80 rounded-2xl shadow-2xl border overflow-hidden ${theme === 'dark'
+                    ? 'bg-[#2A2724] border-gray-600'
+                    : 'bg-white border-gray-100'
+                    }`}
+                  style={{
+                    top: dropdownPosition.top,
                     right: dropdownPosition.right,
                     zIndex: 99999
                   }}
@@ -282,20 +316,19 @@ const Header = ({
                       </div>
                     ) : (
                       visibleLowStockItems.map((item) => (
-                        <div 
-                          key={item._id} 
+                        <div
+                          key={item._id}
                           className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-center gap-3"
                         >
-                          <div 
+                          <div
                             className="flex items-center gap-3 flex-1 cursor-pointer"
                             onClick={() => {
                               setShowNotifications(false);
                               navigate('/inventory');
                             }}
                           >
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                              item.alertType === 'out_of_stock' ? 'bg-red-100' : 'bg-orange-100'
-                            }`}>
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${item.alertType === 'out_of_stock' ? 'bg-red-100' : 'bg-orange-100'
+                              }`}>
                               {item.alertType === 'out_of_stock' ? (
                                 <FaTimesCircle className="text-red-500" />
                               ) : (
@@ -328,7 +361,7 @@ const Header = ({
                   </div>
                   {visibleLowStockItems.length > 0 && (
                     <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
-                      <button 
+                      <button
                         onClick={() => {
                           setShowNotifications(false);
                           navigate('/inventory');
@@ -343,34 +376,49 @@ const Header = ({
                 document.body
               )}
             </div>
-            <div className={`flex items-center ${profileGap} ${profileBackground} ${profilePadding} py-2.5 rounded-full border border-gray-200 shadow-[0_6px_14px_rgba(0,0,0,0.15)]`} style={{ minWidth: profileMinWidth }}>
-              <img 
-                src={profileImageSrc}
-                alt="User" 
-                className="w-10 h-10 rounded-full ring-2 ring-white shadow-sm object-cover"
-              />
+            <div
+              className={`flex items-center ${profileGap} ${profilePadding} py-2.5 rounded-full border shadow-[0_6px_14px_rgba(0,0,0,0.15)]`}
+              style={{
+                minWidth: profileMinWidth,
+                ...(theme === 'dark' ? {
+                  background: 'rgba(42, 37, 33, 0.9)',
+                  backdropFilter: 'blur(6px)',
+                  border: '1px solid #3A332E'
+                } : {})
+              }}
+            >
+              <div className="relative">
+                <img
+                  src={profileImageSrc}
+                  alt="User"
+                  className={`w-10 h-10 rounded-full ring-2 shadow-sm object-cover ${theme === 'dark' ? 'ring-gray-600' : 'ring-white'}`}
+                />
+                <div
+                  className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${theme === 'dark' ? 'border-[#2A2521]' : 'border-white'} ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}
+                  title={isOnline ? 'Online' : 'Offline'}
+                />
+              </div>
               <div>
-                <div className="text-sm font-semibold">{displayName}</div>
-                <div className="text-xs text-gray-500">{displayRole}</div>
+                <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{displayName}</div>
+                <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{displayRole}</div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-   
+
       <div className="flex items-center gap-5">
         {!centerProfile && showFilter && !filterNextToSearch && (
           <div className="relative" ref={sortButtonRef}>
-            <button 
+            <button
               onClick={() => setShowSortDropdown(!showSortDropdown)}
-              className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center border shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] ${
-                sortOption !== 'newest' ? 'border-[#AD7F65] bg-[#AD7F65]/10' : 'border-gray-100'
-              }`}
+              className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center border shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] ${sortOption !== 'newest' ? 'border-[#AD7F65] bg-[#AD7F65]/10' : 'border-gray-100'
+                }`}
             >
               <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
             </button>
-            
+
             {/* Sort Dropdown */}
             {showSortDropdown && (
               <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-[9999]">
@@ -383,9 +431,8 @@ const Header = ({
                       onSortChange && onSortChange('a-z');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
-                      sortOption === 'a-z' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${sortOption === 'a-z' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                      }`}
                   >
                     Name (A-Z)
                     {sortOption === 'a-z' && <span className="text-[#AD7F65]">✓</span>}
@@ -395,9 +442,8 @@ const Header = ({
                       onSortChange && onSortChange('z-a');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
-                      sortOption === 'z-a' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${sortOption === 'z-a' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                      }`}
                   >
                     Name (Z-A)
                     {sortOption === 'z-a' && <span className="text-[#AD7F65]">✓</span>}
@@ -407,9 +453,8 @@ const Header = ({
                       onSortChange && onSortChange('newest');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
-                      sortOption === 'newest' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${sortOption === 'newest' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                      }`}
                   >
                     Newest First
                     {sortOption === 'newest' && <span className="text-[#AD7F65]">✓</span>}
@@ -419,9 +464,8 @@ const Header = ({
                       onSortChange && onSortChange('oldest');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
-                      sortOption === 'oldest' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${sortOption === 'oldest' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                      }`}
                   >
                     Oldest First
                     {sortOption === 'oldest' && <span className="text-[#AD7F65]">✓</span>}
@@ -433,26 +477,27 @@ const Header = ({
         )}
         {!centerProfile && (
           <div className="relative" ref={notificationRef}>
-            <button 
+            <button
               ref={buttonRef}
               onClick={() => setShowNotifications(!showNotifications)}
-              className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] relative transition-all"
+              className="w-12 h-12 rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] relative transition-all"
+              style={theme === 'dark' ? { backgroundColor: '#2A2521' } : { backgroundColor: 'white' }}
             >
-              <FaBell className="text-gray-800 text-2xl" />
+              <FaBell className={`text-2xl ${theme === 'dark' ? 'text-gray-300' : 'text-gray-800'}`} />
               {visibleLowStockItems.length > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
                   {visibleLowStockItems.length > 99 ? '99+' : visibleLowStockItems.length}
                 </span>
               )}
             </button>
-            
+
             {/* Notification Dropdown - Using Portal */}
             {showNotifications && createPortal(
-              <div 
+              <div
                 ref={notificationRef}
                 className="fixed w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden"
-                style={{ 
-                  top: dropdownPosition.top, 
+                style={{
+                  top: dropdownPosition.top,
                   right: dropdownPosition.right,
                   zIndex: 99999
                 }}
@@ -471,20 +516,19 @@ const Header = ({
                     </div>
                   ) : (
                     visibleLowStockItems.map((item) => (
-                      <div 
-                        key={item._id} 
+                      <div
+                        key={item._id}
                         className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-center gap-3"
                       >
-                        <div 
+                        <div
                           className="flex items-center gap-3 flex-1 cursor-pointer"
                           onClick={() => {
                             setShowNotifications(false);
                             navigate('/inventory');
                           }}
                         >
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                            item.alertType === 'out_of_stock' ? 'bg-red-100' : 'bg-orange-100'
-                          }`}>
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${item.alertType === 'out_of_stock' ? 'bg-red-100' : 'bg-orange-100'
+                            }`}>
                             {item.alertType === 'out_of_stock' ? (
                               <FaTimesCircle className="text-red-500" />
                             ) : (
@@ -517,7 +561,7 @@ const Header = ({
                 </div>
                 {visibleLowStockItems.length > 0 && (
                   <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
-                    <button 
+                    <button
                       onClick={() => {
                         setShowNotifications(false);
                         navigate('/inventory');
@@ -534,15 +578,32 @@ const Header = ({
           </div>
         )}
         {!centerProfile && (
-          <div className={`flex items-center ${profileGap} ${profileBackground} ${profilePadding} py-2.5 rounded-full border border-gray-200 shadow-[0_6px_14px_rgba(0,0,0,0.15)]`} style={{ minWidth: profileMinWidth }}>
-            <img 
-              src={profileImageSrc}
-              alt="User" 
-              className="w-10 h-10 rounded-full ring-2 ring-white shadow-sm object-cover"
-            />
+          <div
+            className={`flex items-center ${profileGap} ${profilePadding} py-2.5 rounded-full shadow-[0_6px_14px_rgba(0,0,0,0.15)] ${theme === 'dark' ? 'border' : ''
+              }`}
+            style={{
+              minWidth: profileMinWidth,
+              ...(theme === 'dark' ? {
+                background: 'rgba(42, 37, 33, 0.9)',
+                backdropFilter: 'blur(6px)',
+                border: '1px solid #3A332E'
+              } : {})
+            }}
+          >
+            <div className="relative">
+              <img
+                src={profileImageSrc}
+                alt="User"
+                className={`w-10 h-10 rounded-full ring-2 shadow-sm object-cover ${theme === 'dark' ? 'ring-gray-600' : 'ring-white'}`}
+              />
+              <div
+                className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${theme === 'dark' ? 'border-white' : 'border-white'} ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}
+                title={isOnline ? 'Online' : 'Offline'}
+              />
+            </div>
             <div>
-              <div className="text-sm font-semibold">{displayName}</div>
-              <div className="text-xs text-gray-500">{displayRole}</div>
+              <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{displayName}</div>
+              <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{displayRole}</div>
             </div>
           </div>
         )}

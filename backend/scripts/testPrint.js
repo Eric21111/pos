@@ -1,26 +1,10 @@
-/* eslint-disable no-console */
-/**
- * Test print script for JK-5802H thermal printer (58mm ESC/POS USB).
- * 
- * This script sends a sample receipt directly to the printer configured
- * in your .env file. Use this to verify printer connectivity and formatting.
- * 
- * Usage:
- *   cd backend
- *   node scripts/testPrint.js
- * 
- * Requirements:
- *   - PRINTER_TRANSPORT=escpos-usb in .env
- *   - PRINTER_VENDOR_ID and PRINTER_PRODUCT_ID set (or let it auto-detect)
- *   - Printer connected via USB and powered on
- */
 
 require('dotenv').config();
 const escpos = require('escpos');
 
 let UsbAdapter = null;
 try {
-  // Workaround: escpos-usb expects usb.on() method which doesn't exist in usb@2.x
+ 
   const usb = require('usb');
   if (usb && typeof usb.on === 'undefined') {
     const EventEmitter = require('events');
@@ -70,7 +54,7 @@ const parseUsbId = (value) => {
   return Number.isNaN(parsed) ? null : parsed;
 };
 
-// Sample test receipt data matching the new format
+
 const testReceipt = {
   receiptNo: '000123',
   items: [
@@ -102,7 +86,6 @@ async function testPrint() {
   const vendorId = parseUsbId(process.env.PRINTER_VENDOR_ID);
   const productId = parseUsbId(process.env.PRINTER_PRODUCT_ID);
 
-  // Log the IDs for debugging
   console.log('USB Printer Configuration:');
   console.log(`  Vendor ID: ${process.env.PRINTER_VENDOR_ID || 'not set'} -> ${vendorId} (${vendorId ? '0x' + vendorId.toString(16).toUpperCase() : 'not set'})`);
   console.log(`  Product ID: ${process.env.PRINTER_PRODUCT_ID || 'not set'} -> ${productId} (${productId ? '0x' + productId.toString(16).toUpperCase() : 'not set'})`);
@@ -163,7 +146,6 @@ async function testPrint() {
         const referenceNo = testReceipt.referenceNo || testReceipt.reference || '';
         const issueTime = testReceipt.time || new Date().toLocaleTimeString();
         
-        // Header: Business name (centered, large)
         printer
           .align('ct')
           .size(1, 1)
@@ -171,18 +153,15 @@ async function testPrint() {
           .size(0, 0)
           .feed(1);
 
-        // Time (left) and Contact (right)
         printer.align('lt');
         const timeLine = padLine(issueTime, contactNumber);
         printer.text(timeLine);
         
-        // Location (centered)
         printer.align('ct');
         printer.text(location);
         printer.feed(1);
         printer.text(lineBreak());
 
-        // Receipt No in box format
         printer.align('ct');
         printer.text('Receipt No:');
         printer.style('B');

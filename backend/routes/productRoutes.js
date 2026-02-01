@@ -22,8 +22,8 @@ router.get('/search/:query', searchProducts);
 // Get low stock and out of stock products (for notifications)
 router.get('/low-stock', async (req, res) => {
   try {
-    const { mergeDataFromBothSources } = require('../utils/mergeData');
-    const products = await mergeDataFromBothSources('Product', {}, {});
+    const Product = require('../models/Product');
+    const products = await Product.find({});
     
     const stockAlertItems = products.filter(p => {
       const stock = p.currentStock || 0;
@@ -71,8 +71,8 @@ router.post('/update-stock', updateStockAfterTransaction);
 // Get SKU counts by brand for dashboard chart
 router.get('/sku-stats', async (req, res) => {
   try {
-    const { mergeDataFromBothSources } = require('../utils/mergeData');
-    const products = await mergeDataFromBothSources('Product', {}, {});
+    const Product = require('../models/Product');
+    const products = await Product.find({});
     
     // Group products by brand name and count SKUs
     const brandStats = {};

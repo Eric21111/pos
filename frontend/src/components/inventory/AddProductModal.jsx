@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import AddCategoryModal from './AddCategoryModal';
+import AddBrandModal from './AddBrandModal';
 
 const AddProductModal = ({
   showAddModal,
@@ -15,19 +17,23 @@ const AddProductModal = ({
   resetProductForm,
   loading,
   categories = [],
-  brandPartners = []
+  brandPartners = [],
+  onCategoryAdd,
+  onBrandAdd
 }) => {
   // Built-in categories that have specific size options
   const builtInCategories = ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods'];
   const [showDraftNotice, setShowDraftNotice] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
 
   // Check if there's a recovered draft when modal opens
   useEffect(() => {
     if (showAddModal && !editingProduct) {
-      const hasData = newProduct.itemName || newProduct.variant || 
-                      newProduct.itemPrice || newProduct.costPrice || 
-                      newProduct.currentStock || newProduct.itemImage ||
-                      (newProduct.selectedSizes && newProduct.selectedSizes.length > 0);
+      const hasData = newProduct.itemName || newProduct.variant ||
+        newProduct.itemPrice || newProduct.costPrice ||
+        newProduct.currentStock || newProduct.itemImage ||
+        (newProduct.selectedSizes && newProduct.selectedSizes.length > 0);
       setShowDraftNotice(hasData);
     } else {
       setShowDraftNotice(false);
@@ -64,7 +70,7 @@ const AddProductModal = ({
             ×
           </button>
         </div>
-        
+
         {/* Draft Recovery Notice */}
         {showDraftNotice && !editingProduct && (
           <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
@@ -113,7 +119,15 @@ const AddProductModal = ({
                           name="category"
                           value={newProduct.category}
                           onChange={(e) => {
+                            if (e.target.value === '__add_new__') {
+                              setShowCategoryModal(true);
+                              // Don't actually select "__add_new__", stick with previous or default
+                              // The modal success handler will set the new category
+                              return;
+                            }
+
                             handleInputChange(e);
+
                             // Reset foodSubtype when category changes
                             if (e.target.value !== 'Foods') {
                               setNewProduct(prev => ({ ...prev, foodSubtype: '' }));
@@ -127,6 +141,7 @@ const AddProductModal = ({
                               {category.name}
                             </option>
                           ))}
+                          <option value="__add_new__" className="font-semibold text-[#AD7F65]">+ Add Category</option>
                         </select>
                       </div>
                       <div>
@@ -134,7 +149,14 @@ const AddProductModal = ({
                         <select
                           name="brandName"
                           value={newProduct.brandName || 'Default'}
-                          onChange={handleInputChange}
+                          onChange={(e) => {
+                            if (e.target.value === '__add_new_brand__') {
+                              setShowBrandModal(true);
+                              // Don't change the value yet
+                              return;
+                            }
+                            handleInputChange(e);
+                          }}
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
                         >
                           <option value="Default">Default</option>
@@ -143,6 +165,7 @@ const AddProductModal = ({
                               {name}
                             </option>
                           ))}
+                          <option value="__add_new_brand__" className="font-semibold text-[#AD7F65]">+ Add Brand</option>
                           {legacyBrandSelected && (
                             <option value={newProduct.brandName}>{newProduct.brandName} (Inactive)</option>
                           )}
@@ -185,12 +208,13 @@ const AddProductModal = ({
                           name="variant"
                           value={newProduct.variant}
                           onChange={handleInputChange}
-                          placeholder="Add Variant"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                          disabled={newProduct.differentVariantsPerSize}
+                          placeholder={newProduct.differentVariantsPerSize ? "Multiple variants selected" : "Add Variant"}
+                          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${newProduct.differentVariantsPerSize ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                         />
                       </div>
                     </div>
-                
+
                     {!editingProduct && (
                       <>
                         <div>
@@ -202,10 +226,10 @@ const AddProductModal = ({
                               const category = newProduct.category;
                               const foodSubtype = newProduct.foodSubtype || '';
                               let sizes = [];
-                              
+
                               // Check if category is built-in
                               const isBuiltIn = builtInCategories.includes(category);
-                              
+
                               if (!isBuiltIn) {
                                 // All custom/added categories should have Free Size only
                                 sizes = ['Free Size'];
@@ -248,7 +272,7 @@ const AddProductModal = ({
                               else if (['Accessories', 'Head Wear', 'Makeup'].includes(category)) {
                                 sizes = ['Free Size'];
                               }
-                              
+
                               return sizes.map((size) => (
                                 <label key={size} className="flex items-center gap-2 cursor-pointer">
                                   <input
@@ -262,7 +286,7 @@ const AddProductModal = ({
                               ));
                             })()}
                           </div>
-                        
+
                           {newProduct.selectedSizes?.length > 0 && (
                             <>
                               <div className="mt-3 mb-3">
@@ -294,27 +318,85 @@ const AddProductModal = ({
                                   <span className="text-sm text-gray-700">Different prices each size?</span>
                                 </label>
                               </div>
-                              
-                            <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
-                              <label className="block text-xs font-semibold text-gray-700 mb-2">
-                                Quantity per Size:
-                              </label>
-                              <div className="grid grid-cols-2 gap-3">
-                                {newProduct.selectedSizes.map((size) => (
-                                  <div key={size}>
-                                    <label className="block text-xs text-gray-600 mb-1">{size}</label>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      value={newProduct.sizeQuantities?.[size] || ''}
-                                      onChange={(e) => handleSizeQuantityChange(size, e.target.value)}
-                                      placeholder="Enter quantity"
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                                    />
-                                  </div>
-                                ))}
+
+                              <div className="mb-3">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={newProduct.differentVariantsPerSize || false}
+                                    onChange={(e) => {
+                                      setNewProduct(prev => {
+                                        const newSizeVariants = {};
+                                        if (e.target.checked) {
+                                          prev.selectedSizes.forEach(size => {
+                                            newSizeVariants[size] = prev.variant || '';
+                                          });
+                                          // Clear main variant when this is checked to avoid confusion?
+                                          // Or keep it as a fallback? Let's keep it.
+                                        }
+                                        return {
+                                          ...prev,
+                                          differentVariantsPerSize: e.target.checked,
+                                          sizeVariants: e.target.checked ? newSizeVariants : {}
+                                        };
+                                      });
+                                    }}
+                                    className="w-4 h-4 text-[#AD7F65] border-gray-300 rounded focus:ring-[#AD7F65]"
+                                  />
+                                  <span className="text-sm text-gray-700">Different variants each sizes?</span>
+                                </label>
                               </div>
-                            </div>
+
+                              <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
+                                <label className="block text-xs font-semibold text-gray-700 mb-2">
+                                  Quantity per Size:
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                  {newProduct.selectedSizes.map((size) => (
+                                    <div key={size}>
+                                      <label className="block text-xs text-gray-600 mb-1">{size}</label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={newProduct.sizeQuantities?.[size] || ''}
+                                        onChange={(e) => handleSizeQuantityChange(size, e.target.value)}
+                                        placeholder="Enter quantity"
+                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {newProduct.differentVariantsPerSize && (
+                                <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
+                                  <label className="block text-xs font-semibold text-gray-700 mb-2">
+                                    Variant per Size:
+                                  </label>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {newProduct.selectedSizes.map((size) => (
+                                      <div key={size}>
+                                        <label className="block text-xs text-gray-600 mb-1">{size}</label>
+                                        <input
+                                          type="text"
+                                          value={newProduct.sizeVariants?.[size] || ''}
+                                          onChange={(e) => {
+                                            setNewProduct(prev => ({
+                                              ...prev,
+                                              sizeVariants: {
+                                                ...prev.sizeVariants,
+                                                [size]: e.target.value
+                                              }
+                                            }));
+                                          }}
+                                          placeholder="Enter variant"
+                                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
                               {newProduct.differentPricesPerSize && (
                                 <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
@@ -364,7 +446,7 @@ const AddProductModal = ({
                             </>
                           )}
                         </div>
-                     
+
                         {(!newProduct.selectedSizes || newProduct.selectedSizes.length === 0) && (
                           <div>
                             <label className="block text-xs text-gray-600 mb-1">Stock</label>
@@ -451,10 +533,10 @@ const AddProductModal = ({
                           return parseInt(newProduct.currentStock || 0) === 0;
                         }
                       };
-                      
+
                       const isStockZero = hasZeroStock();
                       const isDisabled = editingProduct && isStockZero;
-                      
+
                       return (
                         <label className={`flex items-center gap-3 ${isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                           <div className="relative">
@@ -466,12 +548,10 @@ const AddProductModal = ({
                               disabled={isDisabled}
                               className="sr-only"
                             />
-                            <div className={`w-14 h-7 rounded-full transition-colors duration-200 ${
-                              newProduct.displayInTerminal !== false ? 'bg-[#AD7F65]' : 'bg-gray-300'
-                            } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                              <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-                                newProduct.displayInTerminal !== false ? 'translate-x-7' : 'translate-x-1'
-                              } mt-0.5`}></div>
+                            <div className={`w-14 h-7 rounded-full transition-colors duration-200 ${newProduct.displayInTerminal !== false ? 'bg-[#AD7F65]' : 'bg-gray-300'
+                              } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                              <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${newProduct.displayInTerminal !== false ? 'translate-x-7' : 'translate-x-1'
+                                } mt-0.5`}></div>
                             </div>
                           </div>
                           <div>
@@ -479,8 +559,8 @@ const AddProductModal = ({
                               Display in Terminal
                             </span>
                             <p className={`text-xs ${isDisabled ? 'text-gray-400' : 'text-gray-500'}`}>
-                              {isDisabled 
-                                ? 'Add stock to enable this option' 
+                              {isDisabled
+                                ? 'Add stock to enable this option'
                                 : 'Show this product in POS/terminal'}
                             </p>
                           </div>
@@ -493,7 +573,7 @@ const AddProductModal = ({
 
               <div className="flex flex-col">
                 <div>
-                  <div 
+                  <div
                     onClick={() => document.getElementById('fileInput').click()}
                     className="w-full border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center bg-gray-50 p-6 cursor-pointer hover:border-[#AD7F65] hover:bg-gray-100 transition-all"
                     style={{ height: '320px' }}
@@ -519,9 +599,9 @@ const AddProductModal = ({
                     />
                     {newProduct.itemImage && newProduct.itemImage.trim() !== '' ? (
                       <div className="w-full h-full flex items-center justify-center p-4">
-                        <img 
-                          src={newProduct.itemImage} 
-                          alt="Product Preview" 
+                        <img
+                          src={newProduct.itemImage}
+                          alt="Product Preview"
                           className="max-w-full max-h-full object-contain rounded-lg"
                           style={{ display: 'block' }}
                         />
@@ -567,6 +647,30 @@ const AddProductModal = ({
           </div>
         </form>
       </div>
+
+      <AddCategoryModal
+        show={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        onAdd={(newCategoryName) => {
+          if (onCategoryAdd) {
+            onCategoryAdd();
+          }
+          // Set the new category in the form
+          setNewProduct(prev => ({ ...prev, category: newCategoryName }));
+        }}
+      />
+
+
+      <AddBrandModal
+        show={showBrandModal}
+        onClose={() => setShowBrandModal(false)}
+        onAdd={(newBrandName) => {
+          if (onBrandAdd) {
+            onBrandAdd();
+          }
+          setNewProduct(prev => ({ ...prev, brandName: newBrandName }));
+        }}
+      />
     </div>
   );
 };

@@ -22,7 +22,7 @@ try {
 
 const DEFAULT_BT_ADDRESS = process.env.PRINTER_BT_ADDRESS || '00:00:00:00:00:00';
 const DEFAULT_BT_CHANNEL = Number(process.env.PRINTER_BT_CHANNEL || 1);
-const MAX_LINE_CHARS = Number(process.env.PRINTER_LINE_CHARS || 32); // 58 mm = ~32 ASCII chars
+const MAX_LINE_CHARS = Number(process.env.PRINTER_LINE_CHARS || 32); // 58 mm 
 
 
 const normalizeLines = rawLines => {
@@ -65,9 +65,7 @@ const printViaEscpos = (lines, { address, channel }) =>
     });
   });
 
-/**
- * Fallback printer that writes raw data using bluetooth-serial-port.
- */
+
 const printViaBluetoothSerial = (lines, { address, channel }) =>
   new Promise((resolve, reject) => {
     if (!bluetoothSerialPort) {

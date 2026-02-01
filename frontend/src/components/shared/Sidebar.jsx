@@ -2,6 +2,7 @@ import { useState, useEffect, memo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import terminalIcon from '../../assets/icons/terminal.svg';
 import inventoryIcon from '../../assets/icons/invenory.svg';
 import transactionIcon from '../../assets/icons/transaction.svg';
@@ -15,7 +16,7 @@ import LogoutConfirmationModal from './LogoutConfirmationModal';
 import logo from '../../assets/logo.png';
 
 // Tooltip component that renders outside the sidebar using portal
-const SidebarTooltip = ({ label, targetRef, show }) => {
+const SidebarTooltip = ({ label, targetRef, show, theme }) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
@@ -32,7 +33,9 @@ const SidebarTooltip = ({ label, targetRef, show }) => {
 
   return createPortal(
     <div
-      className="fixed px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white shadow-lg whitespace-nowrap z-[9999] transform -translate-y-1/2 pointer-events-none"
+      className={`fixed px-3 py-2 rounded-lg text-sm font-medium shadow-lg whitespace-nowrap z-[9999] transform -translate-y-1/2 pointer-events-none ${
+        theme === 'dark' ? 'bg-[#2A2724] text-gray-200 border border-[#4A4037]' : 'bg-white text-gray-700'
+      }`}
       style={{
         top: position.top,
         left: position.left,
@@ -47,6 +50,7 @@ const SidebarTooltip = ({ label, targetRef, show }) => {
 
 const Sidebar = ({ isExpanded, setIsExpanded }) => {
   const location = useLocation();
+  const { theme } = useTheme();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
   const [posExpanded, setPosExpanded] = useState(false);
@@ -197,9 +201,9 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
     <>
       
       <div
-        className={`fixed left-0 top-0 h-screen bg-white transition-all duration-300 ease-in-out z-50 flex flex-col cursor-pointer ${
+        className={`fixed left-0 top-0 h-screen transition-all duration-300 ease-in-out z-50 flex flex-col cursor-pointer ${
           isExpanded ? 'w-70' : 'w-20'
-        }`}
+        } ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`}
         style={{
           borderRadius: '0 30px 30px 0',
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.2)'
@@ -211,7 +215,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
       >
       
         <div 
-          className={`relative flex items-center border-b border-gray-100 px-4 py-4 overflow-hidden ${isExpanded ? '' : 'justify-center'}`}
+          className={`relative flex items-center px-4 py-4 overflow-hidden ${isExpanded ? '' : 'justify-center'}`}
           style={{ minHeight: '120px' }}
           onClick={(e) => {
             e.stopPropagation();
@@ -223,12 +227,20 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
               e.stopPropagation();
               setIsExpanded(!isExpanded);
             }}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 shrink-0 z-10"
+            className={`p-2 rounded-lg transition-all duration-300 shrink-0 z-10 ${
+              theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-100'
+            }`}
           >
             <div className="flex flex-col justify-center items-center w-6 h-6 shrink-0">
-              <span className="block h-0.5 w-5 bg-gray-600 rounded transition-all duration-300"></span>
-              <span className="block h-0.5 w-5 bg-gray-600 rounded transition-all duration-300 my-1"></span>
-              <span className="block h-0.5 w-5 bg-gray-600 rounded transition-all duration-300"></span>
+              <span className={`block h-0.5 w-5 rounded transition-all duration-300 ${
+                theme === 'dark' ? 'bg-gray-400' : 'bg-gray-600'
+              }`}></span>
+              <span className={`block h-0.5 w-5 rounded transition-all duration-300 my-1 ${
+                theme === 'dark' ? 'bg-gray-400' : 'bg-gray-600'
+              }`}></span>
+              <span className={`block h-0.5 w-5 rounded transition-all duration-300 ${
+                theme === 'dark' ? 'bg-gray-400' : 'bg-gray-600'
+              }`}></span>
             </div>
           </button>
           
@@ -271,7 +283,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
                           posActive 
                             ? 'shadow-lg' 
-                            : 'hover:bg-gray-50'
+                            : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
                         }`}
                         style={posActive ? {
                           background: item.gradient,
@@ -284,7 +296,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                             src={item.icon} 
                             alt={item.name}
                             className={`w-6 h-6 transition-all duration-300 ${
-                              posActive ? 'brightness-0 invert' : 'opacity-80 group-hover:opacity-100'
+                              posActive ? 'brightness-0 invert' : theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
                             }`}
                           />
                         </div>
@@ -292,7 +304,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         {isExpanded && (
                           <span
                             className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
-                              posActive ? 'text-white' : 'text-gray-800 group-hover:text-[#76462B]'
+                              posActive ? 'text-white' : theme === 'dark' ? 'text-gray-200 group-hover:text-[#C2A68C]' : 'text-gray-800 group-hover:text-[#76462B]'
                             }`}
                             style={{
                               fontSize: '16px'
@@ -307,7 +319,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         <svg
                           className={`w-5 h-5 mr-4 transition-transform duration-300 ${
                             posExpanded ? 'rotate-180' : ''
-                          } ${posActive ? 'text-white' : 'text-gray-600'}`}
+                          } ${posActive ? 'text-white' : theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -338,7 +350,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
                           posActive 
                             ? 'shadow-lg' 
-                            : 'hover:bg-gray-50'
+                            : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
                         }`}
                         style={posActive ? {
                           background: item.gradient,
@@ -351,7 +363,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               src={item.icon} 
                               alt={item.name}
                               className={`w-6 h-6 transition-all duration-300 ${
-                                posActive ? 'brightness-0 invert' : 'opacity-80 group-hover:opacity-100'
+                                posActive ? 'brightness-0 invert' : theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
                               }`}
                             />
                           </div>
@@ -359,7 +371,8 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         <SidebarTooltip 
                           label={item.name} 
                           targetRef={{ current: itemRefs.current['pos-terminal'] }} 
-                          show={hoveredItem === 'pos-terminal' && !isExpanded} 
+                          show={hoveredItem === 'pos-terminal' && !isExpanded}
+                          theme={theme}
                         />
                         {posActive && (
                           <div 
@@ -387,8 +400,8 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               }}
                               className={`w-full flex items-center rounded-lg transition-all duration-300 group relative overflow-hidden py-2.5 ${
                                 subActive
-                                  ? 'bg-[#F5E6D3]'
-                                  : 'hover:bg-gray-50'
+                                  ? theme === 'dark' ? 'bg-[#352F2A]' : 'bg-[#F5E6D3]'
+                                  : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
                               }`}
                             >
                               {subActive && (
@@ -396,7 +409,9 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               )}
                               <span
                                 className={`font-medium transition-all duration-300 whitespace-nowrap ml-6 ${
-                                  subActive ? 'text-[#76462B] font-semibold' : 'text-gray-700 group-hover:text-[#76462B]'
+                                  subActive 
+                                    ? theme === 'dark' ? 'text-[#C2A68C] font-semibold' : 'text-[#76462B] font-semibold' 
+                                    : theme === 'dark' ? 'text-gray-300 group-hover:text-[#C2A68C]' : 'text-gray-700 group-hover:text-[#76462B]'
                                 }`}
                                 style={{
                                   fontSize: '15px'
@@ -431,7 +446,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
                           inventoryActive 
                             ? 'shadow-lg' 
-                            : 'hover:bg-gray-50'
+                            : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
                         }`}
                         style={inventoryActive ? {
                           background: item.gradient,
@@ -444,7 +459,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                             src={item.icon} 
                             alt={item.name}
                             className={`w-6 h-6 transition-all duration-300 ${
-                              inventoryActive ? 'brightness-0 invert' : 'opacity-80 group-hover:opacity-100'
+                              inventoryActive ? 'brightness-0 invert' : theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
                             }`}
                           />
                         </div>
@@ -452,7 +467,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         {isExpanded && (
                           <span
                             className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
-                              inventoryActive ? 'text-white' : 'text-gray-800 group-hover:text-[#76462B]'
+                              inventoryActive ? 'text-white' : theme === 'dark' ? 'text-gray-200 group-hover:text-[#C2A68C]' : 'text-gray-800 group-hover:text-[#76462B]'
                             }`}
                             style={{
                               fontSize: '16px'
@@ -467,7 +482,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         <svg
                           className={`w-5 h-5 mr-4 transition-transform duration-300 ${
                             inventoryExpanded ? 'rotate-180' : ''
-                          } ${inventoryActive ? 'text-white' : 'text-gray-600'}`}
+                          } ${inventoryActive ? 'text-white' : theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -498,7 +513,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
                           inventoryActive 
                             ? 'shadow-lg' 
-                            : 'hover:bg-gray-50'
+                            : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
                         }`}
                         style={inventoryActive ? {
                           background: item.gradient,
@@ -511,7 +526,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               src={item.icon} 
                               alt={item.name}
                               className={`w-6 h-6 transition-all duration-300 ${
-                                inventoryActive ? 'brightness-0 invert' : 'opacity-80 group-hover:opacity-100'
+                                inventoryActive ? 'brightness-0 invert' : theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
                               }`}
                             />
                           </div>
@@ -519,7 +534,8 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                         <SidebarTooltip 
                           label={item.name} 
                           targetRef={{ current: itemRefs.current['inventory'] }} 
-                          show={hoveredItem === 'inventory' && !isExpanded} 
+                          show={hoveredItem === 'inventory' && !isExpanded}
+                          theme={theme}
                         />
                         {inventoryActive && (
                           <div 
@@ -547,8 +563,8 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               }}
                               className={`w-full flex items-center rounded-lg transition-all duration-300 group relative overflow-hidden py-2.5 ${
                                 subActive
-                                  ? 'bg-[#F5E6D3]'
-                                  : 'hover:bg-gray-50'
+                                  ? theme === 'dark' ? 'bg-[#352F2A]' : 'bg-[#F5E6D3]'
+                                  : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
                               }`}
                             >
                               {subActive && (
@@ -556,7 +572,9 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               )}
                               <span
                                 className={`font-medium transition-all duration-300 whitespace-nowrap ml-6 ${
-                                  subActive ? 'text-[#76462B] font-semibold' : 'text-gray-700 group-hover:text-[#76462B]'
+                                  subActive 
+                                    ? theme === 'dark' ? 'text-[#C2A68C] font-semibold' : 'text-[#76462B] font-semibold' 
+                                    : theme === 'dark' ? 'text-gray-300 group-hover:text-[#C2A68C]' : 'text-gray-700 group-hover:text-[#76462B]'
                                 }`}
                                 style={{
                                   fontSize: '15px'
@@ -589,7 +607,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                   className={`w-full flex items-center rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
                     active 
                       ? 'shadow-lg' 
-                      : 'hover:bg-gray-50'
+                      : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
                   }`}
                   style={active ? {
                     background: item.gradient,
@@ -602,7 +620,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                       src={item.icon} 
                       alt={item.name}
                       className={`w-6 h-6 transition-all duration-300 ${
-                        active ? 'brightness-0 invert' : 'opacity-80 group-hover:opacity-100'
+                        active ? 'brightness-0 invert' : theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
                       }`}
                     />
                   </div>
@@ -610,13 +628,14 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                   <SidebarTooltip 
                     label={item.name} 
                     targetRef={{ current: itemRefs.current[item.path] }} 
-                    show={hoveredItem === item.path && !isExpanded} 
+                    show={hoveredItem === item.path && !isExpanded}
+                    theme={theme}
                   />
                 
                   {isExpanded && (
                     <span
                       className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
-                        active ? 'text-white' : 'text-gray-800 group-hover:text-[#76462B]'
+                        active ? 'text-white' : theme === 'dark' ? 'text-gray-200 group-hover:text-[#C2A68C]' : 'text-gray-800 group-hover:text-[#76462B]'
                       }`}
                       style={{
                         fontSize: '16px'
@@ -643,7 +662,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
         </nav>
 
        
-        <div className="border-t border-gray-100 py-6 px-2">
+        <div className="py-6 px-2">
           <button
             ref={(el) => (itemRefs.current['logout'] = el)}
             onClick={(e) => {
@@ -652,23 +671,30 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
             }}
             onMouseEnter={() => !isExpanded && setHoveredItem('logout')}
             onMouseLeave={() => setHoveredItem(null)}
-            className="w-full flex items-center rounded-2xl transition-all duration-300 hover:bg-gray-50 group py-3.5"
+            className={`w-full flex items-center rounded-2xl transition-all duration-300 group py-3.5 ${
+              theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
+            }`}
           >
             <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4 relative">
               <img 
                 src={logoutIcon} 
                 alt="Log Out"
-                className="w-6 h-6 opacity-80 group-hover:opacity-100 transition-all duration-300"
+                className={`w-6 h-6 transition-all duration-300 ${
+                  theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
+                }`}
               />
             </div>
             <SidebarTooltip 
               label="Log Out" 
               targetRef={{ current: itemRefs.current['logout'] }} 
-              show={hoveredItem === 'logout' && !isExpanded} 
+              show={hoveredItem === 'logout' && !isExpanded}
+              theme={theme}
             />
             {isExpanded && (
               <span
-                className="font-medium text-gray-800 group-hover:text-[#76462B] transition-all duration-300 whitespace-nowrap ml-4"
+                className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
+                  theme === 'dark' ? 'text-gray-200 group-hover:text-[#C2A68C]' : 'text-gray-800 group-hover:text-[#76462B]'
+                }`}
                 style={{
                   fontSize: '16px'
                 }}

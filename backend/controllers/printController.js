@@ -160,18 +160,18 @@ const printViaEscposUsb = (receiptData = {}) => new Promise((resolve, reject) =>
         .size(0, 0)
         .feed(1);
 
-      // Time (left) and Contact (right)
+      // Time and Contact 
       printer.align('lt');
       const timeLine = padLine(issueTime, contactNumber);
       printer.text(timeLine);
       
-      // Location (centered)
+      // Location 
       printer.align('ct');
       printer.text(location);
       printer.feed(1);
       printer.text(lineBreak());
 
-      // Receipt No in box format
+      // Receipt 
       printer.align('ct');
       printer.text('Receipt No:');
       printer.style('B');
@@ -272,19 +272,17 @@ const printReceipt = async (req, res) => {
         });
       } catch (usbError) {
         console.error('USB print error:', usbError);
-        // Fall back to file printing if USB fails (more reliable than Windows printer driver)
-        console.log('USB printing failed. Falling back to file printing...');
-        // Override interface to file printing for fallback
+      
+      
         printerInterface = 'file';
         printerName = process.env.PRINTER_NAME || './receipt.txt';
-        // Continue to thermal printer code below with file interface
+    
       }
     }
 
-    // --- Existing printing path (node-thermal-printer) ---
+
     let printer;
 
-    // Determine printer type enum
     let printerTypeEnum = PrinterTypes.EPSON;
     if (printerType === 'STAR') {
       printerTypeEnum = PrinterTypes.STAR;
@@ -292,22 +290,19 @@ const printReceipt = async (req, res) => {
       printerTypeEnum = PrinterTypes.BEPOST;
     }
 
-    // Build interface string based on configuration
     let interfaceString;
     if (printerInterface === 'tcp' || printerInterface === 'network') {
       interfaceString = `tcp://${printerIP}:${printerPort}`;
     } else if (printerInterface === 'usb') {
       interfaceString = 'usb';
     } else if (printerInterface === 'file') {
-      // File printing - writes to a file instead of physical printer
+     
       interfaceString = `file:${printerName || './receipt.txt'}`;
     } else {
-      // Windows printer name
+      
       interfaceString = printerName ? `printer:${printerName}` : 'printer';
     }
 
-    // Extra safety: if we're using a Windows printer interface but the
-    // optional "printer" driver is not installed, fall back to file printing
     if ((interfaceString.startsWith('printer:') || interfaceString === 'printer') && !windowsPrinterDriver) {
       console.warn('Windows printer driver module "printer" is not available. Falling back to file printing...');
       interfaceString = `file:${printerName || './receipt.txt'}`;
@@ -322,29 +317,24 @@ const printReceipt = async (req, res) => {
       lineCharacter: '-',
       breakLine: BreakLine.WORD,
       options: {
-        timeout: 30000, // Increased to 30 seconds for slower printers
+        timeout: 30000, 
       }
     };
 
-    // Attach Windows printer driver when using a Windows printer interface
     if ((interfaceString.startsWith('printer:') || interfaceString === 'printer') && windowsPrinterDriver) {
       printerConfig.driver = windowsPrinterDriver;
     }
 
     printer = new ThermalPrinter(printerConfig);
     
-    // Verify printer object was created
+   
     if (!printer) {
       throw new Error('Failed to initialize printer. Please check printer configuration.');
     }
 
-    // Check if printer is connected (with error handling)
-    // For Windows "printer:" interface we skip the connectivity check because
-    // many drivers always report "disconnected" even when printing works.
+ 
     let isConnected = true;
-    // Only perform connection check for explicit network interfaces.
-    // USB and Windows printer interfaces often do not support this and can
-    // incorrectly report "not connected", so we skip the check for them.
+   
     const shouldCheckConnection = printerInterface === 'tcp' || printerInterface === 'network';
 
     if (shouldCheckConnection) {
@@ -353,8 +343,8 @@ const printReceipt = async (req, res) => {
         isConnected = await printer.isPrinterConnected();
       } catch (connectionError) {
         console.error('Printer connection check failed:', connectionError);
-        // Continue anyway - some printers don't support connection check
-        isConnected = true; // Assume connected and try to print
+        
+        isConnected = true;
       }
 
       if (!isConnected) {
@@ -365,14 +355,14 @@ const printReceipt = async (req, res) => {
       }
     }
 
-    // Build receipt content
+  
     const storeName = receiptData.storeName || DEFAULT_STORE_NAME;
     const contactNumber = receiptData.contactNumber || '+631112224444';
     const location = receiptData.location || 'Pasonanca, Zamboanga City';
     const referenceNo = receiptData.referenceNo || receiptData.reference || '';
     const issueTime = receiptData.time || new Date().toLocaleTimeString();
 
-    // Header: Business name (centered, slightly larger)
+
     printer.alignCenter();
     printer.setTextSize(1, 0);
     printer.bold(true);
@@ -380,17 +370,17 @@ const printReceipt = async (req, res) => {
     printer.bold(false);
     printer.setTextSize(0, 0);
     
-    // Time (left) and Contact (right) - need to manually align (58mm = 32 chars)
+  
     printer.alignLeft();
     const timeContactLine = `${issueTime}${' '.repeat(Math.max(0, RECEIPT_CHAR_WIDTH - issueTime.length - contactNumber.length))}${contactNumber}`;
     printer.println(timeContactLine.substring(0, RECEIPT_CHAR_WIDTH));
     
-    // Location (centered)
+
     printer.alignCenter();
     printer.println(location);
     printer.drawLine();
     
-    // Receipt No in box format
+
     printer.alignCenter();
     printer.println('Receipt No:');
     printer.bold(true);
@@ -398,7 +388,7 @@ const printReceipt = async (req, res) => {
     printer.bold(false);
     printer.drawLine();
 
-    // Items table headers
+ 
     printer.alignLeft();
     printer.tableCustom([
       { text: 'Item', align: 'LEFT', width: 0.55 },
@@ -449,7 +439,7 @@ const printReceipt = async (req, res) => {
     printer.newLine();
     printer.cut();
 
-    // Check if we're using file printing (not actual printer)
+ 
     const isFilePrinting = interfaceString.startsWith('file:');
     
     if (isFilePrinting) {
@@ -459,7 +449,6 @@ const printReceipt = async (req, res) => {
       console.log(`Attempting to print to: ${interfaceString}`);
     }
 
-    // Execute print with proper error handling and logging
     let printSuccess = false;
     try {
       console.log('Sending print job to printer...');
@@ -467,7 +456,7 @@ const printReceipt = async (req, res) => {
       printSuccess = true;
       console.log('Print job sent successfully');
     } catch (executeError) {
-      // printer.execute() failed - this is the actual print error
+     
       console.error('Printer execute error:', executeError);
       console.error('Error details:', {
         message: executeError.message,
@@ -476,7 +465,7 @@ const printReceipt = async (req, res) => {
         printerType: printerType
       });
       
-      // Don't return immediately - check if it's a timeout or connection issue
+    
       const errorMessage = executeError.message || 'Unknown printer error';
       const isTimeout = errorMessage.toLowerCase().includes('timeout') || errorMessage.toLowerCase().includes('timed out');
       const isConnection = errorMessage.toLowerCase().includes('connect') || errorMessage.toLowerCase().includes('connection');
@@ -487,15 +476,14 @@ const printReceipt = async (req, res) => {
       });
     }
     
-    // Verify print was successful
+
     if (!printSuccess) {
       return res.status(500).json({ 
         success: false, 
         message: 'Print job did not complete successfully'
       });
     }
-    
-    // If file printing, return a warning message (not success)
+
     if (isFilePrinting) {
       return res.json({ 
         success: false, 
@@ -505,7 +493,7 @@ const printReceipt = async (req, res) => {
       });
     }
     
-    // For actual printers, return success
+   
     console.log('Print completed successfully');
     res.json({ 
       success: true, 

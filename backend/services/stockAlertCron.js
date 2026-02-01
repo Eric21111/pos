@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { sendLowStockAlert } = require('./emailService');
-const { mergeDataFromBothSources } = require('../utils/mergeData');
+const Product = require('../models/Product');
+const Employee = require('../models/Employee');
 
 // Track last email sent time to prevent duplicate emails
 let lastEmailSentTime = null;
@@ -11,7 +12,7 @@ const MIN_EMAIL_INTERVAL_MS = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
  */
 const getLowStockItems = async () => {
   try {
-    const products = await mergeDataFromBothSources('Product', {}, {});
+    const products = await Product.find({});
     
     const lowStockItems = products.filter(p => {
       const stock = p.currentStock || 0;
@@ -45,7 +46,7 @@ const getLowStockItems = async () => {
  */
 const getOwnerEmail = async () => {
   try {
-    const employees = await mergeDataFromBothSources('Employee', { role: 'Owner', status: 'Active' }, {});
+    const employees = await Employee.find({ role: 'Owner', status: 'Active' });
     
     if (employees.length > 0 && employees[0].email) {
       return employees[0].email;

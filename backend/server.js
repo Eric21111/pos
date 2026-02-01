@@ -1,12 +1,14 @@
 const express = require('express');
 const dotenv = require('dotenv');
+
+// Load env vars before other imports
+dotenv.config();
+
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const connectDB = require('./config/database');
 const networkDetection = require('./middleware/networkDetection');
 const { initStockAlertCron } = require('./services/stockAlertCron');
-
-dotenv.config();
 
 const app = express();
 
@@ -21,9 +23,10 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use(networkDetection);
 
 app.get('/', (req, res) => {
+  const dbManager = require('./config/databaseManager');
   res.json({
     message: 'Welcome to POS System API',
-    database: 'Local MongoDB'
+    database: `${dbManager.getCurrentMode()} MongoDB`
   });
 });
 
@@ -52,7 +55,16 @@ const HOST = '0.0.0.0';
 app.listen(PORT, HOST, () => {
   console.log(`Server is running on http://${HOST}:${PORT}`);
   console.log(`Access from other devices using your computer's IP address`);
-  
+
   // Initialize stock alert cron job
   initStockAlertCron();
+
+  // Schedule Data Sync (Every 5 minutes)
+  const cron = require('node-cron');
+  const dataSyncService = require('./services/dataSyncService');
+
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('[Cron] Triggering Data Sync...');
+    await dataSyncService.sync();
+  });
 });

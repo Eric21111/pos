@@ -12,8 +12,10 @@ import ResetPinConfirmModal from '../../components/owner/ResetPinConfirmModal';
 import TemporaryPinModal from '../../components/owner/TemporaryPinModal';
 import defaultAvatar from '../../assets/default.jpeg';
 import filterIcon from '../../assets/filter.svg';
+import { useTheme } from '../../context/ThemeContext';
 
 const ManageEmployees = () => {
+  const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -263,10 +265,10 @@ const ManageEmployees = () => {
       <div className="mt-6">
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4 flex-1">
-            <div className="flex items-center shadow-md overflow-hidden" style={{ maxWidth: '400px', width: '100%', borderRadius: '15px' }}>
+            <div className="flex shadow-md overflow-hidden" style={{ maxWidth: '400px', width: '100%', borderRadius: '15px' }}>
               <button
                 type="button"
-                className="px-4 py-3 flex items-center justify-center"
+                className="px-4 flex items-center justify-center self-stretch"
                 style={{ 
                   background: 'linear-gradient(135deg, rgba(173, 127, 101, 1) 0%, rgba(118, 70, 43, 1) 100%)',
                   borderTopLeftRadius: '15px',
@@ -281,7 +283,11 @@ const ManageEmployees = () => {
                 placeholder="Search by name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 px-4 py-3 bg-white focus:outline-none text-gray-700 placeholder-gray-400"
+                className={`flex-1 px-4 py-3 focus:outline-none ${
+                  theme === 'dark' 
+                    ? 'bg-[#2A2724] text-white placeholder-white' 
+                    : 'bg-white text-gray-700 placeholder-gray-400'
+                }`}
                 style={{
                   borderTopRightRadius: '15px',
                   borderBottomRightRadius: '15px'
@@ -292,25 +298,35 @@ const ManageEmployees = () => {
               <button 
                 data-filter-button
                 onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`p-2 border rounded-lg hover:bg-gray-50 transition-colors ${
+                className={`p-2 border rounded-lg transition-colors ${
                   (roleFilter !== 'All' || statusFilter !== 'All') 
                     ? 'border-[#AD7F65] bg-[#AD7F65]/10' 
-                    : 'border-gray-300'
+                    : theme === 'dark' 
+                      ? 'border-gray-600 hover:bg-[#352F2A]' 
+                      : 'border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
+                <img src={filterIcon} alt="Filter" className={`w-5 h-5 ${
+                  theme === 'dark' ? 'brightness-0 invert opacity-90' : 'opacity-90'
+                }`} />
               </button>
               
               {showFilterDropdown && (
-                <div data-filter-dropdown className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-4">
+                <div data-filter-dropdown className={`absolute top-full left-0 mt-2 w-64 rounded-lg shadow-lg border z-50 p-4 ${
+                  theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-white border-gray-200'
+                }`}>
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-gray-700">Filters</h4>
+                    <h4 className={`font-semibold ${
+                      theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                    }`}>Filters</h4>
                     <button
                       onClick={() => {
                         setRoleFilter('All');
                         setStatusFilter('All');
                       }}
-                      className="text-xs text-[#AD7F65] hover:underline"
+                      className={`text-xs ${
+                        theme === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
+                      }`}
                     >
                       Clear All
                     </button>
@@ -318,14 +334,18 @@ const ManageEmployees = () => {
                   
                   {/* Role Filter */}
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-600 mb-2">Role</label>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                    }`}>Role</label>
                     <select
                       value={roleFilter}
                       onChange={(e) => {
                         setRoleFilter(e.target.value);
                         setCurrentPage(1);
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${
+                        theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-gray-200' : 'border-gray-300'
+                      }`}
                     >
                       {availableRoles.map(role => (
                         <option key={role} value={role}>{role}</option>
@@ -335,14 +355,18 @@ const ManageEmployees = () => {
                   
                   {/* Status Filter */}
                   <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-600 mb-2">Status</label>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                    }`}>Status</label>
                     <select
                       value={statusFilter}
                       onChange={(e) => {
                         setStatusFilter(e.target.value);
                         setCurrentPage(1);
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${
+                        theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-gray-200' : 'border-gray-300'
+                      }`}
                     >
                       <option value="All">All</option>
                       <option value="Active">Active</option>
@@ -374,12 +398,20 @@ const ManageEmployees = () => {
 
         {loading ? (
           <div className="flex justify-center items-center py-12">
-            <div className="text-gray-500">Loading employees...</div>
+            <div className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}>Loading employees...</div>
           </div>
         ) : employees.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-inner border border-dashed border-gray-300">
-            <p className="text-2xl font-semibold text-gray-700 mb-3">No accounts yet</p>
-            <p className="text-gray-500 mb-6 text-center max-w-md">
+          <div className={`flex flex-col items-center justify-center py-20 rounded-2xl shadow-inner border border-dashed ${
+            theme === 'dark' 
+              ? 'bg-[#2A2724] border-gray-600' 
+              : 'bg-white border-gray-300'
+          }`}>
+            <p className={`text-2xl font-semibold mb-3 ${
+              theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+            }`}>No accounts yet</p>
+            <p className={`mb-6 text-center max-w-md ${
+              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+            }`}>
               You haven&apos;t added any employees. Click below to create the first account and assign access.
             </p>
             <button
@@ -395,15 +427,19 @@ const ManageEmployees = () => {
             {paginatedEmployees.map((employee) => (
             <div
               key={employee.id}
-              className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow relative"
+              className={`rounded-lg shadow-sm hover:shadow-md transition-shadow relative ${
+                theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'
+              }`}
             >
               <div className="overflow-hidden rounded-t-lg">
-                <div
-                  className="h-2 w-full"
-                  style={{
-                    background: 'radial-gradient(circle at center, #C2A68C 0%, #AD7F65 50%, #76462B 100%)'
-                  }}
-                />
+                {theme !== 'dark' && (
+                  <div
+                    className="h-2 w-full"
+                    style={{
+                      background: 'radial-gradient(circle at center, #C2A68C 0%, #AD7F65 50%, #76462B 100%)'
+                    }}
+                  />
+                )}
               </div>
               
               {/* Hide 3-dot menu for Owner */}
@@ -415,7 +451,7 @@ const ManageEmployees = () => {
                       e.stopPropagation();
                       setOpenDropdown(openDropdown === employee.id ? null : employee.id);
                     }}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    className={theme === 'dark' ? 'text-gray-500 hover:text-gray-300 transition-colors' : 'text-gray-400 hover:text-gray-600 transition-colors'}
                   >
                     <FaEllipsisV />
                   </button>
@@ -423,7 +459,9 @@ const ManageEmployees = () => {
                   {openDropdown === employee.id && (
                   <div
                     id={`dropdown-menu-${employee.id}`}
-                    className="fixed w-48 bg-white rounded-lg border border-gray-200 shadow-lg"
+                    className={`fixed w-48 rounded-lg border shadow-lg ${
+                      theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-white border-gray-200'
+                    }`}
                     style={{
                       zIndex: 9999,
                       boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
@@ -433,7 +471,11 @@ const ManageEmployees = () => {
                   >
                     <button
                       onClick={() => handleViewEmployee(employee)}
-                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b rounded-t-lg"
+                      className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 border-b rounded-t-lg ${
+                        theme === 'dark' 
+                          ? 'hover:bg-[#352F2A] border-gray-600 text-gray-200' 
+                          : 'hover:bg-gray-50 text-gray-700'
+                      }`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -443,7 +485,11 @@ const ManageEmployees = () => {
                     </button>
                     <button
                       onClick={() => handleEditEmployee(employee)}
-                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b"
+                      className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 border-b ${
+                        theme === 'dark' 
+                          ? 'hover:bg-[#352F2A] border-gray-600 text-gray-200' 
+                          : 'hover:bg-gray-50 text-gray-700'
+                      }`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -452,7 +498,11 @@ const ManageEmployees = () => {
                     </button>
                     <button
                       onClick={() => handleResetPin(employee)}
-                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 border-b text-blue-600"
+                      className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 border-b text-blue-600 ${
+                        theme === 'dark' 
+                          ? 'hover:bg-[#352F2A] border-gray-600' 
+                          : 'hover:bg-gray-50'
+                      }`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -461,8 +511,10 @@ const ManageEmployees = () => {
                     </button>
                     <button
                       onClick={() => handleToggleStatus(employee)}
-                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 rounded-b-lg ${
+                      className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 rounded-b-lg ${
                         employee.status === 'Active' ? 'text-orange-600' : 'text-green-600'
+                      } ${
+                        theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
                       }`}
                     >
                       {employee.status === 'Active' ? (
@@ -497,10 +549,14 @@ const ManageEmployees = () => {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-gray-800 text-base mb-2 ">
+                    <h3 className={`font-bold text-base mb-2 ${
+                      theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
+                    }`}>
                       {employee.name}
                     </h3>
-                    <p className="text-sm text-gray-500 mb-5">{employee.role}</p>
+                    <p className={`text-sm mb-5 ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                    }`}>{employee.role}</p>
                     <span
                       className={`inline-block px-3 py-1 rounded text-xs font-medium ${
                         employee.status === 'Active'

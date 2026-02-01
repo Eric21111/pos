@@ -102,13 +102,13 @@ const productSchema = new mongoose.Schema({
 });
 
 
-productSchema.pre('save', function(next) {
+productSchema.pre('save', function (next) {
   this.lastUpdated = Date.now();
   next();
 });
 
 // Virtual for terminal status (shown/not shown)
-productSchema.virtual('terminalStatus').get(function() {
+productSchema.virtual('terminalStatus').get(function () {
   return this.displayInTerminal !== false ? 'shown' : 'not shown';
 });
 

@@ -1,6 +1,7 @@
 import { useRef, useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { FaSpinner, FaCheck } from 'react-icons/fa';
 import logo from '../assets/logo.png';
 import bgImage from '../assets/bg.png';
 import { validatePinSecurity } from '../utils/pinValidation';
@@ -78,6 +79,7 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
   const [isCodeSent, setIsCodeSent] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [verificationTimer, setVerificationTimer] = useState(0);
+  const [showCodeSentCheck, setShowCodeSentCheck] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
 
   const pinRefs = useRef([]);
@@ -334,8 +336,12 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
       const data = await response.json();
 
       if (data.success) {
-        setIsCodeSent(true);
-        setVerificationTimer(60); // 60 seconds cooldown
+        setShowCodeSentCheck(true);
+        setTimeout(() => {
+          setIsCodeSent(true);
+          setShowCodeSentCheck(false);
+          setVerificationTimer(60); // 60 seconds cooldown
+        }, 1000);
         const timer = setInterval(() => {
           setVerificationTimer((prev) => {
             if (prev <= 1) {
@@ -587,10 +593,24 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
                   <button
                     type="button"
                     onClick={handleSendCode}
-                    disabled={loading || !formValues.email || !!fieldErrors.email || verificationTimer > 0}
-                    className="w-full py-3 rounded-xl border border-[#8B7355] text-[#8B7355] font-medium hover:bg-[#8B7355] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={loading || !formValues.email || !!fieldErrors.email || verificationTimer > 0 || showCodeSentCheck}
+                    className="w-full py-3 rounded-xl border border-[#8B7355] text-[#8B7355] font-medium hover:bg-[#8B7355] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {verificationTimer > 0 ? `Resend in ${verificationTimer}s` : 'Send Verification Code'}
+                    {loading ? (
+                      <>
+                        <FaSpinner className="animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : showCodeSentCheck ? (
+                      <>
+                        <FaCheck className="animate-pulse" />
+                        <span>Code Sent!</span>
+                      </>
+                    ) : verificationTimer > 0 ? (
+                      `Resend in ${verificationTimer}s`
+                    ) : (
+                      'Send Verification Code'
+                    )}
                   </button>
                 ) : (
                   <div className="flex gap-2">

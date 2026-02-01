@@ -34,6 +34,9 @@ const brandPartnerSchema = new mongoose.Schema(
 
 brandPartnerSchema.index({ brandName: 1 }, { unique: true });
 
+// Export schema for dynamic connection
+module.exports.schema = brandPartnerSchema;
+
 module.exports = mongoose.model('BrandPartner', brandPartnerSchema);
 
 

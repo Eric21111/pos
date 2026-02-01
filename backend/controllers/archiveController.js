@@ -193,7 +193,7 @@ exports.restoreArchiveItem = async (req, res) => {
       });
     }
 
-    // Return the item data for restoration
+  
     res.json({
       success: true,
       message: 'Item data retrieved for restoration',

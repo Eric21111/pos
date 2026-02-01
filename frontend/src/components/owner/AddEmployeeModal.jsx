@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { FaTimes } from 'react-icons/fa';
+import { FaTimes, FaSpinner, FaCheck } from 'react-icons/fa';
 import circleIcon from '../../assets/owner/circle.svg';
 import cameraIcon from '../../assets/owner/camera.svg';
 
@@ -66,6 +66,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
   const [isCodeSent, setIsCodeSent] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [verificationTimer, setVerificationTimer] = useState(0);
+  const [showCodeSentCheck, setShowCodeSentCheck] = useState(false);
 
   // Generate random 6-digit PIN
   const generateRandomPin = () => {
@@ -153,8 +154,12 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
       const data = await response.json();
 
       if (data.success) {
-        setIsCodeSent(true);
-        setVerificationTimer(60); // 60 seconds cooldown
+        setShowCodeSentCheck(true);
+        setTimeout(() => {
+          setIsCodeSent(true);
+          setShowCodeSentCheck(false);
+          setVerificationTimer(60); // 60 seconds cooldown
+        }, 1000);
         setError('');
         const timer = setInterval(() => {
           setVerificationTimer((prev) => {
@@ -485,10 +490,24 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
                     <button
                       type="button"
                       onClick={handleSendCode}
-                      disabled={emailLoading || !formData.email || verificationTimer > 0}
-                      className="w-full px-3 py-2 bg-[#AD7F65] text-white rounded-lg text-sm disabled:opacity-50"
+                      disabled={emailLoading || !formData.email || verificationTimer > 0 || showCodeSentCheck}
+                      className="w-full px-3 py-2 bg-[#AD7F65] text-white rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
                     >
-                      {verificationTimer > 0 ? `Resend in ${verificationTimer}s` : 'Send Code'}
+                      {emailLoading ? (
+                        <>
+                          <FaSpinner className="animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : showCodeSentCheck ? (
+                        <>
+                          <FaCheck className="animate-pulse" />
+                          <span>Code Sent!</span>
+                        </>
+                      ) : verificationTimer > 0 ? (
+                        `Resend in ${verificationTimer}s`
+                      ) : (
+                        'Send Code'
+                      )}
                     </button>
                   )}
 

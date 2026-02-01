@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, memo } from 'react';
 import Header from '../components/shared/header';
 import { useDataCache } from '../context/DataCacheContext';
-import { 
+import {
   FaPlus,
   FaSearch
 } from 'react-icons/fa';
@@ -99,7 +99,7 @@ const Inventory = () => {
   const [loading, setLoading] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [showStockModal, setShowStockModal] = useState(false);
-  const [stockModalType, setStockModalType] = useState('in'); 
+  const [stockModalType, setStockModalType] = useState('in');
   const [stockAmount, setStockAmount] = useState('');
   const [viewingProduct, setViewingProduct] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -135,7 +135,7 @@ const Inventory = () => {
     supplierName: '',
     supplierContact: '',
     itemImage: '',
-    selectedSizes: [], 
+    selectedSizes: [],
     sizeQuantities: {},
     sizePrices: {},
     sizeCostPrices: {},
@@ -169,11 +169,11 @@ const Inventory = () => {
     if (!editingProduct && showAddModal) {
       try {
         // Don't save if form is essentially empty (just defaults)
-        const hasData = newProduct.itemName || newProduct.variant || 
-                        newProduct.itemPrice || newProduct.costPrice || 
-                        newProduct.currentStock || newProduct.itemImage ||
-                        (newProduct.selectedSizes && newProduct.selectedSizes.length > 0);
-        
+        const hasData = newProduct.itemName || newProduct.variant ||
+          newProduct.itemPrice || newProduct.costPrice ||
+          newProduct.currentStock || newProduct.itemImage ||
+          (newProduct.selectedSizes && newProduct.selectedSizes.length > 0);
+
         if (hasData) {
           localStorage.setItem(ADD_PRODUCT_STORAGE_KEY, JSON.stringify(newProduct));
         }
@@ -199,7 +199,7 @@ const Inventory = () => {
     try {
       const response = await fetch('http://localhost:5000/api/categories');
       const data = await response.json();
-      
+
       if (data.success && Array.isArray(data.data)) {
         // Filter only active categories, exclude "Others", and map with icons
         const activeCategories = data.data
@@ -208,7 +208,7 @@ const Inventory = () => {
             name: cat.name,
             icon: categoryIconMap[cat.name] || allIcon
           }));
-        
+
         // Add 'All' at the beginning
         setCategories([
           { name: 'All', icon: allIcon },
@@ -262,20 +262,20 @@ const Inventory = () => {
         return match ? parseInt(match[1]) : 0;
       })
       .filter(num => num > 0);
-    
+
     // Get the highest number, or start from 0
     const maxCode = numericCodes.length > 0 ? Math.max(...numericCodes) : 0;
-    
+
     // Increment and pad with zeros to 5 digits
     return String(maxCode + 1).padStart(5, '0');
   };
 
- 
+
   const getColorCode = (variant) => {
     if (!variant || variant.trim() === '') {
       return 'XXX';
     }
-    
+
     const cleaned = variant.replace(/\s+/g, '').toUpperCase();
     return cleaned.substring(0, 3).padEnd(3, 'X');
   };
@@ -283,18 +283,18 @@ const Inventory = () => {
 
   const generateSKU = (category, variant) => {
     const categoryCode = categoryCodeMap[category] || 'OTH';
-    
+
     // Generate random alphanumeric string (6 characters)
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let randomCode = '';
     for (let i = 0; i < 6; i++) {
       randomCode += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    
+
     if (!variant || variant.trim() === '') {
       return `${categoryCode}-${randomCode}`;
     }
-    
+
     const colorCode = getColorCode(variant);
     return `${categoryCode}-${randomCode}-${colorCode}`;
   };
@@ -347,7 +347,7 @@ const Inventory = () => {
 
     // Search filter
     if (searchQuery) {
-      filtered = filtered.filter(product => 
+      filtered = filtered.filter(product =>
         product.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -395,7 +395,7 @@ const Inventory = () => {
       const reorderLevel = p.reorderNumber || 10;
       return p.currentStock > 0 && p.currentStock <= reorderLevel;
     }).length;
-    
+
     const inStockItems = products.filter(p => {
       const reorderLevel = p.reorderNumber || 10;
       return p.currentStock > reorderLevel;
@@ -415,7 +415,7 @@ const Inventory = () => {
   const someVisibleSelected = paginatedProductIds.some(id => selectedProductIds.includes(id));
 
   useEffect(() => {
-    setCurrentPage(1); 
+    setCurrentPage(1);
   }, [filterCategory, filterBrand, filterStatus, searchQuery, sortBy]);
 
   useEffect(() => {
@@ -429,7 +429,7 @@ const Inventory = () => {
       setLoading(true);
       const response = await fetch('http://localhost:5000/api/products');
       const data = await response.json();
-      
+
       if (data.success) {
         setProducts(data.data);
         setCachedData('products', data.data);
@@ -445,7 +445,7 @@ const Inventory = () => {
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     const inputValue = type === 'checkbox' ? checked : value;
-    
+
     // Explicitly handle displayInTerminal checkbox
     if (name === 'displayInTerminal' && type === 'checkbox') {
       setNewProduct(prev => ({
@@ -454,20 +454,20 @@ const Inventory = () => {
       }));
       return;
     }
-    
+
     setNewProduct(prev => {
       const updatedProduct = {
         ...prev,
         [name]: inputValue
       };
-      
+
 
       if (!editingProduct && (name === 'category' || name === 'variant')) {
         const category = name === 'category' ? inputValue : prev.category;
         const variant = name === 'variant' ? inputValue : prev.variant;
         updatedProduct.sku = generateSKU(category, variant);
       }
-      
+
       return updatedProduct;
     });
   };
@@ -478,7 +478,7 @@ const Inventory = () => {
       const newSelectedSizes = isSelected
         ? prev.selectedSizes.filter(s => s !== size)
         : [...prev.selectedSizes, size];
-      
+
       const newSizeQuantities = { ...prev.sizeQuantities };
       const newSizePrices = { ...prev.sizePrices };
       if (isSelected) {
@@ -491,7 +491,7 @@ const Inventory = () => {
           newSizePrices[size] = prev.itemPrice || '';
         }
       }
-      
+
       return {
         ...prev,
         selectedSizes: newSelectedSizes,
@@ -546,7 +546,7 @@ const Inventory = () => {
       displayInTerminal: true
     });
     setEditingProduct(null);
-    
+
     // Clear localStorage draft when form is reset
     if (clearStorage) {
       try {
@@ -559,13 +559,13 @@ const Inventory = () => {
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    
+
     // Only validate stock/sizes when adding new product
     if (!editingProduct) {
-      const hasSizeQuantities = newProduct.selectedSizes?.length > 0 && 
+      const hasSizeQuantities = newProduct.selectedSizes?.length > 0 &&
         Object.values(newProduct.sizeQuantities || {}).some(qty => qty > 0);
       const hasStock = parseInt(newProduct.currentStock) > 0;
-      
+
       if (!hasSizeQuantities && !hasStock) {
         alert('Please either select sizes with quantities or provide a stock value.');
         return;
@@ -577,7 +577,7 @@ const Inventory = () => {
           const price = newProduct.sizePrices?.[size];
           return !price || price === '' || parseFloat(price) <= 0;
         });
-        
+
         if (missingPrices.length > 0) {
           alert(`Please enter prices for all selected sizes: ${missingPrices.join(', ')}`);
           return;
@@ -589,7 +589,7 @@ const Inventory = () => {
           return;
         }
       }
-      
+
       setShowConfirmModal(true);
     } else {
       setProductToEdit(editingProduct);
@@ -599,19 +599,19 @@ const Inventory = () => {
 
   const confirmAddProduct = async () => {
     setShowConfirmModal(false);
-    
+
     const totalStock = newProduct.selectedSizes?.length > 0
       ? Object.values(newProduct.sizeQuantities || {}).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0)
       : parseInt(newProduct.currentStock) || 0;
-    
+
     try {
       setLoading(true);
-      const url = editingProduct 
+      const url = editingProduct
         ? `http://localhost:5000/api/products/${editingProduct._id}`
         : 'http://localhost:5000/api/products';
-      
+
       const method = editingProduct ? 'PUT' : 'POST';
-      
+
       // Prepare payload - exclude sizes and stock when editing
       // If differentPricesPerSize is enabled, use first size price as default itemPrice if itemPrice is not set
       let defaultItemPrice = parseFloat(newProduct.itemPrice) || 0;
@@ -621,7 +621,7 @@ const Inventory = () => {
           defaultItemPrice = parseFloat(firstSizePrice) || 0;
         }
       }
-      
+
       const payload = {
         ...newProduct,
         itemPrice: defaultItemPrice,
@@ -629,7 +629,7 @@ const Inventory = () => {
         reorderNumber: parseInt(newProduct.reorderNumber) || 0,
         displayInTerminal: newProduct.displayInTerminal !== false
       };
-      
+
       // Only include stock and sizes when adding new product
       if (!editingProduct) {
         payload.currentStock = totalStock;
@@ -652,7 +652,7 @@ const Inventory = () => {
           payload.sizes = null;
         }
       }
-      
+
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -661,7 +661,7 @@ const Inventory = () => {
         body: JSON.stringify(payload)
       });
 
-     
+
       if (!response.ok) {
         if (response.status === 413) {
           alert('Image file is too large. Please use a smaller image or compress it before uploading.');
@@ -700,12 +700,12 @@ const Inventory = () => {
 
   const handleEditClick = (product) => {
     setEditingProduct(product);
-    
+
     const existingSizes = product.sizes ? Object.keys(product.sizes) : [];
     let existingSizeQuantities = {};
     let existingSizePrices = {};
     let hasDifferentPrices = false;
-    
+
     // Check if sizes contain price information (object with quantity and price)
     if (product.sizes) {
       existingSizes.forEach(size => {
@@ -720,7 +720,7 @@ const Inventory = () => {
         }
       });
     }
-    
+
     setNewProduct({
       sku: product.sku || '',
       itemName: product.itemName || '',
@@ -742,24 +742,24 @@ const Inventory = () => {
       foodSubtype: product.foodSubtype || '',
       displayInTerminal: product.displayInTerminal !== undefined ? product.displayInTerminal : true
     });
-    
+
     setShowAddModal(true);
   };
 
   const confirmEditProduct = async () => {
     setShowEditModal(false);
-    
+
     if (!editingProduct) return;
-    
+
     try {
       setLoading(true);
       const url = `http://localhost:5000/api/products/${editingProduct._id}`;
-      
+
       // Prepare payload - exclude sizes and stock when editing
       // Ensure displayInTerminal is explicitly set: true = show in terminal, false = don't show
       // Explicitly handle the boolean value - if it's explicitly false, use false, otherwise default to true
       const displayInTerminalValue = newProduct.displayInTerminal === false ? false : true;
-      
+
       const payload = {
         ...newProduct,
         itemPrice: parseFloat(newProduct.itemPrice) || 0,
@@ -767,10 +767,10 @@ const Inventory = () => {
         reorderNumber: parseInt(newProduct.reorderNumber) || 0,
         displayInTerminal: displayInTerminalValue
       };
-      
+
       console.log('[confirmEditProduct] newProduct.displayInTerminal:', newProduct.displayInTerminal);
       console.log('[confirmEditProduct] Sending displayInTerminal:', payload.displayInTerminal);
-      
+
       // Remove stock and size-related fields from payload
       delete payload.currentStock;
       delete payload.sizes;
@@ -778,7 +778,7 @@ const Inventory = () => {
       delete payload.sizeQuantities;
       delete payload.sizePrices;
       delete payload.differentPricesPerSize;
-      
+
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
@@ -842,9 +842,9 @@ const Inventory = () => {
 
   const confirmDeleteProduct = async () => {
     if (!productToDelete) return;
-    
+
     setShowDeleteModal(false);
-    
+
     try {
       setLoading(true);
       const response = await fetch(`http://localhost:5000/api/products/${productToDelete}`, {
@@ -879,7 +879,7 @@ const Inventory = () => {
 
   const handleStockSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!stockAmount || parseInt(stockAmount) <= 0) {
       alert('Please enter a valid quantity');
       return;
@@ -888,7 +888,7 @@ const Inventory = () => {
     try {
       setLoading(true);
       const amount = parseInt(stockAmount);
-      const newStock = stockModalType === 'in' 
+      const newStock = stockModalType === 'in'
         ? editingProduct.currentStock + amount
         : Math.max(0, editingProduct.currentStock - amount);
 
@@ -929,9 +929,9 @@ const Inventory = () => {
 
     try {
       setLoading(true);
-      
+
       const updatedSizes = { ...(editingProduct.sizes || {}) };
-      
+
       // Helper to get quantity from size data
       const getSizeQty = (sizeData) => {
         if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
@@ -939,7 +939,7 @@ const Inventory = () => {
         }
         return typeof sizeData === 'number' ? sizeData : 0;
       };
-      
+
       // Helper to get price from size data
       const getSizePrice = (sizeData) => {
         if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
@@ -947,14 +947,14 @@ const Inventory = () => {
         }
         return null;
       };
-      
+
       stockData.selectedSizes.forEach(size => {
         const currentSizeData = updatedSizes[size];
         const currentQty = getSizeQty(currentSizeData);
         const currentPrice = getSizePrice(currentSizeData);
         const addQty = stockData.sizes[size] || 0;
         const newQty = currentQty + addQty;
-        
+
         // Preserve price structure if it exists
         if (currentPrice !== null || (typeof currentSizeData === 'object' && currentSizeData !== null)) {
           updatedSizes[size] = {
@@ -965,7 +965,7 @@ const Inventory = () => {
           updatedSizes[size] = newQty;
         }
       });
-      
+
       const totalStock = Object.values(updatedSizes).reduce((sum, sizeData) => sum + getSizeQty(sizeData), 0);
       const stockBefore = editingProduct.currentStock || 0;
       const addedQuantity = totalStock - stockBefore;
@@ -1028,9 +1028,9 @@ const Inventory = () => {
 
     try {
       setLoading(true);
-      
+
       const updatedSizes = { ...(editingProduct.sizes || {}) };
-      
+
       // Helper to get quantity from size data
       const getSizeQty = (sizeData) => {
         if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
@@ -1038,7 +1038,7 @@ const Inventory = () => {
         }
         return typeof sizeData === 'number' ? sizeData : 0;
       };
-      
+
       // Helper to get price from size data
       const getSizePrice = (sizeData) => {
         if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
@@ -1046,14 +1046,14 @@ const Inventory = () => {
         }
         return null;
       };
-      
+
       stockData.selectedSizes.forEach(size => {
         const currentSizeData = updatedSizes[size];
         const currentQty = getSizeQty(currentSizeData);
         const currentPrice = getSizePrice(currentSizeData);
         const removeQty = stockData.sizes[size] || 0;
         const newQty = Math.max(0, currentQty - removeQty);
-        
+
         // Preserve price structure if it exists
         if (currentPrice !== null || (typeof currentSizeData === 'object' && currentSizeData !== null)) {
           updatedSizes[size] = {
@@ -1064,7 +1064,7 @@ const Inventory = () => {
           updatedSizes[size] = newQty;
         }
       });
-      
+
       const totalStock = Object.values(updatedSizes).reduce((sum, sizeData) => sum + getSizeQty(sizeData), 0);
 
       // Get current user info
@@ -1073,8 +1073,8 @@ const Inventory = () => {
       const handledById = currentUser._id || currentUser.id || '';
 
       // Determine type based on reason
-      const movementType = stockData.reason === 'Damaged' || stockData.reason === 'Lost' || stockData.reason === 'Expired' 
-        ? 'Pull-Out' 
+      const movementType = stockData.reason === 'Damaged' || stockData.reason === 'Lost' || stockData.reason === 'Expired'
+        ? 'Pull-Out'
         : 'Stock-Out';
 
       // Calculate size quantities that were removed
@@ -1113,7 +1113,7 @@ const Inventory = () => {
           // Create archive entries for each size
           const totalQuantityRemoved = Object.values(sizeQuantitiesRemoved).reduce((sum, qty) => sum + qty, 0);
           const sizesString = stockData.selectedSizes.join(', ');
-          
+
           try {
             await fetch('http://localhost:5000/api/archive', {
               method: 'POST',
@@ -1254,7 +1254,7 @@ const Inventory = () => {
       const filteredPreferredOrder = preferredExportFieldOrder.filter(
         field => !excludedFields.includes(field)
       );
-      
+
       const orderedFields = filteredPreferredOrder.filter(field => dynamicFields.has(field));
       const remainingFields = Array.from(dynamicFields).filter(field => !orderedFields.includes(field)).sort();
       const headers = [...orderedFields, ...remainingFields, 'stockStatus'];
@@ -1278,7 +1278,7 @@ const Inventory = () => {
       // Convert to CSV format
       const csvContent = [
         humanReadableHeaders.join(','),
-        ...rows.map(row => 
+        ...rows.map(row =>
           row.map(cell => {
             // Escape cells that contain commas, quotes, or newlines
             const cellStr = String(cell ?? '');
@@ -1294,15 +1294,15 @@ const Inventory = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
-      
+
       link.setAttribute('href', url);
       link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
       link.style.visibility = 'hidden';
-      
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       alert(`${productsToExport.length} products exported successfully!`);
       setIsExportSelectionMode(false);
       setSelectedProductIds([]);
@@ -1320,7 +1320,7 @@ const Inventory = () => {
       setLoading(true);
       const text = await file.text();
       const lines = text.split('\n').filter(line => line.trim());
-      
+
       if (lines.length < 2) {
         alert('CSV file is empty or invalid');
         return;
@@ -1329,7 +1329,7 @@ const Inventory = () => {
       // Parse CSV
       const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
       const rows = lines.slice(1);
-      
+
       let successCount = 0;
       let errorCount = 0;
       const errors = [];
@@ -1340,7 +1340,7 @@ const Inventory = () => {
           const values = [];
           let currentValue = '';
           let insideQuotes = false;
-          
+
           for (let char of rows[i]) {
             if (char === '"') {
               insideQuotes = !insideQuotes;
@@ -1356,7 +1356,7 @@ const Inventory = () => {
           // Map values to product object
           const sizesValue = values[headers.indexOf('Sizes')] || '';
           let parsedSizes = null;
-          
+
           // Try to parse sizes JSON
           if (sizesValue && sizesValue.trim() !== '') {
             try {
@@ -1365,10 +1365,10 @@ const Inventory = () => {
               console.warn('Failed to parse sizes JSON:', e);
             }
           }
-          
+
           // Get SKU from CSV if available, otherwise let backend auto-generate
           const skuFromCsv = values[headers.indexOf('SKU')]?.trim();
-          
+
           const product = {
             itemName: values[headers.indexOf('Item Name')] || '',
             category: values[headers.indexOf('Category')] || 'Foods',
@@ -1383,7 +1383,7 @@ const Inventory = () => {
             itemImage: values[headers.indexOf('Image URL')] || '',
             sizes: parsedSizes
           };
-          
+
           // Only include SKU if it exists in CSV
           if (skuFromCsv) {
             product.sku = skuFromCsv;
@@ -1406,7 +1406,7 @@ const Inventory = () => {
           });
 
           const data = await response.json();
-          
+
           if (data.success) {
             successCount++;
           } else {
@@ -1422,13 +1422,13 @@ const Inventory = () => {
       // Show results in modal
       setImportResult({ successCount, errorCount, errors });
       setShowImportResultModal(true);
-      
+
       // Refresh products list
       if (successCount > 0) {
         invalidateCache('products');
         fetchProducts();
       }
-      
+
       // Reset file input
       event.target.value = '';
     } catch (error) {
@@ -1441,328 +1441,330 @@ const Inventory = () => {
   };
 
   return (
-      <div className="p-8 min-h-screen">
-        <Header pageName="Product & Stocks" showBorder={false} />
+    <div className="p-8 min-h-screen">
+      <Header pageName="Product & Stocks" showBorder={false} />
 
-        
-        <div className="mb-6">
-          <div className="flex gap-4 flex-wrap">
-            <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
-              <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-500"></div>
-              <div className="ml-2">
-                <div className="text-3xl font-bold text-blue-500">{stockStats.totalItems.toLocaleString()}</div>
-                <div className="text-xs text-blue-400 mt-0.5">Total Items</div>
-              </div>
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
-                </svg>
-              </div>
+
+      <div className="mb-6">
+        <div className="flex gap-4 flex-wrap">
+          <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
+            <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-500"></div>
+            <div className="ml-2">
+              <div className="text-3xl font-bold text-blue-500">{stockStats.totalItems.toLocaleString()}</div>
+              <div className="text-xs text-blue-400 mt-0.5">Total Items</div>
             </div>
-
-            <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
-              <div className="absolute left-0 top-0 bottom-0 w-2 bg-green-500"></div>
-              <div className="ml-2">
-                <div className="text-3xl font-bold text-green-500">{stockStats.inStockItems.toLocaleString()}</div>
-                <div className="text-xs text-green-400 mt-0.5">In Stock</div>
-              </div>
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                  <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
-                </svg>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
-              <div className="absolute left-0 top-0 bottom-0 w-2 bg-orange-500"></div>
-              <div className="ml-2">
-                <div className="text-3xl font-bold text-orange-500">{stockStats.lowStockItems}</div>
-                <div className="text-xs text-orange-400 mt-0.5">Low Stock</div>
-              </div>
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
-              <div className="absolute left-0 top-0 bottom-0 w-2 bg-red-500"></div>
-              <div className="ml-2">
-                <div className="text-3xl font-bold text-red-500">{stockStats.outOfStockItems}</div>
-                <div className="text-xs text-red-400 mt-0.5">Out-of-Stock</div>
-              </div>
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-
-            <button 
-              onClick={handleExportButtonClick}
-              className={`bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isExportSelectionMode ? 'border border-[#AD7F65] bg-[#AD7F65]/5' : 'hover:bg-gray-50'}`} 
-              style={{ minWidth: '100px' }}
-            >
-              <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
               </svg>
-              <div className="text-xs font-medium text-gray-700">
-                {isExportSelectionMode ? 'Export Selected' : 'Export'}
-              </div>
-            </button>
-            {isExportSelectionMode && (
-              <button
-                onClick={handleCancelExportSelection}
-                className="bg-white rounded-2xl shadow-md px-4 py-2 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-            )}
+            </div>
+          </div>
 
-            <button 
-              onClick={() => document.getElementById('csv-file-input').click()}
-              className="bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 hover:bg-gray-50 transition-colors" 
-              style={{ minWidth: '100px' }}
-            >
-              <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
+            <div className="absolute left-0 top-0 bottom-0 w-2 bg-green-500"></div>
+            <div className="ml-2">
+              <div className="text-3xl font-bold text-green-500">{stockStats.inStockItems.toLocaleString()}</div>
+              <div className="text-xs text-green-400 mt-0.5">In Stock</div>
+            </div>
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
               </svg>
-              <div className="text-xs font-medium text-gray-700">Import</div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
+            <div className="absolute left-0 top-0 bottom-0 w-2 bg-orange-500"></div>
+            <div className="ml-2">
+              <div className="text-3xl font-bold text-orange-500">{stockStats.lowStockItems}</div>
+              <div className="text-xs text-orange-400 mt-0.5">Low Stock</div>
+            </div>
+            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
+            <div className="absolute left-0 top-0 bottom-0 w-2 bg-red-500"></div>
+            <div className="ml-2">
+              <div className="text-3xl font-bold text-red-500">{stockStats.outOfStockItems}</div>
+              <div className="text-xs text-red-400 mt-0.5">Out-of-Stock</div>
+            </div>
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+          </div>
+
+          <button
+            onClick={handleExportButtonClick}
+            className={`bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isExportSelectionMode ? 'border border-[#AD7F65] bg-[#AD7F65]/5' : 'hover:bg-gray-50'}`}
+            style={{ minWidth: '100px' }}
+          >
+            <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <div className="text-xs font-medium text-gray-700">
+              {isExportSelectionMode ? 'Export Selected' : 'Export'}
+            </div>
+          </button>
+          {isExportSelectionMode && (
+            <button
+              onClick={handleCancelExportSelection}
+              className="bg-white rounded-2xl shadow-md px-4 py-2 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
             </button>
+          )}
+
+          <button
+            onClick={() => document.getElementById('csv-file-input').click()}
+            className="bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 hover:bg-gray-50 transition-colors"
+            style={{ minWidth: '100px' }}
+          >
+            <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <div className="text-xs font-medium text-gray-700">Import</div>
+          </button>
+          <input
+            id="csv-file-input"
+            type="file"
+            accept=".csv"
+            onChange={handleImportFromCSV}
+            style={{ display: 'none' }}
+          />
+        </div>
+      </div>
+
+
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-3">
+          <div className="relative" style={{ width: '300px' }}>
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+              <FaSearch className="text-gray-400" />
+            </div>
             <input
-              id="csv-file-input"
-              type="file"
-              accept=".csv"
-              onChange={handleImportFromCSV}
-              style={{ display: 'none' }}
+              type="text"
+              placeholder="Search For..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-10 pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
             />
           </div>
+
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+          >
+            <option value="All">By Category</option>
+            {categories.filter(c => c.name !== 'All').map(cat => (
+              <option key={cat.name} value={cat.name}>{cat.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={filterBrand}
+            onChange={(e) => setFilterBrand(e.target.value)}
+            className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+          >
+            <option value="All">By Brand</option>
+            {uniqueBrands.map(brand => (
+              <option key={brand} value={brand}>{brand}</option>
+            ))}
+          </select>
+
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+          >
+            <option value="All">By Status</option>
+            <option value="In Stock">In Stock</option>
+            <option value="Low Stock">Low Stock</option>
+            <option value="Out of Stock">Out of Stock</option>
+          </select>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+          >
+            <option value="sku-new">SKU: Newest First</option>
+            <option value="sku-old">SKU: Oldest First</option>
+            <option value="name">Sort By Name</option>
+            <option value="price-low">Price: Low to High</option>
+            <option value="price-high">Price: High to Low</option>
+            <option value="stock-low">Stock: Low to High</option>
+            <option value="stock-high">Stock: High to Low</option>
+            <option value="date-new">Date: Newest First</option>
+            <option value="date-old">Date: Oldest First</option>
+          </select>
         </div>
-
-     
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <div className="relative" style={{ width: '300px' }}>
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                <FaSearch className="text-gray-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search For..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-10 pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-              />
-            </div>
-            
-            <select 
-              value={filterCategory} 
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
-            >
-              <option value="All">By Category</option>
-              {categories.filter(c => c.name !== 'All').map(cat => (
-                <option key={cat.name} value={cat.name}>{cat.name}</option>
-              ))}
-            </select>
-            
-            <select 
-              value={filterBrand} 
-              onChange={(e) => setFilterBrand(e.target.value)}
-              className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
-            >
-              <option value="All">By Brand</option>
-              {uniqueBrands.map(brand => (
-                <option key={brand} value={brand}>{brand}</option>
-              ))}
-            </select>
-            
-            <select 
-              value={filterStatus} 
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
-            >
-              <option value="All">By Status</option>
-              <option value="In Stock">In Stock</option>
-              <option value="Low Stock">Low Stock</option>
-              <option value="Out of Stock">Out of Stock</option>
-            </select>
-            
-            <select 
-              value={sortBy} 
-              onChange={(e) => setSortBy(e.target.value)}
-              className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
-            >
-              <option value="sku-new">SKU: Newest First</option>
-              <option value="sku-old">SKU: Oldest First</option>
-              <option value="name">Sort By Name</option>
-              <option value="price-low">Price: Low to High</option>
-              <option value="price-high">Price: High to Low</option>
-              <option value="stock-low">Stock: Low to High</option>
-              <option value="stock-high">Stock: High to Low</option>
-              <option value="date-new">Date: Newest First</option>
-              <option value="date-old">Date: Oldest First</option>
-            </select>
-          </div>
-          <div className="flex gap-3">
-            <button 
-              onClick={() => {
-                resetProductForm();
-                setShowAddModal(true);
-              }}
-              className="px-6 py-2 text-white rounded-lg hover:opacity-90 flex items-center gap-2 font-medium transition-all"
-              style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
-            >
-              <FaPlus /> Add New Item
-            </button>
-          </div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => {
+              resetProductForm();
+              setShowAddModal(true);
+            }}
+            className="px-6 py-2 text-white rounded-lg hover:opacity-90 flex items-center gap-2 font-medium transition-all"
+            style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+          >
+            <FaPlus /> Add New Item
+          </button>
         </div>
-
-        <ProductTable
-          loading={loading}
-          filteredProducts={paginatedProducts}
-          handleEditProduct={handleEditClick}
-          handleDeleteProduct={handleDeleteClick}
-          handleViewProduct={handleViewProduct}
-          handleStockUpdate={handleStockUpdate}
-          selectedProductIds={selectedProductIds}
-          onToggleSelect={handleToggleProductSelection}
-          onToggleSelectAll={handleToggleSelectAllVisible}
-          showSelection={isExportSelectionMode}
-          allVisibleSelected={allVisibleSelected}
-          someVisibleSelected={someVisibleSelected}
-        />
-
-        {filteredProducts.length >= itemsPerPage && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(filteredProducts.length / itemsPerPage)}
-            onPageChange={setCurrentPage}
-          />
-        )}
-
-
-        <AddProductModal
-          showAddModal={showAddModal}
-          setShowAddModal={setShowAddModal}
-          editingProduct={editingProduct}
-          setEditingProduct={setEditingProduct}
-          newProduct={newProduct}
-          setNewProduct={setNewProduct}
-          handleAddProduct={handleAddProduct}
-          handleInputChange={handleInputChange}
-          handleSizeToggle={handleSizeToggle}
-          handleSizeQuantityChange={handleSizeQuantityChange}
-          handleSizePriceChange={handleSizePriceChange}
-          resetProductForm={resetProductForm}
-          loading={loading}
-          categories={categories}
-          brandPartners={brandPartners}
-        />
-
-        <ConfirmAddProductModal
-          isOpen={showConfirmModal}
-          onClose={() => setShowConfirmModal(false)}
-          onConfirm={confirmAddProduct}
-          productName={newProduct.itemName}
-        />
-
-        <SuccessModal
-          isOpen={showSuccessModal}
-          onClose={() => setShowSuccessModal(false)}
-          message={successMessage || "The item was added successfully!"}
-        />
-
-        <DeleteConfirmationModal
-          isOpen={showDeleteModal}
-          onClose={() => {
-            setShowDeleteModal(false);
-            setProductToDelete(null);
-          }}
-          onConfirm={confirmDeleteProduct}
-          itemName={productToDelete ? filteredProducts.find(p => p._id === productToDelete)?.itemName : ''}
-        />
-
-        <EditConfirmationModal
-          isOpen={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setProductToEdit(null);
-          }}
-          onConfirm={confirmEditProduct}
-          itemName={productToEdit?.itemName || editingProduct?.itemName || ''}
-        />
-
-        <ViewProductModal
-          showViewModal={showViewModal}
-          setShowViewModal={setShowViewModal}
-          viewingProduct={viewingProduct}
-          formatDate={formatDate}
-        />
-
-        {showStockModal && stockModalType === 'in' && (
-          <StockInModal
-            isOpen={showStockModal}
-            onClose={() => {
-              setShowStockModal(false);
-              setEditingProduct(null);
-              setStockAmount('');
-            }}
-            product={editingProduct}
-            onConfirm={handleStockInConfirm}
-            loading={loading}
-          />
-        )}
-
-        {showStockModal && stockModalType === 'out' && (
-          <StockOutModal
-            isOpen={showStockModal}
-            onClose={() => {
-              setShowStockModal(false);
-              setEditingProduct(null);
-              setStockAmount('');
-            }}
-            product={editingProduct}
-            onConfirm={handleStockOutConfirm}
-            loading={loading}
-          />
-        )}
-
-        {showImportResultModal && (
-          <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-[#2D2D2D] rounded-2xl w-full max-w-2xl p-8 text-white shadow-2xl">
-              <h2 className="text-2xl font-bold mb-4">localhost:5173 says</h2>
-              <div className="space-y-4 mb-6">
-                <p className="text-lg">Import completed!</p>
-                <div className="space-y-2">
-                  <p>Successful: {importResult.successCount}</p>
-                  <p>Failed: {importResult.errorCount}</p>
-                </div>
-                {importResult.errors.length > 0 && (
-                  <div className="mt-4">
-                    <p className="mb-2">Showing first 5 errors:</p>
-                    <div className="bg-black/30 rounded-lg p-4 max-h-60 overflow-y-auto">
-                      {importResult.errors.slice(0, 5).map((error, idx) => (
-                        <p key={idx} className="text-sm mb-1">{error}</p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setShowImportResultModal(false)}
-                  className="px-8 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium transition-colors"
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      <ProductTable
+        loading={loading}
+        filteredProducts={paginatedProducts}
+        handleEditProduct={handleEditClick}
+        handleDeleteProduct={handleDeleteClick}
+        handleViewProduct={handleViewProduct}
+        handleStockUpdate={handleStockUpdate}
+        selectedProductIds={selectedProductIds}
+        onToggleSelect={handleToggleProductSelection}
+        onToggleSelectAll={handleToggleSelectAllVisible}
+        showSelection={isExportSelectionMode}
+        allVisibleSelected={allVisibleSelected}
+        someVisibleSelected={someVisibleSelected}
+      />
+
+      {filteredProducts.length >= itemsPerPage && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={Math.ceil(filteredProducts.length / itemsPerPage)}
+          onPageChange={setCurrentPage}
+        />
+      )}
+
+
+      <AddProductModal
+        showAddModal={showAddModal}
+        setShowAddModal={setShowAddModal}
+        editingProduct={editingProduct}
+        setEditingProduct={setEditingProduct}
+        newProduct={newProduct}
+        setNewProduct={setNewProduct}
+        handleAddProduct={handleAddProduct}
+        handleInputChange={handleInputChange}
+        handleSizeToggle={handleSizeToggle}
+        handleSizeQuantityChange={handleSizeQuantityChange}
+        handleSizePriceChange={handleSizePriceChange}
+        resetProductForm={resetProductForm}
+        loading={loading}
+        categories={categories}
+        brandPartners={brandPartners}
+      />
+
+      <ConfirmAddProductModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={confirmAddProduct}
+        productName={newProduct.itemName}
+        onCategoryAdd={fetchCategories}
+        onBrandAdd={fetchBrandPartners}
+      />
+
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        message={successMessage || "The item was added successfully!"}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setProductToDelete(null);
+        }}
+        onConfirm={confirmDeleteProduct}
+        itemName={productToDelete ? filteredProducts.find(p => p._id === productToDelete)?.itemName : ''}
+      />
+
+      <EditConfirmationModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setProductToEdit(null);
+        }}
+        onConfirm={confirmEditProduct}
+        itemName={productToEdit?.itemName || editingProduct?.itemName || ''}
+      />
+
+      <ViewProductModal
+        showViewModal={showViewModal}
+        setShowViewModal={setShowViewModal}
+        viewingProduct={viewingProduct}
+        formatDate={formatDate}
+      />
+
+      {showStockModal && stockModalType === 'in' && (
+        <StockInModal
+          isOpen={showStockModal}
+          onClose={() => {
+            setShowStockModal(false);
+            setEditingProduct(null);
+            setStockAmount('');
+          }}
+          product={editingProduct}
+          onConfirm={handleStockInConfirm}
+          loading={loading}
+        />
+      )}
+
+      {showStockModal && stockModalType === 'out' && (
+        <StockOutModal
+          isOpen={showStockModal}
+          onClose={() => {
+            setShowStockModal(false);
+            setEditingProduct(null);
+            setStockAmount('');
+          }}
+          product={editingProduct}
+          onConfirm={handleStockOutConfirm}
+          loading={loading}
+        />
+      )}
+
+      {showImportResultModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-[#2D2D2D] rounded-2xl w-full max-w-2xl p-8 text-white shadow-2xl">
+            <h2 className="text-2xl font-bold mb-4">localhost:5173 says</h2>
+            <div className="space-y-4 mb-6">
+              <p className="text-lg">Import completed!</p>
+              <div className="space-y-2">
+                <p>Successful: {importResult.successCount}</p>
+                <p>Failed: {importResult.errorCount}</p>
+              </div>
+              {importResult.errors.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-2">Showing first 5 errors:</p>
+                  <div className="bg-black/30 rounded-lg p-4 max-h-60 overflow-y-auto">
+                    {importResult.errors.slice(0, 5).map((error, idx) => (
+                      <p key={idx} className="text-sm mb-1">{error}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowImportResultModal(false)}
+                className="px-8 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
