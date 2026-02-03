@@ -1,4 +1,17 @@
 import config from '../config/api';
+import NetworkService from './NetworkService';
+import OfflineService from './OfflineService';
+
+// Initialize Network Service
+NetworkService.init();
+
+// Sync queue when coming back online
+NetworkService.subscribe(async (isConnected) => {
+  if (isConnected) {
+    console.log('Network restored. Syncing offline queue...');
+    await syncOfflineQueue();
+  }
+});
 
 // Helper function to create a timeout promise
 const timeoutPromise = (ms) => {
@@ -7,11 +20,70 @@ const timeoutPromise = (ms) => {
   });
 };
 
+// Process offline queue
+const syncOfflineQueue = async () => {
+  const queue = await OfflineService.getQueue();
+  if (queue.length === 0) return;
+
+  console.log(`Syncing ${queue.length} offline actions...`);
+
+  for (const action of queue) {
+    try {
+      console.log('Replaying action:', action);
+      // We need to reconstruct the API call
+      // This is a simplified replay. In a real app, we might need more complex logic
+      // to handle dependent actions (e.g. create item, then update it).
+
+      const { endpoint, options, id } = action;
+
+      // Call the actual API (force online mode for this call to avoid loop)
+      await apiCall(endpoint, options, true);
+
+      // Remove from queue if successful
+      await OfflineService.removeFromQueue(id);
+    } catch (error) {
+      console.error('Failed to sync action:', action, error);
+      // Keep in queue to retry later? Or move to a "failed" queue?
+      // For now, we leave it. It will retry next time we sync.
+    }
+  }
+};
+
 // Helper function to make API calls with timeout
-const apiCall = async (endpoint, options = {}) => {
+const apiCall = async (endpoint, options = {}, forceOnline = false) => {
+  const isConnected = NetworkService.getIsConnected();
+  const method = options.method || 'GET';
+
+  // OFFLINE MODE
+  if (!isConnected && !forceOnline) {
+    console.log(`[OFFLINE] ${method} ${endpoint}`);
+
+    if (method === 'GET') {
+      // Try to get from cache
+      const cachedData = await OfflineService.getCache(endpoint);
+      if (cachedData) {
+        console.log('Serving from cache');
+        return cachedData;
+      } else {
+        throw new Error('No internet connection and no cached data available.');
+      }
+    } else {
+      // Queue write operations
+      const success = await OfflineService.queueAction({ endpoint, options });
+      if (success) {
+        console.log('Action queued for sync');
+        // Return a mock success response
+        return { success: true, message: 'Action queued (Offline Mode)', data: {} };
+      } else {
+        throw new Error('Failed to queue offline action.');
+      }
+    }
+  }
+
+  // ONLINE MODE
   const url = `${config.API_URL}${endpoint}`;
   const timeout = config.TIMEOUT || 10000;
-  
+
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
@@ -33,16 +105,32 @@ const apiCall = async (endpoint, options = {}) => {
       fetch(url, finalOptions),
       timeoutPromise(timeout)
     ]);
-    
+
     const data = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(data.message || `HTTP error! status: ${response.status}`);
     }
-    
+
+    // Cache successful GET requests
+    if (method === 'GET') {
+      OfflineService.saveCache(endpoint, data);
+    }
+
     return data;
   } catch (error) {
     console.error(`API Error [${endpoint}]:`, error.message);
+
+    // Fallback to cache if request fails (and it's a GET request)
+    if (method === 'GET') {
+      console.log('Request failed, attempting to serve from cache...');
+      const cachedData = await OfflineService.getCache(endpoint);
+      if (cachedData) {
+        console.log('Serving from cache (fallback)');
+        return cachedData;
+      }
+    }
+
     throw error;
   }
 };
@@ -219,7 +307,7 @@ export const employeeAPI = {
         method: 'POST',
         body: JSON.stringify({ pin }),
       });
-      
+
       // Check if the verified employee is an Owner
       if (response.success && response.data) {
         // Only allow Owner role to access mobile app
@@ -230,7 +318,7 @@ export const employeeAPI = {
             data: null
           };
         }
-        
+
         // Owner verified successfully
         return {
           success: true,
@@ -239,7 +327,7 @@ export const employeeAPI = {
           requiresPinReset: response.requiresPinReset || false
         };
       }
-      
+
       return response;
     } catch (error) {
       // Handle network or API errors
