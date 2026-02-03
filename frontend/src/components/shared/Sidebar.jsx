@@ -174,7 +174,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
     { name: 'Categories', path: '/categories' }
   ];
 
-  // POS/Transaction sub-menu items
+
   const posSubItems = [
     { name: 'Terminal', path: '/terminal' },
    
@@ -266,7 +266,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
           <div className="space-y-3">
             {menuItems.map((item) => {
               // Special handling for POS / Terminal dropdown
-              if (item.name === 'POS / Terminal') {
+              if (item.name === 'POS') {
                 const posActive = isPosActive();
                 const hasPosPermission = isOwner() || hasPermission('posTerminal');
                 
