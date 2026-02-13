@@ -2,11 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useState, useCallback } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { stockAPI } from "../../services/api";
 
 const Header = () => {
   const router = useRouter();
+  const [notificationCount, setNotificationCount] = useState(0);
 
   const [fontsLoaded] = useFonts({
     Allura: require("../shared/fontz/Allura-Regular.ttf"),
@@ -14,6 +17,23 @@ const Header = () => {
     DancingS: require("../shared/fontz/DancingScript.ttf"),
     Poppins: require("../shared/fontz/Poppins-Bold.ttf"),
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchNotifications = async () => {
+        try {
+          const response = await stockAPI.getLowStock();
+          if (response && response.success) {
+            setNotificationCount(response.count || 0);
+          }
+        } catch (error) {
+          console.error("Error fetching notifications:", error);
+        }
+      };
+
+      fetchNotifications();
+    }, [])
+  );
 
   if (!fontsLoaded) return null;
 
@@ -29,10 +49,16 @@ const Header = () => {
 
         <TouchableOpacity
           style={styles.notificationButton}
-          onPress={() => router.push("/Notification")} // ✅ Redirects to Notification.jsx
+          onPress={() => router.push("/Notification")}
         >
           <Ionicons name="notifications-outline" size={25} color="#fff" />
-          <View style={styles.notificationDot} />
+          {notificationCount > 0 && (
+            <View style={styles.notificationDot}>
+              <Text style={styles.notificationText}>
+                {notificationCount > 9 ? "9+" : notificationCount}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </LinearGradient>
     </View>
@@ -61,12 +87,22 @@ const styles = StyleSheet.create({
   },
   notificationDot: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
+    top: 4,
+    right: 4,
+    minWidth: 16,
+    height: 16,
     backgroundColor: "#FF3B30",
-    borderRadius: 4,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: "#AD7F65",
+  },
+  notificationText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });
 

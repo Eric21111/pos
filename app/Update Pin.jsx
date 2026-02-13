@@ -1,15 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
+  Alert
 } from "react-native";
+import { employeeAPI } from "../services/api";
 
 export default function UpdatePin() {
   const navigation = useNavigation();
@@ -25,16 +29,37 @@ export default function UpdatePin() {
   const [message, setMessage] = useState("");
   const [messageColor, setMessageColor] = useState("red");
   const [successModal, setSuccessModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  // Fake OLD PIN (replace with backend response later)
-  const storedOldPin = "123456";
   const PIN_LENGTH = 6;
 
-  const handleConfirm = () => {
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const stored = await AsyncStorage.getItem("currentEmployee");
+        if (stored) {
+          setCurrentUser(JSON.parse(stored));
+        }
+      } catch (error) {
+        console.error("Failed to load user:", error);
+      }
+    };
+    loadUser();
+  }, []);
+
+  const handleConfirm = async () => {
     setMessage("");
 
-    if (oldPin !== storedOldPin) {
-      setMessage("Old PIN is incorrect.");
+    if (!currentUser) {
+      setMessage("User session not found. Please re-login.");
+      setMessageColor("red");
+      return;
+    }
+
+    // 1. Validate Form Inputs
+    if (oldPin.length !== PIN_LENGTH) {
+      setMessage(`Old PIN must be ${PIN_LENGTH} digits.`);
       setMessageColor("red");
       return;
     }
@@ -51,14 +76,52 @@ export default function UpdatePin() {
       return;
     }
 
-    setTimeout(() => {
-      setSuccessModal(true);
+    if (oldPin === newPin) {
+      setMessage("New PIN cannot be the same as the old PIN.");
+      setMessageColor("red");
+      return;
+    }
 
-      setTimeout(() => {
-        setSuccessModal(false);
-        router.push("/(tabs)/profile");
-      }, 1000);
-    }, 200);
+    try {
+      setLoading(true);
+      const employeeId = currentUser._id || currentUser.id;
+
+      // 2. Verify Old PIN
+      const verifyRes = await employeeAPI.verifyPin(oldPin, employeeId);
+
+      if (!verifyRes || !verifyRes.success) {
+        setMessage("Incorrect Old PIN.");
+        setMessageColor("red");
+        setLoading(false);
+        return;
+      }
+
+      // 3. Update to New PIN
+      // Backend expects: { pin: newPin } or { newPin: newPin }
+      // We'll send both to be safe, but controller checks `newPin || pin`
+      const updateRes = await employeeAPI.updatePin(employeeId, {
+        pin: newPin,
+        newPin: newPin
+      });
+
+      if (updateRes && updateRes.success) {
+        setSuccessModal(true);
+        setTimeout(() => {
+          setSuccessModal(false);
+          router.back();
+        }, 1500);
+      } else {
+        setMessage(updateRes?.message || "Failed to update PIN.");
+        setMessageColor("red");
+      }
+
+    } catch (error) {
+      console.error("Update PIN error:", error);
+      setMessage("An error occurred. Please try again.");
+      setMessageColor("red");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const PinField = ({ value, setValue, show, setShow, label }) => (
@@ -74,6 +137,7 @@ export default function UpdatePin() {
           keyboardType="numeric"
           maxLength={PIN_LENGTH}
           style={styles.input}
+          editable={!loading}
         />
 
         <TouchableOpacity onPress={() => setShow(!show)}>
@@ -90,43 +154,60 @@ export default function UpdatePin() {
 
   return (
     <View style={styles.container}>
-      <PinField
-        label="Old PIN"
-        value={oldPin}
-        setValue={setOldPin}
-        show={showOld}
-        setShow={setShowOld}
-      />
+      {/* Header / Back Button */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Update Pincode</Text>
+      </View>
 
-      <PinField
-        label="New PIN"
-        value={newPin}
-        setValue={setNewPin}
-        show={showNew}
-        setShow={setShowNew}
-      />
+      <View style={styles.content}>
+        <PinField
+          label="Old PIN"
+          value={oldPin}
+          setValue={setOldPin}
+          show={showOld}
+          setShow={setShowOld}
+        />
 
-      <PinField
-        label="Re-enter New PIN"
-        value={rePin}
-        setValue={setRePin}
-        show={showRe}
-        setShow={setShowRe}
-      />
+        <PinField
+          label="New PIN"
+          value={newPin}
+          setValue={setNewPin}
+          show={showNew}
+          setShow={setShowNew}
+        />
 
-      {message !== "" && (
-        <Text style={[styles.message, { color: messageColor }]}>{message}</Text>
-      )}
+        <PinField
+          label="Re-enter New PIN"
+          value={rePin}
+          setValue={setRePin}
+          show={showRe}
+          setShow={setShowRe}
+        />
 
-      <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
-        <Text style={styles.confirmText}>Confirm</Text>
-      </TouchableOpacity>
+        {message !== "" && (
+          <Text style={[styles.message, { color: messageColor }]}>{message}</Text>
+        )}
 
-      {/* Instruction / Description below Confirm button */}
-      <Text style={styles.instruction}>
-        Make sure your new PIN is 6 digits. Need to enter the correct old pin,
-        then enter the new pin, and then re-enter the new pin
-      </Text>
+        <TouchableOpacity
+          style={[styles.confirmBtn, loading && styles.disabledBtn]}
+          onPress={handleConfirm}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <Text style={styles.confirmText}>Confirm Change</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Instruction / Description below Confirm button */}
+        <Text style={styles.instruction}>
+          Enter your current 6-digit PIN to verify your identity, then create and confirm a new 6-digit PIN.
+        </Text>
+      </View>
 
       {/* SUCCESS POP NOTIFICATION */}
       <Modal transparent visible={successModal} animationType="fade">
@@ -144,8 +225,27 @@ export default function UpdatePin() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 25,
     backgroundColor: "#fff",
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 50, // Status bar
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  backBtn: {
+    padding: 5,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 15,
+    color: '#333',
+  },
+  content: {
+    padding: 25,
   },
   inputGroup: {
     marginBottom: 20,
@@ -154,6 +254,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     marginBottom: 8,
+    color: '#444',
   },
   inputWrapper: {
     flexDirection: "row",
@@ -162,23 +263,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 5,
+    backgroundColor: '#FAFAFA',
   },
   input: {
     flex: 1,
     padding: 12,
     fontSize: 18,
     letterSpacing: 3,
+    color: '#333',
   },
   message: {
     fontSize: 14,
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 15,
+    fontWeight: "500",
   },
   confirmBtn: {
-    backgroundColor: "#8B4513",
+    backgroundColor: "#AD7F65",
     padding: 15,
     borderRadius: 12,
     marginTop: 10,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  disabledBtn: {
+    opacity: 0.7,
   },
   confirmText: {
     textAlign: "center",
@@ -187,10 +299,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   instruction: {
-    marginTop: 8,
+    marginTop: 20,
     fontSize: 13,
-    color: "#777",
+    color: "#888",
     textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 10,
   },
   modalWrapper: {
     flex: 1,
@@ -200,13 +314,19 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: "#fff",
-    padding: 25,
-    borderRadius: 15,
+    padding: 30,
+    borderRadius: 20,
     alignItems: "center",
+    width: '80%',
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
   },
   successText: {
-    marginTop: 10,
-    fontSize: 16,
+    marginTop: 15,
+    fontSize: 18,
     fontWeight: "600",
+    color: "#333",
   },
 });

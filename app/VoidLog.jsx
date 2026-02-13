@@ -2,18 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    FlatList,
-    Modal,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    ActivityIndicator,
-    RefreshControl
+  FlatList,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { voidLogAPI } from '../services/api';
 
@@ -62,8 +62,8 @@ export default function VoidLog() {
   };
 
   const filteredLogs = voidLogs.filter(log => {
-    const transactionId = log.transactionId || log.transaction?.receiptNo || '';
-    const reason = log.reason || '';
+    const transactionId = log.voidId || log.transactionId || log.transaction?.receiptNo || '';
+    const reason = log.voidReason || '';
     const approvedBy = log.approvedBy || log.approvedByName || '';
     const searchLower = search.toLowerCase();
     return (
@@ -74,15 +74,15 @@ export default function VoidLog() {
   });
 
   const renderItem = ({ item }) => {
-    const transactionId = item.transactionId || item.transaction?.receiptNo || item._id || 'N/A';
-    const date = item.date || item.createdAt || item.timestamp || new Date();
-    const reason = item.reason || 'No reason provided';
+    const transactionId = item.voidId || item.transactionId || item.transaction?.receiptNo || item._id || 'N/A';
+    const date = item.voidedAt || item.date || item.createdAt || item.timestamp || new Date();
+    const reason = item.voidReason || 'No reason provided';
     const items = item.items || [];
-    const total = item.total || item.totalAmount || 0;
-    const approvedBy = item.approvedBy || item.approvedByName || 'N/A';
-    
+    const total = item.totalAmount || item.total || 0;
+    const approvedBy = item.approvedBy || item.voidedByName || 'N/A';
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.logItem}
         onPress={() => handleVoidPress(item)}
       >
@@ -98,20 +98,20 @@ export default function VoidLog() {
             })}
           </Text>
         </View>
-        
+
         <View style={styles.logDetails}>
           <Text style={styles.reason}>{reason}</Text>
           {items.length > 0 && (
             <Text style={styles.items}>
               {items.map((i, idx) => {
                 const qty = i.quantity || i.qty || 1;
-                const name = i.name || i.productName || 'Unknown';
+                const name = i.itemName || i.name || i.productName || 'Unknown';
                 return `${qty}x ${name}`;
               }).join(', ')}
             </Text>
           )}
         </View>
-        
+
         <View style={styles.logFooter}>
           <Text style={styles.total}>₱{parseFloat(total).toFixed(2)}</Text>
           <Text style={styles.approvedBy}>Approved by: {approvedBy}</Text>
@@ -183,24 +183,24 @@ export default function VoidLog() {
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.modalContent}>
               {selectedVoid && (() => {
-                const transactionId = selectedVoid.transactionId || selectedVoid.transaction?.receiptNo || selectedVoid._id || 'N/A';
-                const date = selectedVoid.date || selectedVoid.createdAt || selectedVoid.timestamp || new Date();
-                const reason = selectedVoid.reason || 'No reason provided';
+                const transactionId = selectedVoid.voidId || selectedVoid.transactionId || selectedVoid.transaction?.receiptNo || selectedVoid._id || 'N/A';
+                const date = selectedVoid.voidedAt || selectedVoid.date || selectedVoid.createdAt || selectedVoid.timestamp || new Date();
+                const reason = selectedVoid.voidReason || 'No reason provided';
                 const items = selectedVoid.items || [];
-                const total = selectedVoid.total || selectedVoid.totalAmount || 0;
-                const approvedBy = selectedVoid.approvedBy || selectedVoid.approvedByName || 'N/A';
-                const status = selectedVoid.status || 'Completed';
-                
+                const total = selectedVoid.totalAmount || selectedVoid.total || 0;
+                const approvedBy = selectedVoid.approvedBy || selectedVoid.voidedByName || 'N/A';
+                const status = selectedVoid.status || 'Voided';
+
                 return (
                   <>
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Transaction ID:</Text>
                       <Text style={styles.detailValue}>{transactionId}</Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Date & Time:</Text>
                       <Text style={styles.detailValue}>
@@ -213,13 +213,13 @@ export default function VoidLog() {
                         })}
                       </Text>
                     </View>
-                    
+
                     {items.length > 0 && (
                       <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Items Voided</Text>
                         {items.map((item, index) => {
                           const qty = item.quantity || item.qty || 1;
-                          const name = item.name || item.productName || 'Unknown';
+                          const name = item.itemName || item.name || item.productName || 'Unknown';
                           const price = item.price || 0;
                           return (
                             <View key={index} style={styles.itemRow}>
@@ -230,28 +230,28 @@ export default function VoidLog() {
                         })}
                       </View>
                     )}
-                    
+
                     <View style={styles.section}>
                       <View style={styles.totalRow}>
                         <Text style={styles.totalLabel}>Total Voided:</Text>
                         <Text style={styles.totalAmount}>₱{parseFloat(total).toFixed(2)}</Text>
                       </View>
                     </View>
-                    
+
                     <View style={styles.section}>
                       <Text style={styles.sectionTitle}>Reason for Void</Text>
                       <View style={styles.reasonBox}>
                         <Text style={styles.reasonText}>{reason}</Text>
                       </View>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Approved By:</Text>
                       <Text style={[styles.detailValue, { color: '#2E7D32' }]}>
                         {approvedBy}
                       </Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Status:</Text>
                       <View style={[
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  
+
   // Existing styles
   container: {
     flex: 1,

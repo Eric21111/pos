@@ -1,115 +1,84 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import { useState } from "react";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useState, useCallback } from "react";
 import {
-  Animated,
-  Dimensions,
+  ActivityIndicator,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from "react-native";
-
-const { width } = Dimensions.get('window');
-
-const initialNotifications = [
-  { 
-    id: "1", 
-    title: "Product #ILY143 is updated", 
-    description: "The product details have been successfully updated.",
-    time: "2 mins ago",
-    isRead: false 
-  },
-  { 
-    id: "2", 
-    title: "PIN was changed successfully", 
-    description: "Your account PIN has been updated.",
-    time: "10 mins ago",
-    isRead: false 
-  },
-  { 
-    id: "3", 
-    title: "Product #SKU111 is updated", 
-    description: "New stock has been added to this product.",
-    time: "1 hr ago",
-    isRead: false 
-  },
-  { 
-    id: "4", 
-    title: "PIN was changed successfully", 
-    description: "Your account PIN has been updated.",
-    time: "12 hr ago",
-    isRead: false 
-  },
-  { 
-    id: "5", 
-    title: "Product #SKU765 is updated", 
-    description: "Product price has been adjusted.",
-    time: "24 hr ago",
-    isRead: false 
-  },
-  { 
-    id: "6", 
-    title: "Product #UYP123 is updated", 
-    description: "Product category has been updated.",
-    time: "24 hr ago",
-    isRead: false 
-  },
-];
+import { stockAPI } from "../services/api";
 
 export default function Notification() {
   const navigation = useNavigation();
-  const [notifications, setNotifications] = useState(initialNotifications);
-  const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-
-  const handleMarkAsRead = () => {
-    if (isMarkingAll) return;
-    
-    setIsMarkingAll(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setNotifications(prevNotifications => 
-        prevNotifications.map(notification => ({
-          ...notification,
-          isRead: true
-        }))
-      );
-      setIsMarkingAll(false);
-    }, 500);
+  // Fetch stock alerts
+  const fetchNotifications = async () => {
+    try {
+      const response = await stockAPI.getLowStock();
+      if (response && response.success && response.data) {
+        // Transform stock data to notification format
+        const stockAlerts = response.data.map(item => ({
+          id: item._id,
+          title: item.alertType === 'out_of_stock'
+            ? `${item.itemName} is OUT OF STOCK`
+            : `${item.itemName} is running low`,
+          description: `Current stock: ${item.currentStock} ${item.reorderNumber ? `| Reorder level: ${item.reorderNumber}` : ''}`,
+          time: item.alertType === 'out_of_stock' ? 'Urgent' : 'Low Stock',
+          isRead: false,
+          type: item.alertType,
+          itemData: item
+        }));
+        setNotifications(stockAlerts);
+      } else {
+        setNotifications([]);
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const markAsRead = (id) => {
-    setNotifications(prevNotifications =>
-      prevNotifications.map(notification =>
-        notification.id === id 
-          ? { ...notification, isRead: true } 
-          : notification
-      )
-    );
+  // Fetch on focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotifications();
+    }, [])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchNotifications();
   };
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
-  const fadeAnim = useState(new Animated.Value(1))[0];
-
-  const handleMarkAll = () => {
-    if (unreadCount === 0) return;
-    
-    Animated.timing(fadeAnim, {
-      toValue: 0.6,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      handleMarkAsRead();
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    });
+  const getIconColor = (type) => {
+    return type === 'out_of_stock' ? '#D45D3E' : '#E6A23C';
   };
+
+  const getIconBg = (type) => {
+    return type === 'out_of_stock' ? '#FFE8E0' : '#FFF6E0';
+  };
+
+  const getIconName = (type) => {
+    return type === 'out_of_stock' ? 'alert-circle' : 'warning';
+  };
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Ionicons name="checkmark-circle-outline" size={80} color="#4CAF50" />
+      <Text style={styles.emptyText}>All Stocks Healthy</Text>
+      <Text style={styles.emptySubtext}>No low stock or out-of-stock items found.</Text>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -123,80 +92,76 @@ export default function Notification() {
           >
             <Ionicons name="arrow-back" size={24} color="#76462B" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          <TouchableOpacity
-            onPress={handleMarkAll}
-            style={[styles.markAllButton, (unreadCount === 0 || isMarkingAll) && styles.disabledButton]}
-            disabled={unreadCount === 0 || isMarkingAll}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.markAllText, unreadCount === 0 && styles.disabledText]}>
-              {isMarkingAll ? 'Marking...' : 'Mark All Read'}
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Stock Alerts</Text>
+          <View style={{ width: 40 }} />
         </View>
-        
-        {unreadCount > 0 && (
+
+        {notifications.length > 0 && (
           <View style={styles.unreadBadge}>
             <Text style={styles.unreadText}>
-              {unreadCount} {unreadCount === 1 ? 'unread' : 'unread'}
+              {notifications.length} {notifications.length === 1 ? 'alert' : 'alerts'}
             </Text>
           </View>
         )}
       </View>
 
       {/* Notification List */}
-      {notifications.length > 0 ? (
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#AD7F65" />
+          <Text style={styles.loadingText}>Checking stock levels...</Text>
+        </View>
+      ) : (
         <FlatList
           data={notifications}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={notifications.length === 0 ? styles.emptyListContent : styles.listContent}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={renderEmptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#AD7F65']}
+              tintColor="#AD7F65"
+            />
+          }
           renderItem={({ item }) => (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.card,
-                !item.isRead && styles.unreadCard
+                item.type === 'out_of_stock' && styles.outOfStockCard,
+                item.type === 'low_stock' && styles.lowStockCard
               ]}
-              activeOpacity={0.8}
-              onPress={() => !item.isRead && markAsRead(item.id)}
+              activeOpacity={0.9}
             >
               <View style={[
                 styles.iconContainer,
-                item.isRead ? styles.iconRead : styles.iconUnread
+                { backgroundColor: getIconBg(item.type) }
               ]}>
-                <Ionicons 
-                  name={item.isRead ? "notifications-off-outline" : "notifications-outline"} 
-                  size={20} 
-                  color={item.isRead ? "#888" : "#AD7F65"} 
+                <Ionicons
+                  name={getIconName(item.type)}
+                  size={24}
+                  color={getIconColor(item.type)}
                 />
               </View>
               <View style={styles.textContainer}>
                 <View style={styles.titleRow}>
                   <Text style={[
                     styles.title,
-                    item.isRead && styles.readTitle
+                    item.type === 'out_of_stock' ? styles.outOfStockTitle : styles.lowStockTitle
                   ]}>
                     {item.title}
                   </Text>
-                  {!item.isRead && <View style={styles.unreadDot} />}
                 </View>
                 <Text style={styles.description}>
                   {item.description}
                 </Text>
-                <Text style={styles.time}>
-                  {item.time}
-                </Text>
+                <Text style={styles.skuText}>SKU: {item.itemData.sku}</Text>
               </View>
             </TouchableOpacity>
           )}
         />
-      ) : (
-        <View style={styles.emptyState}>
-          <Ionicons name="notifications-off-outline" size={60} color="#E0E0E0" />
-          <Text style={styles.emptyText}>No notifications yet</Text>
-          <Text style={styles.emptySubtext}>You're all caught up!</Text>
-        </View>
       )}
     </View>
   );
@@ -235,30 +200,17 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#3E3E3E',
-    marginLeft: 15,
+    textAlign: 'center',
     flex: 1,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionButton: {
-    padding: 8,
-    borderRadius: 12,
-    marginLeft: 8,
-    backgroundColor: '#F5EFE9',
-  },
-  disabledButton: {
-    opacity: 0.5,
+    marginRight: 0, // Adjusted simple alignment
   },
   unreadBadge: {
     backgroundColor: '#FFE8E0',
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     paddingVertical: 4,
     paddingHorizontal: 12,
     borderRadius: 12,
     marginTop: 10,
-    marginLeft: 20,
   },
   unreadText: {
     color: '#D45D3E',
@@ -268,6 +220,14 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 15,
     paddingTop: 10,
+    paddingBottom: 30,
+  },
+  emptyListContent: {
+    padding: 15,
+    paddingTop: 10,
+    paddingBottom: 30,
+    flex: 1,
+    justifyContent: 'center',
   },
   card: {
     flexDirection: 'row',
@@ -282,31 +242,27 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
     borderColor: '#F0F0F0',
+    alignItems: 'center',
   },
-  unreadCard: {
+  outOfStockCard: {
     borderLeftWidth: 4,
     borderLeftColor: '#D45D3E',
-    backgroundColor: '#FFFCFA',
+  },
+  lowStockCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#E6A23C',
   },
   iconContainer: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
-    alignSelf: 'flex-start',
-    marginTop: 2,
-  },
-  iconUnread: {
-    backgroundColor: '#FFEDE6',
-  },
-  iconRead: {
-    backgroundColor: '#F5F5F5',
+    marginRight: 16,
   },
   textContainer: {
     flex: 1,
-    paddingRight: 8,
+    justifyContent: 'center',
   },
   titleRow: {
     flexDirection: 'row',
@@ -317,45 +273,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#2D2D2D',
-    marginRight: 6,
     lineHeight: 20,
   },
-  readTitle: {
-    color: '#6E6E6E',
-    fontWeight: '500',
+  outOfStockTitle: {
+    color: '#D45D3E',
+  },
+  lowStockTitle: {
+    color: '#D9822B', // Slightly darker orange for text readability
   },
   description: {
     fontSize: 13.5,
     color: '#5A5A5A',
-    marginBottom: 8,
+    marginBottom: 4,
     lineHeight: 19,
-    marginTop: 2,
   },
-  time: {
+  skuText: {
     fontSize: 12,
     color: '#8E8E8E',
     fontWeight: '500',
-    marginTop: 2,
   },
-  markAllButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#F0E6DD',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  markAllText: {
-    color: '#76462B',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  disabledText: {
-    color: '#AAA',
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#D45D3E',
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 14,
   },
   emptyState: {
     flex: 1,

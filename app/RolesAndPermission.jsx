@@ -2,74 +2,44 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from "@react-native-picker/picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
-    Alert,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ActivityIndicator
 } from "react-native";
-
-// Mock data - replace with your actual data source
-const initialEmployees = [
-  {
-    id: 1,
-    name: "Juan Dela Cruz",
-    email: "juan.delacruz@example.com",
-    position: "Manager",
-    contactNumber: "09123456789",
-    dateJoined: "2023-01-15",
-    isActive: true,
-    permissions: {
-      pos: true,
-      inventory: true,
-      viewTransaction: true,
-      generateReports: true
-    }
-  },
-  {
-    id: 2,
-    name: "Maria Santos",
-    email: "maria.santos@example.com",
-    position: "Cashier",
-    contactNumber: "09123456788",
-    dateJoined: "2023-03-10",
-    isActive: true,
-    permissions: {
-      pos: true,
-      inventory: false,
-      viewTransaction: true,
-      generateReports: false
-    }
-  },
-  // Add more employees as needed
-];
+import { employeeAPI } from "../services/api";
 
 const RolesAndPermission = () => {
   const router = useRouter();
-  const [employees, setEmployees] = useState(initialEmployees);
-  const [filteredEmployees, setFilteredEmployees] = useState(initialEmployees);
-  const [archivedEmployees, setArchivedEmployees] = useState([]);
-  const { restoreEmployee, archivedItems } = useLocalSearchParams();
+  const [employees, setEmployees] = useState([]);
+  const [filteredEmployees, setFilteredEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    position: "Cashier",
+    position: "Cashier", // Maps to 'role'
     contactNumber: "",
     dateJoined: new Date().toISOString().split('T')[0],
-    isActive: true,
+    isActive: true, // Maps to 'status'
     permissions: {
       pos: false,
       inventory: false,
@@ -78,85 +48,162 @@ const RolesAndPermission = () => {
     }
   });
 
+  const loadEmployees = async () => {
+    try {
+      setLoading(true);
+      const res = await employeeAPI.getAll();
+      if (res && res.success && res.data) {
+        // Filter out 'Owner' role (case insensitive)
+        const staff = res.data.filter(emp => emp.role.toLowerCase() !== 'owner');
+        setEmployees(staff);
+        setFilteredEmployees(staff);
+      }
+    } catch (error) {
+      console.error("Failed to load employees:", error);
+      Alert.alert("Error", "Failed to load employees.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadEmployees();
+      return () => { };
+    }, [])
+  );
+
   const handleEdit = (employee) => {
     setEditingEmployee(employee);
     setFormData({
       name: employee.name,
       email: employee.email,
-      position: employee.position,
-      contactNumber: employee.contactNumber,
-      dateJoined: employee.dateJoined,
-      isActive: employee.isActive,
-      permissions: { ...employee.permissions }
+      position: employee.role, // Mapping role -> position for UI consistency
+      contactNumber: employee.contactNo,
+      dateJoined: employee.dateJoined ? new Date(employee.dateJoined).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      isActive: employee.status === 'Active',
+      permissions: {
+        pos: false,
+        inventory: false,
+        viewTransaction: false,
+        generateReports: false,
+        ...(employee.permissions || {})
+      }
     });
     setIsEditModalVisible(true);
   };
 
-  const handleSave = () => {
-    if (editingEmployee) {
-      // Update existing employee
-      setEmployees(employees.map(emp => {
-        if (emp.id === editingEmployee.id) {
-          return { ...emp, ...formData };
-        }
-        return emp;
-      }));
-    } else {
-      // Add new employee
-      const newEmployee = {
-        id: employees.length + 1,
-        ...formData
-      };
-      setEmployees([...employees, newEmployee]);
+  const handleSave = async () => {
+    if (!formData.name || !formData.email || !formData.position) {
+      Alert.alert("Error", "Please fill in all required fields.");
+      return;
     }
-    setIsEditModalVisible(false);
-    setEditingEmployee(null);
+
+    try {
+      setSaving(true);
+
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        role: formData.position, // Map UI position to backend role
+        contactNo: formData.contactNumber,
+        dateJoined: new Date(formData.dateJoined),
+        status: formData.isActive ? 'Active' : 'Inactive',
+        permissions: formData.permissions
+      };
+
+      let res;
+      if (editingEmployee) {
+        // Update existing
+        res = await employeeAPI.update(editingEmployee._id || editingEmployee.id, payload);
+      } else {
+        // Create new
+        // Auto-generate a random 6-digit PIN for new employees
+        const randomPin = Math.floor(100000 + Math.random() * 900000).toString();
+
+        const newEmployeePayload = {
+          ...payload,
+          pin: randomPin,
+          firstName: formData.name.split(' ')[0], // Simple split
+          lastName: formData.name.split(' ').slice(1).join(' ') || '',
+          requiresPinReset: true,
+          sendPinEmail: true // Backend handles email sending
+        };
+
+        res = await employeeAPI.create(newEmployeePayload);
+      }
+
+      if (res && res.success) {
+        Alert.alert(
+          "Success",
+          editingEmployee ? "Employee updated successfully." : "Employee added successfully. A temporary PIN has been sent to their email.",
+          [{ text: "OK", onPress: () => setIsEditModalVisible(false) }]
+        );
+        loadEmployees(); // Refresh list
+      } else {
+        Alert.alert("Error", res?.message || "Failed to save employee.");
+      }
+
+    } catch (error) {
+      console.error("Save error:", error);
+      Alert.alert("Error", "An unexpected error occurred.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const toggleEmployeeStatus = (employeeId) => {
-    const employee = employees.find(emp => emp.id === employeeId);
+  const toggleEmployeeStatus = (employee) => {
     setSelectedEmployee(employee);
     setShowStatusModal(true);
   };
 
-  const confirmStatusChange = () => {
+  const confirmStatusChange = async () => {
     if (selectedEmployee) {
-      setEmployees(employees.map(emp => 
-        emp.id === selectedEmployee.id ? { ...emp, isActive: !emp.isActive } : emp
-      ));
+      try {
+        const newStatus = selectedEmployee.status === 'Active' ? 'Inactive' : 'Active';
+        const res = await employeeAPI.update(selectedEmployee._id || selectedEmployee.id, { status: newStatus });
+
+        if (res && res.success) {
+          loadEmployees();
+        } else {
+          Alert.alert("Error", "Failed to update status.");
+        }
+      } catch (error) {
+        console.error("Status update error:", error);
+        Alert.alert("Error", "Failed to update status.");
+      }
     }
     setShowStatusModal(false);
   };
 
-  const archiveEmployee = (employeeId) => {
+  const archiveEmployee = (employee) => {
     Alert.alert(
-      "Archive Employee",
-      "Are you sure you want to archive this employee?",
+      "Delete Employee",
+      `Are you sure you want to delete ${employee.name}? This action cannot be undone.`,
       [
         {
           text: "Cancel",
           style: "cancel"
         },
-        { 
-          text: "Archive", 
-          onPress: () => {
-            const employeeToArchive = employees.find(emp => emp.id === employeeId);
-            if (employeeToArchive) {
-              setArchivedEmployees(prev => [...prev, { ...employeeToArchive, archivedAt: new Date().toISOString() }]);
-              setEmployees(employees.filter(emp => emp.id !== employeeId));
+        {
+          text: "Delete",
+          onPress: async () => {
+            try {
+              const res = await employeeAPI.delete(employee._id || employee.id);
+              if (res && res.success) {
+                loadEmployees();
+              } else {
+                Alert.alert("Error", res?.message || "Failed to delete employee.");
+              }
+            } catch (error) {
+              console.error("Delete error:", error);
+              Alert.alert("Error", "Failed to delete employee.");
             }
           },
           style: "destructive"
         }
       ]
     );
-  };
-
-  const navigateToArchive = () => {
-    router.push({
-      pathname: '/Archive',
-      params: { archivedItems: JSON.stringify(archivedEmployees) }
-    });
   };
 
   const handlePermissionToggle = (permission) => {
@@ -181,45 +228,23 @@ const RolesAndPermission = () => {
     if (query === '') {
       setFilteredEmployees(employees);
     } else {
-      const filtered = employees.filter(employee => 
-        employee.name.toLowerCase().includes(query.toLowerCase()) ||
-        employee.email.toLowerCase().includes(query.toLowerCase()) ||
-        employee.position.toLowerCase().includes(query.toLowerCase())
+      const lowerQuery = query.toLowerCase();
+      const filtered = employees.filter(employee =>
+        (employee.name && employee.name.toLowerCase().includes(lowerQuery)) ||
+        (employee.email && employee.email.toLowerCase().includes(lowerQuery)) ||
+        (employee.role && employee.role.toLowerCase().includes(lowerQuery))
       );
       setFilteredEmployees(filtered);
     }
   };
 
-  useEffect(() => {
-    // Handle restored employee if coming back from archive
-    if (restoreEmployee) {
-      try {
-        const restoredEmployee = JSON.parse(restoreEmployee);
-        // Only add if not already in the employees list
-        if (!employees.some(emp => emp.id === restoredEmployee.id)) {
-          setEmployees(prevEmployees => [...prevEmployees, restoredEmployee]);
-        }
-        
-        // Update archived employees list if it was passed back
-        if (archivedItems) {
-          setArchivedEmployees(JSON.parse(archivedItems));
-        }
-      } catch (error) {
-        console.error('Error restoring employee:', error);
-      }
-    }
-    
-    // Only update filteredEmployees when searchQuery or employees change
-    const filtered = searchQuery === '' 
-      ? employees 
-      : employees.filter(employee => 
-          employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          employee.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          employee.position.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    
-    setFilteredEmployees(filtered);
-  }, [searchQuery, restoreEmployee, archivedItems, employees]);
+  if (loading && !employees.length) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#AD7F65" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -234,15 +259,22 @@ const RolesAndPermission = () => {
             placeholderTextColor="#999"
           />
         </View>
-        
-        <TouchableOpacity 
-          onPress={navigateToArchive}
+
+        {/* Archive Button - navigating to Archive page doesn't make sense for permanent delete, 
+            so maybe we keep it generic or remove if managing deleted employees isn't supported differently. 
+            Keeping it as is but it might lead to item archive. 
+            Actually, the original code navigated to '/Archive'. I'll keep it but it's likely for products.
+            Wait, user context: "Archive" usually means "Item Archive". 
+            I'll disable it for now or redirect to the main Archive page.
+        */}
+        <TouchableOpacity
+          onPress={() => router.push('/Archive')}
           style={styles.addButton}
         >
           <Ionicons name="archive" size={24} color="white" />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.addButton}
           onPress={() => {
             setEditingEmployee(null);
@@ -268,80 +300,89 @@ const RolesAndPermission = () => {
       </View>
 
       <ScrollView style={styles.scrollView}>
-        {filteredEmployees.map((employee) => (
-          <View key={employee.id} style={[
-            styles.employeeCard,
-            !employee.isActive && styles.inactiveEmployee
-          ]}>
-            <View style={styles.employeeHeader}>
-              <View style={styles.employeeInfo}>
-                <Text style={styles.employeeName}>{employee.name}</Text>
-                <Text style={styles.employeePosition}>{employee.position}</Text>
-                <View style={[styles.statusBadge, employee.isActive ? styles.activeBadge : styles.inactiveBadge]}>
-                  <Text style={styles.statusText}>
-                    {employee.isActive ? 'Active' : 'Inactive'}
-                  </Text>
+        {filteredEmployees.length === 0 ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ color: '#888' }}>No employees found.</Text>
+          </View>
+        ) : (
+          filteredEmployees.map((employee) => (
+            <View key={employee._id || employee.id} style={[
+              styles.employeeCard,
+              employee.status !== 'Active' && styles.inactiveEmployee
+            ]}>
+              <View style={styles.employeeHeader}>
+                <View style={styles.employeeInfo}>
+                  <Text style={styles.employeeName}>{employee.name}</Text>
+                  <Text style={styles.employeePosition}>{employee.role}</Text>
+                  <View style={[styles.statusBadge, employee.status === 'Active' ? styles.activeBadge : styles.inactiveBadge]}>
+                    <Text style={styles.statusText}>
+                      {employee.status || 'Inactive'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.employeeActions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleEdit(employee)}
+                  >
+                    <Ionicons name="pencil" size={20} color="#4A90E2" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => archiveEmployee(employee)}
+                    style={styles.actionButton}
+                  >
+                    <Ionicons name="trash" size={20} color="#f44336" />
+                  </TouchableOpacity>
+                  <Switch
+                    value={employee.status === 'Active'}
+                    onValueChange={() => toggleEmployeeStatus(employee)}
+                    trackColor={{ false: "#D3D3D3", true: "#AD7F65" }}
+                    thumbColor={"#FFFFFF"}
+                  />
                 </View>
               </View>
-              <View style={styles.employeeActions}>
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={() => handleEdit(employee)}
-                >
-                  <Ionicons name="pencil" size={20} color="#4A90E2" />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  onPress={() => archiveEmployee(employee.id)}
-                  style={styles.actionButton}
-                >
-                  <Ionicons name="trash" size={20} color="#f44336" />
-                </TouchableOpacity>
-                <Switch
-                  value={employee.isActive}
-                  onValueChange={() => toggleEmployeeStatus(employee.id)}
-                  trackColor={{ false: "#D3D3D3", true: "#AD7F65" }}
-                  thumbColor={"#FFFFFF"}
-                />
-              </View>
-            </View>
-            
-            <View style={styles.employeeDetails}>
-              <View style={styles.detailRow}>
-                <Ionicons name="mail" size={16} color="#666" />
-                <Text style={styles.detailText}>{employee.email}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Ionicons name="call" size={16} color="#666" />
-                <Text style={styles.detailText}>{employee.contactNumber}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Ionicons name="calendar" size={16} color="#666" />
-                <Text style={styles.detailText}>Joined: {employee.dateJoined}</Text>
-              </View>
-            </View>
 
-            <View style={styles.permissionsContainer}>
-              <Text style={styles.permissionsTitle}>Permissions:</Text>
-              <View style={styles.permissionsGrid}>
-                {Object.entries(employee.permissions).map(([key, value]) => (
-                  <View key={key} style={styles.permissionItem}>
-                    <Text style={styles.permissionText}>
-                      {key.split(/(?=[A-Z])/).join(' ').toUpperCase()}
-                    </Text>
-                    <View style={[
-                      styles.permissionBadge,
-                      value ? styles.permissionGranted : styles.permissionDenied
-                    ]}>
-                      <Text style={styles.permissionBadgeText}>
-                        {value ? '✓' : '✗'}
+              <View style={styles.employeeDetails}>
+                <View style={styles.detailRow}>
+                  <Ionicons name="mail" size={16} color="#666" />
+                  <Text style={styles.detailText}>{employee.email}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="call" size={16} color="#666" />
+                  <Text style={styles.detailText}>{employee.contactNo}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="calendar" size={16} color="#666" />
+                  <Text style={styles.detailText}>Joined: {employee.dateJoined ? new Date(employee.dateJoined).toLocaleDateString() : 'N/A'}</Text>
+                </View>
+              </View>
+
+              <View style={styles.permissionsContainer}>
+                <Text style={styles.permissionsTitle}>Permissions:</Text>
+                <View style={styles.permissionsGrid}>
+                  {employee.permissions && Object.entries(employee.permissions).map(([key, value]) => (
+                    <View key={key} style={styles.permissionItem}>
+                      <Text style={styles.permissionText}>
+                        {key.split(/(?=[A-Z])/).join(' ').toUpperCase()}
                       </Text>
+                      <View style={[
+                        styles.permissionBadge,
+                        value ? styles.permissionGranted : styles.permissionDenied
+                      ]}>
+                        <Text style={styles.permissionBadgeText}>
+                          {value ? '✓' : '✗'}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  ))}
+                  {(!employee.permissions || Object.keys(employee.permissions).length === 0) && (
+                    <Text style={{ fontSize: 12, color: '#999', fontStyle: 'italic' }}>No specific permissions set</Text>
+                  )}
+                </View>
               </View>
             </View>
-          </View>
-        ))}
+          ))
+        )}
       </ScrollView>
 
       {/* Edit/Add Employee Modal */}
@@ -349,7 +390,7 @@ const RolesAndPermission = () => {
         visible={isEditModalVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setIsEditModalVisible(false)}
+        onRequestClose={() => !saving && setIsEditModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -357,7 +398,7 @@ const RolesAndPermission = () => {
               <Text style={styles.modalTitle}>
                 {editingEmployee ? 'Edit Employee' : 'Add New Employee'}
               </Text>
-              <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
+              <TouchableOpacity onPress={() => !saving && setIsEditModalVisible(false)} disabled={saving}>
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
@@ -370,6 +411,7 @@ const RolesAndPermission = () => {
                   value={formData.name}
                   onChangeText={(text) => handleInputChange('name', text)}
                   placeholder="Enter full name"
+                  editable={!saving}
                 />
               </View>
 
@@ -382,16 +424,19 @@ const RolesAndPermission = () => {
                   placeholder="Enter email address"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  editable={!saving}
                 />
+                {!editingEmployee && <Text style={styles.hintText}>A temporary PIN will be sent to this email.</Text>}
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Position</Text>
+                <Text style={styles.label}>Position (Role)</Text>
                 <View style={styles.pickerContainer}>
                   <Picker
                     selectedValue={formData.position}
                     onValueChange={(itemValue) => handleInputChange('position', itemValue)}
                     style={styles.picker}
+                    enabled={!saving}
                   >
                     <Picker.Item label="Cashier" value="Cashier" />
                     <Picker.Item label="Manager" value="Manager" />
@@ -408,14 +453,16 @@ const RolesAndPermission = () => {
                   onChangeText={(text) => handleInputChange('contactNumber', text)}
                   placeholder="Enter contact number"
                   keyboardType="phone-pad"
+                  editable={!saving}
                 />
               </View>
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Date Joined</Text>
-                <TouchableOpacity 
-                  onPress={() => setShowDatePicker(true)}
+                <TouchableOpacity
+                  onPress={() => !saving && setShowDatePicker(true)}
                   style={styles.dateInputContainer}
+                  disabled={saving}
                 >
                   <Text style={styles.dateInputText}>
                     {formData.dateJoined || 'Select date'}
@@ -450,6 +497,7 @@ const RolesAndPermission = () => {
                     onValueChange={(value) => handleInputChange('isActive', value)}
                     trackColor={{ false: "#D3D3D3", true: "#AD7F65" }}
                     thumbColor={"#FFFFFF"}
+                    disabled={saving}
                   />
                 </View>
               </View>
@@ -464,9 +512,10 @@ const RolesAndPermission = () => {
                       onValueChange={() => handlePermissionToggle('pos')}
                       trackColor={{ false: "#D3D3D3", true: "#AD7F65" }}
                       thumbColor={"#FFFFFF"}
+                      disabled={saving}
                     />
                   </View>
-                  
+
                   <View style={styles.permissionToggle}>
                     <Text style={styles.permissionLabel}>Inventory Management</Text>
                     <Switch
@@ -474,9 +523,10 @@ const RolesAndPermission = () => {
                       onValueChange={() => handlePermissionToggle('inventory')}
                       trackColor={{ false: "#D3D3D3", true: "#AD7F65" }}
                       thumbColor={"#FFFFFF"}
+                      disabled={saving}
                     />
                   </View>
-                  
+
                   <View style={styles.permissionToggle}>
                     <Text style={styles.permissionLabel}>View Transactions</Text>
                     <Switch
@@ -484,9 +534,10 @@ const RolesAndPermission = () => {
                       onValueChange={() => handlePermissionToggle('viewTransaction')}
                       trackColor={{ false: "#D3D3D3", true: "#AD7F65" }}
                       thumbColor={"#FFFFFF"}
+                      disabled={saving}
                     />
                   </View>
-                  
+
                   <View style={styles.permissionToggle}>
                     <Text style={styles.permissionLabel}>Generate Reports</Text>
                     <Switch
@@ -494,6 +545,7 @@ const RolesAndPermission = () => {
                       onValueChange={() => handlePermissionToggle('generateReports')}
                       trackColor={{ false: "#D3D3D3", true: "#AD7F65" }}
                       thumbColor={"#FFFFFF"}
+                      disabled={saving}
                     />
                   </View>
                 </View>
@@ -501,19 +553,25 @@ const RolesAndPermission = () => {
             </ScrollView>
 
             <View style={styles.modalFooter}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.button, styles.cancelButton]}
                 onPress={() => setIsEditModalVisible(false)}
+                disabled={saving}
               >
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.button, styles.saveButton]}
                 onPress={handleSave}
+                disabled={saving}
               >
-                <Text style={[styles.buttonText, { color: 'white' }]}>
-                  {editingEmployee ? 'Save Changes' : 'Add Employee'}
-                </Text>
+                {saving ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={[styles.buttonText, { color: 'white' }]}>
+                    {editingEmployee ? 'Save Changes' : 'Add Employee'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -530,24 +588,24 @@ const RolesAndPermission = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.confirmModalContent}>
             <Text style={styles.modalTitle}>
-              {selectedEmployee?.isActive ? 'Disable Employee' : 'Enable Employee'}
+              {selectedEmployee?.status === 'Active' ? 'Disable Employee' : 'Enable Employee'}
             </Text>
             <Text style={styles.confirmText}>
-              Are you sure you want to {selectedEmployee?.isActive ? 'disable' : 'enable'} {selectedEmployee?.name}?
+              Are you sure you want to {selectedEmployee?.status === 'Active' ? 'disable' : 'enable'} {selectedEmployee?.name}?
             </Text>
             <View style={styles.confirmButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.confirmButton, styles.cancelButton]}
                 onPress={() => setShowStatusModal(false)}
               >
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.confirmButton, styles.confirmActionButton]}
                 onPress={confirmStatusChange}
               >
                 <Text style={[styles.buttonText, { color: 'white' }]}>
-                  {selectedEmployee?.isActive ? 'Disable' : 'Enable'}
+                  {selectedEmployee?.status === 'Active' ? 'Disable' : 'Enable'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -616,11 +674,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    width: 360,
+    width: '95%',
     alignSelf: 'center',
   },
   inactiveEmployee: {
     opacity: 0.7,
+    backgroundColor: '#F2F2F2',
   },
   employeeHeader: {
     flexDirection: 'row',
@@ -656,8 +715,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   inactiveBadge: {
-    backgroundColor: '#FFEBEE',
-    borderColor: '#F44336',
+    backgroundColor: '#FFF3E0', // Changed to orange for inactive/pending
+    borderColor: '#FF9800',
     borderWidth: 1,
   },
   statusText: {
@@ -738,7 +797,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     width: '100%',
-    maxHeight: '80%',
+    maxHeight: '90%',
   },
   confirmModalContent: {
     backgroundColor: 'white',
@@ -798,94 +857,94 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    marginBottom: 8,
-    color: '#555',
+    marginBottom: 6,
+    color: '#333',
   },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
-    fontSize: 14,
-    backgroundColor: '#f9f9f9',
+    fontSize: 16,
+    color: '#333',
+    backgroundColor: '#fafafa',
   },
   pickerContainer: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
+    backgroundColor: '#fafafa',
     overflow: 'hidden',
-    backgroundColor: '#f9f9f9',
   },
   picker: {
     height: 50,
+    width: '100%',
+  },
+  dateInputContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fafafa',
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: '#333',
   },
   switchContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-  },
-  switchLabel: {
-    fontSize: 14,
-    color: '#555',
-  },
-  permissionsList: {
-    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
+    backgroundColor: '#fafafa',
+  },
+  switchLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  permissionsList: {
+    marginTop: 8,
   },
   permissionToggle: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   permissionLabel: {
-    fontSize: 14,
-    color: '#333',
+    fontSize: 15,
+    color: '#444',
   },
   modalFooter: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
+    gap: 12,
   },
   button: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    flex: 1,
+    padding: 14,
     borderRadius: 8,
-    marginLeft: 12,
-    minWidth: 100,
     alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
   },
   saveButton: {
     backgroundColor: '#AD7F65',
   },
-  buttonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-  },
-  dateInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-  },
-  dateInputText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  datePicker: {
-    marginTop: 10,
+  hintText: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
 

@@ -18,9 +18,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  BackHandler
 } from 'react-native';
 import { productAPI, brandPartnerAPI } from '../services/api';
+import AddCategoryModal from '../components/AddCategoryModal';
+import AddBrandModal from '../components/AddBrandModal';
 
 const categoryCodeMap = {
   Tops: 'TOP',
@@ -115,6 +118,9 @@ function AddItem({ onBack, item, isEditing = false }) {
   const [shoeSize, setShoeSize] = useState(item?.shoeSize || "");
   const [essentialType, setEssentialType] = useState(item?.essentialType || "");
   const [customEssentialType, setCustomEssentialType] = useState(item?.customEssentialType || "");
+  const [variant, setVariant] = useState(item?.variant || "");
+  const [differentVariantsPerSize, setDifferentVariantsPerSize] = useState(false);
+  const [sizeVariants, setSizeVariants] = useState({});
   const [costPrice, setCostPrice] = useState(
     item?.costPrice !== undefined ? item.costPrice.toString() : ""
   );
@@ -139,7 +145,7 @@ function AddItem({ onBack, item, isEditing = false }) {
         ? item.stock.toString()
         : ""
   );
-  const [brand, setBrand] = useState(item?.brandName || item?.brand || "Brandless");
+  const [brand, setBrand] = useState(item?.brandName || item?.brand || "Default");
   const [brandsList, setBrandsList] = useState([]);
   const [expirationDate, setExpirationDate] = useState(item?.expirationDate || "");
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -152,7 +158,13 @@ function AddItem({ onBack, item, isEditing = false }) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [isForPOS, setIsForPOS] = useState(item?.isForPOS || false);
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [showAddBrandModal, setShowAddBrandModal] = useState(false);
+  const [categoriesList, setCategoriesList] = useState([
+    'Tops', 'Bottoms', 'Dresses', 'Head Wear', 'Makeup', 'Accessories', 'Shoes', 'Foods'
+  ]); // Start with default categories
 
   // Animation refs
   const toastTranslate = useRef(new Animated.Value(-60)).current;
@@ -200,62 +212,71 @@ function AddItem({ onBack, item, isEditing = false }) {
 
   // Check if there are any unsaved changes
   const hasUnsavedChanges = () => {
-    return (
-      itemImage ||
-      itemName ||
-      itemCategory ||
-      itemSize ||
-      selectedSizes.length > 0 ||
-      Object.keys(sizeQuantities).length > 0 ||
-      waistSize ||
-      accessoryType ||
-      makeupBrand ||
-      makeupShade ||
-      shoeSize ||
-      essentialType ||
-      customEssentialType ||
-      itemPrice ||
-      itemStock ||
-      brand !== "Brandless" ||
-      expirationDate ||
-      essentialExpirationDate ||
-      foodType ||
-      customFoodType ||
-      isForPOS
-    );
+    const changes = [
+      !!itemImage,
+      !!itemName,
+      itemCategory && itemCategory !== 'Tops',
+      !!itemSize,
+      selectedSizes.length > 0,
+      Object.keys(sizeQuantities).length > 0,
+      !!waistSize,
+      !!accessoryType,
+      !!makeupBrand,
+      !!makeupShade,
+      !!shoeSize,
+      !!essentialType,
+      !!customEssentialType,
+      !!itemPrice,
+      !!itemStock,
+      brand !== "Default",
+      !!expirationDate,
+      !!essentialExpirationDate,
+      !!foodType,
+      !!customFoodType,
+      !!variant,
+      differentVariantsPerSize,
+      Object.keys(sizeVariants).length > 0,
+      isForPOS,
+      showAddCategoryModal,
+      showAddBrandModal
+    ];
+
+    const hasChanges = changes.some(Boolean);
+    console.log('Has unsaved changes:', hasChanges);
+    return hasChanges;
   };
 
   // Handle back navigation with confirmation if there are unsaved changes
   const handleBack = () => {
-    if (hasUnsavedChanges()) {
-      // Show confirmation dialog
-      Alert.alert(
-        'Discard Changes?',
-        'You have unsaved changes. Are you sure you want to leave?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Discard',
-            style: 'destructive',
-            onPress: () => {
-              if (typeof onBack === 'function') {
-                onBack();
-              }
-            },
-          },
-        ],
-        { cancelable: true }
-      );
+    const unsaved = hasUnsavedChanges();
+    console.log('Handle back pressed. Unsaved changes:', unsaved);
+
+    if (unsaved) {
+      setShowDiscardModal(true);
     } else {
       // No unsaved changes, proceed with back navigation
       if (typeof onBack === 'function') {
         onBack();
+      } else {
+        router.back();
       }
     }
   };
+
+  // Handle hardware back button
+  useEffect(() => {
+    const backAction = () => {
+      handleBack();
+      return true; // Prevent default behavior (exit app)
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [hasUnsavedChanges]); // check dependencies logic later
 
   // Initialize all form fields with default values
   const initializeForm = () => {
@@ -276,11 +297,14 @@ function AddItem({ onBack, item, isEditing = false }) {
     setSellingPrice('');
     setItemPrice('');
     setItemStock('');
-    setBrand('Brandless');
+    setBrand('Default');
     setExpirationDate('');
     setEssentialExpirationDate('');
     setFoodType('');
     setCustomFoodType('');
+    setVariant('');
+    setDifferentVariantsPerSize(false);
+    setSizeVariants({});
     setIsForPOS(false);
   };
 
@@ -297,6 +321,13 @@ function AddItem({ onBack, item, isEditing = false }) {
       }
     };
     fetchBrands();
+  }, []);
+
+  // Fetch categories (if dynamic) or ensure custom categories are loaded
+  // For now, we utilize the defaults but could extend to fetch from API if categories are dynamic
+  useEffect(() => {
+    // If we were to fetch categories from API, do it here
+    // For now, we'll just stick to the initial list but this placeholder is here for future
   }, []);
 
   // Initialize form on component mount or when item prop changes
@@ -336,11 +367,16 @@ function AddItem({ onBack, item, isEditing = false }) {
             ? item.stock.toString()
             : ''
       );
-      setBrand(item.brandName || item.brand || 'Brandless');
+      setBrand(item.brandName || item.brand || 'Default');
       setExpirationDate(item.expirationDate || '');
       setEssentialExpirationDate(item.essentialExpirationDate || '');
       setFoodType(item.foodType || '');
       setCustomFoodType(item.customFoodType || '');
+      setVariant(item.variant || '');
+      // logic to popuplate specific size variants if they exist (web seemingly doesn't pass this explicitly in simple mode but lets try to act smart)
+      // For now, simpler reset
+      setDifferentVariantsPerSize(false);
+      setSizeVariants({});
       setIsForPOS(!!item.isForPOS);
     } else {
       initializeForm();
@@ -472,7 +508,9 @@ function AddItem({ onBack, item, isEditing = false }) {
     try {
       const normalizedCategory = itemCategory || 'Tops';
 
-      const skuValue = item?.sku || generateMobileSKU(normalizedCategory, itemSize || customEssentialType || '');
+      // Use variant from new field if available, or fallback
+      const skuVariant = variant || customEssentialType || itemSize || '';
+      const skuValue = item?.sku || generateMobileSKU(normalizedCategory, skuVariant);
 
       // Convert image to base64 for proper storage
       let imageBase64 = '';
@@ -491,7 +529,10 @@ function AddItem({ onBack, item, isEditing = false }) {
               : (parseFloat(sellingPrice) || 0),
             costPrice: differentPricesPerSize
               ? (parseFloat(sizeCostPrices[size]) || 0)
-              : (parseFloat(costPrice) || 0)
+              : (parseFloat(costPrice) || 0),
+            variant: differentVariantsPerSize
+              ? (sizeVariants[size] || '')
+              : (variant || '')
           };
         });
       }
@@ -505,7 +546,7 @@ function AddItem({ onBack, item, isEditing = false }) {
         itemPrice: parseFloat(sellingPrice) || 0,
         currentStock: hasSizesSelected ? totalSizeStock : (parseInt(itemStock) || 0),
         costPrice: parseFloat(costPrice) || 0,
-        variant: customEssentialType || itemSize || '',
+        variant: variant || customEssentialType || itemSize || '',
         size: itemSize,
         sizes: hasSizesSelected ? sizesObject : {},
         waistSize,
@@ -546,7 +587,13 @@ function AddItem({ onBack, item, isEditing = false }) {
         setTimeout(() => {
           setShowSuccess(false);
           // Navigate back after a short delay
-          setTimeout(() => onBack(), 500);
+          setTimeout(() => {
+            if (typeof onBack === 'function') {
+              onBack();
+            } else {
+              router.back();
+            }
+          }, 500);
         }, 2000);
       } else {
         throw new Error(response.message || 'Failed to save item');
@@ -568,8 +615,31 @@ function AddItem({ onBack, item, isEditing = false }) {
 
   return (
     <View style={styles.container}>
+      <AddCategoryModal
+        visible={showAddCategoryModal}
+        onClose={() => setShowAddCategoryModal(false)}
+        onAdd={(newCategory) => {
+          setCategoriesList(prev => [...prev, newCategory]);
+          setItemCategory(newCategory);
+          // Reset size selections/variants since category changed
+          setSelectedSizes([]);
+          setSizeQuantities({});
+          setDifferentVariantsPerSize(false);
+          setSizeVariants({});
+          setVariant('');
+        }}
+      />
+      <AddBrandModal
+        visible={showAddBrandModal}
+        onClose={() => setShowAddBrandModal(false)}
+        onAdd={(newBrand) => {
+          setBrandsList(prev => [...prev, { _id: Date.now().toString(), brandName: newBrand }]);
+          setBrand(newBrand);
+        }}
+      />
       {/* Success Toast */}
       <Animated.View
+        pointerEvents={showSuccess ? 'auto' : 'none'}
         style={[
           styles.toastContainer,
           {
@@ -590,6 +660,44 @@ function AddItem({ onBack, item, isEditing = false }) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isEditing ? 'Edit Item' : 'Add New Item'}</Text>
       </View>
+
+      {/* Discard Changes Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showDiscardModal}
+        onRequestClose={() => setShowDiscardModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Discard Changes?</Text>
+            <Text style={styles.modalText}>
+              You have unsaved changes. Are you sure you want to leave?
+            </Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowDiscardModal(false)}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#EF4444' }]}
+                onPress={() => {
+                  setShowDiscardModal(false);
+                  if (typeof onBack === 'function') {
+                    onBack();
+                  } else {
+                    router.back();
+                  }
+                }}
+              >
+                <Text style={[styles.buttonText, { color: 'white' }]}>Discard</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <ScrollView
         style={styles.scrollView}
@@ -672,12 +780,19 @@ function AddItem({ onBack, item, isEditing = false }) {
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={brand}
-              onValueChange={(itemValue) => setBrand(itemValue)}
+              onValueChange={(itemValue) => {
+                if (itemValue === '__add_new__') {
+                  setShowAddBrandModal(true);
+                  // Don't change selection yet
+                  return;
+                }
+                setBrand(itemValue);
+              }}
               style={styles.picker}
               dropdownIconColor="#6b7280"
               mode="dropdown"
             >
-              <Picker.Item label="Brandless" value="Brandless" />
+              <Picker.Item label="Default" value="Default" />
               {brandsList.map((brandItem) => (
                 <Picker.Item
                   key={brandItem._id}
@@ -685,6 +800,7 @@ function AddItem({ onBack, item, isEditing = false }) {
                   value={brandItem.brandName}
                 />
               ))}
+              <Picker.Item label="+ Add Brand" value="__add_new__" color="#AD7F65" />
             </Picker>
           </View>
         </View>
@@ -696,27 +812,49 @@ function AddItem({ onBack, item, isEditing = false }) {
             <Picker
               selectedValue={itemCategory}
               onValueChange={(itemValue) => {
+                if (itemValue === '__add_new__') {
+                  setShowAddCategoryModal(true);
+                  return;
+                }
                 setItemCategory(itemValue);
-                // Reset size selections when category changes
+                // Reset size selections and variants when category changes
                 setSelectedSizes([]);
                 setSizeQuantities({});
+                setDifferentVariantsPerSize(false);
+                setSizeVariants({});
+                setVariant('');
               }}
               style={styles.picker}
               dropdownIconColor="#6b7280"
               mode="dropdown"
             >
               <Picker.Item label="Select a category" value="" />
-              <Picker.Item label="Tops" value="Tops" />
-              <Picker.Item label="Bottoms" value="Bottoms" />
-              <Picker.Item label="Dresses" value="Dresses" />
-              <Picker.Item label="Head Wear" value="Head Wear" />
-              <Picker.Item label="Makeup" value="Makeup" />
-              <Picker.Item label="Accessories" value="Accessories" />
-              <Picker.Item label="Shoes" value="Shoes" />
-              <Picker.Item label="Foods" value="Foods" />
+              {categoriesList.map(cat => (
+                <Picker.Item key={cat} label={cat} value={cat} />
+              ))}
+              <Picker.Item label="+ Add Category" value="__add_new__" color="#AD7F65" />
             </Picker>
           </View>
         </View>
+
+        {/* Variant (Optional) */}
+        {!['Essentials', 'Foods'].includes(itemCategory) && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>
+              Variant <Text style={{ color: '#9ca3af', fontWeight: '400' }}>Optional</Text>
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                differentVariantsPerSize && styles.disabledInput
+              ]}
+              placeholder={differentVariantsPerSize ? "Multiple variants selected" : "Add Variant"}
+              value={variant}
+              onChangeText={setVariant}
+              editable={!differentVariantsPerSize}
+            />
+          </View>
+        )}
 
         {/* Size Selection - For tops, dresses, and bottoms */}
         {['Tops', 'Dresses', 'Bottoms'].includes(itemCategory) && (
@@ -735,6 +873,12 @@ function AddItem({ onBack, item, isEditing = false }) {
                           const newQty = { ...prevQty };
                           delete newQty[size];
                           return newQty;
+                        });
+                        // Remove size variant
+                        setSizeVariants(prevVar => {
+                          const newVar = { ...prevVar };
+                          delete newVar[size];
+                          return newVar;
                         });
                         return prev.filter(s => s !== size);
                       } else {
@@ -759,6 +903,32 @@ function AddItem({ onBack, item, isEditing = false }) {
             {/* Quantity inputs for selected sizes */}
             {selectedSizes.length > 0 && (
               <>
+                {/* Different variants per size checkbox */}
+                <TouchableOpacity
+                  style={styles.differentPricesRow}
+                  onPress={() => {
+                    setDifferentVariantsPerSize(!differentVariantsPerSize);
+                    if (!differentVariantsPerSize) {
+                      const newSizeVariants = {};
+                      selectedSizes.forEach(size => {
+                        newSizeVariants[size] = variant || '';
+                      });
+                      setSizeVariants(newSizeVariants);
+                    } else {
+                      setSizeVariants({});
+                    }
+                  }}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    differentVariantsPerSize && styles.checkboxChecked
+                  ]}>
+                    {differentVariantsPerSize && (
+                      <Ionicons name="checkmark" size={14} color="#fff" />
+                    )}
+                  </View>
+                  <Text style={styles.differentPricesLabel}>Different variants each sizes?</Text>
+                </TouchableOpacity>
                 {/* Different prices per size checkbox */}
                 <TouchableOpacity
                   style={styles.differentPricesRow}
@@ -813,6 +983,31 @@ function AddItem({ onBack, item, isEditing = false }) {
                     ))}
                   </View>
                 </View>
+
+                {/* Variants per size - only show when differentVariantsPerSize is true */}
+                {differentVariantsPerSize && (
+                  <View style={styles.sizeQuantityContainer}>
+                    <Text style={styles.sizeQuantityTitle}>Variant per Size:</Text>
+                    <View style={styles.sizeQuantityGrid}>
+                      {selectedSizes.map((size) => (
+                        <View key={size} style={styles.sizeQuantityItem}>
+                          <Text style={styles.sizeQuantityLabel}>{size}</Text>
+                          <TextInput
+                            style={styles.sizeQuantityInput}
+                            placeholder="Variant"
+                            value={sizeVariants[size] || ''}
+                            onChangeText={(value) => {
+                              setSizeVariants(prev => ({
+                                ...prev,
+                                [size]: value
+                              }));
+                            }}
+                          />
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
 
                 {/* Pricing per size - only show when differentPricesPerSize is true */}
                 {differentPricesPerSize && (
@@ -1601,6 +1796,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
     marginBottom: 4,
+  },
+  disabledInput: {
+    backgroundColor: '#f3f4f6',
+    color: '#9ca3af',
   },
 });
 
