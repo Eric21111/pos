@@ -1,13 +1,13 @@
-import { useState, useEffect, useMemo, memo, useRef } from 'react';
-import Header from '../components/shared/header';
-import { FaSearch, FaEye, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import { useDataCache } from '../context/DataCacheContext';
-import StockInIcon from '../assets/logs/Stock in.svg';
-import StockOutIcon from '../assets/logs/Stock out.svg';
-import PullOutIcon from '../assets/logs/Pull out.svg';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { FaChevronLeft, FaChevronRight, FaEye, FaSearch } from 'react-icons/fa';
+import PullOutIcon from '../assets/logs/pull-out.svg';
+import StockInIcon from '../assets/logs/stock-in.svg';
+import StockOutIcon from '../assets/logs/stock-out.svg';
 import ViewVoidLogModal from '../components/logs/ViewVoidLogModal';
+import Header from '../components/shared/header';
+import { useAuth } from '../context/AuthContext';
+import { useDataCache } from '../context/DataCacheContext';
+import { useTheme } from '../context/ThemeContext';
 
 const Logs = () => {
   const { theme } = useTheme();
@@ -541,8 +541,8 @@ const Logs = () => {
         <button
           onClick={() => setActiveTab('stock-movement')}
           className={`px-6 py-3 font-medium transition-all ${activeTab === 'stock-movement'
-              ? 'text-white shadow-md rounded-xl'
-              : `${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 border-gray-700 hover:border-gray-600' : 'bg-white text-gray-800 border border-gray-200 hover:border-gray-300'} rounded-lg`
+            ? 'text-white shadow-md rounded-xl'
+            : `${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 border-gray-700 hover:border-gray-600' : 'bg-white text-gray-800 border border-gray-200 hover:border-gray-300'} rounded-lg`
             }`}
           style={
             activeTab === 'stock-movement'
@@ -555,8 +555,8 @@ const Logs = () => {
         <button
           onClick={() => setActiveTab('void-logs')}
           className={`px-6 py-3 font-medium transition-all ${activeTab === 'void-logs'
-              ? 'text-white shadow-md rounded-xl'
-              : `${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 border-gray-700 hover:border-gray-600' : 'bg-white text-gray-800 border border-gray-200 hover:border-gray-300'} rounded-lg`
+            ? 'text-white shadow-md rounded-xl'
+            : `${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 border-gray-700 hover:border-gray-600' : 'bg-white text-gray-800 border border-gray-200 hover:border-gray-300'} rounded-lg`
             }`}
           style={
             activeTab === 'void-logs'
@@ -845,10 +845,10 @@ const Logs = () => {
                                 <span
                                   key={size}
                                   className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${movement.type === 'Stock-In'
-                                      ? 'bg-green-100 text-green-700'
-                                      : movement.type === 'Pull-Out'
-                                        ? 'bg-orange-100 text-orange-700'
-                                        : 'bg-red-100 text-red-700'
+                                    ? 'bg-green-100 text-green-700'
+                                    : movement.type === 'Pull-Out'
+                                      ? 'bg-orange-100 text-orange-700'
+                                      : 'bg-red-100 text-red-700'
                                     }`}
                                 >
                                   {size}: {movement.type === 'Stock-In' ? '+' : '-'}{qty}
@@ -903,8 +903,8 @@ const Logs = () => {
                         key={pageNumber}
                         onClick={() => setCurrentPage(pageNumber)}
                         className={`w-8 h-8 rounded-full text-sm font-semibold ${currentPage === pageNumber
-                            ? 'bg-[#AD7F65] text-white shadow-md'
-                            : `${theme === 'dark' ? 'text-gray-400 hover:bg-[#3A3734]' : 'text-gray-600 hover:bg-gray-50'}`
+                          ? 'bg-[#AD7F65] text-white shadow-md'
+                          : `${theme === 'dark' ? 'text-gray-400 hover:bg-[#3A3734]' : 'text-gray-600 hover:bg-gray-50'}`
                           }`}
                       >
                         {pageNumber}
@@ -916,8 +916,8 @@ const Logs = () => {
                     <button
                       onClick={() => setCurrentPage(totalPages)}
                       className={`w-8 h-8 rounded-full text-sm font-semibold ${currentPage === totalPages
-                          ? 'bg-[#AD7F65] text-white shadow-md'
-                          : 'text-gray-600 hover:bg-gray-50'
+                        ? 'bg-[#AD7F65] text-white shadow-md'
+                        : 'text-gray-600 hover:bg-gray-50'
                         }`}
                     >
                       {totalPages}
@@ -1004,10 +1004,10 @@ const Logs = () => {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${log.approvedByRole === 'Owner'
-                              ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                              : log.approvedByRole === 'Manager'
-                                ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                                : 'bg-gray-100 text-gray-600 border border-gray-200'
+                            ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                            : log.approvedByRole === 'Manager'
+                              ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                              : 'bg-gray-100 text-gray-600 border border-gray-200'
                             }`}>
                             {getApprovedByDisplay()}
                           </span>
@@ -1055,8 +1055,8 @@ const Logs = () => {
                         key={pageNumber}
                         onClick={() => setVoidCurrentPage(pageNumber)}
                         className={`w-8 h-8 rounded-full text-sm font-semibold ${voidCurrentPage === pageNumber
-                            ? 'bg-[#AD7F65] text-white shadow-md'
-                            : `${theme === 'dark' ? 'text-gray-400 hover:bg-[#3A3734]' : 'text-gray-600 hover:bg-gray-50'}`
+                          ? 'bg-[#AD7F65] text-white shadow-md'
+                          : `${theme === 'dark' ? 'text-gray-400 hover:bg-[#3A3734]' : 'text-gray-600 hover:bg-gray-50'}`
                           }`}
                       >
                         {pageNumber}
@@ -1068,8 +1068,8 @@ const Logs = () => {
                     <button
                       onClick={() => setVoidCurrentPage(voidTotalPages)}
                       className={`w-8 h-8 rounded-full text-sm font-semibold ${voidCurrentPage === voidTotalPages
-                          ? 'bg-[#AD7F65] text-white shadow-md'
-                          : 'text-gray-600 hover:bg-gray-50'
+                        ? 'bg-[#AD7F65] text-white shadow-md'
+                        : 'text-gray-600 hover:bg-gray-50'
                         }`}
                     >
                       {voidTotalPages}
