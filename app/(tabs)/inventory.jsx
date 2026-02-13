@@ -274,6 +274,7 @@ export default function Inventory() {
       sku: product.sku || 'N/A',
       itemImage: product.itemImage || product.image || '',
       dateAdded: product.dateAdded || product.createdAt || product.updatedAt || null,
+      costPrice: product.costPrice ?? 0,
     };
   }, []);
 
@@ -309,7 +310,14 @@ export default function Inventory() {
       return sum + ((p.price || 0) * (p.stock || 0));
     }, 0);
 
-    return { totalItems, inStock, lowStock, outOfStock, inventoryValue };
+    const totalCostValue = products.reduce((sum, p) => {
+      return sum + ((p.costPrice || 0) * (p.stock || 0));
+    }, 0);
+
+    const grossProfit = inventoryValue - totalCostValue;
+    const grossMargin = inventoryValue > 0 ? (grossProfit / inventoryValue) * 100 : 0;
+
+    return { totalItems, inStock, lowStock, outOfStock, inventoryValue, totalCostValue, grossMargin };
   }, [products]);
 
   // Memoized recently added items
@@ -482,11 +490,13 @@ export default function Inventory() {
 
               <View style={styles.row}>
                 <View style={styles.column}>
-                  <Text style={styles.subValue}>₱0.00</Text>
-                  <Text style={styles.subLabel}>Cost of Goods Sold</Text>
+                  <Text style={styles.subValue}>₱{inventoryStats.totalCostValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                  <Text style={styles.subLabel}>Total Cost Value</Text>
                 </View>
                 <View style={styles.column}>
-                  <Text style={styles.subValue}>--</Text>
+                  <Text style={[styles.subValue, { color: inventoryStats.grossMargin >= 0 ? '#2ECC71' : '#E74C3C' }]}>
+                    {inventoryStats.grossMargin.toFixed(1)}%
+                  </Text>
                   <Text style={styles.subLabel}>Gross Profit Margin</Text>
                 </View>
               </View>

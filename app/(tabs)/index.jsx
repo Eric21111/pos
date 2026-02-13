@@ -40,59 +40,26 @@ export default function Dashboard() {
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
   // Fetch dashboard statistics from API
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = async (timeframe = 'daily', showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
 
-      // Fetch transactions for today's stats
-      const transactionsResponse = await transactionAPI.getAll({ limit: '1000' });
-      const productsResponse = await productAPI.getAll();
+      const response = await transactionAPI.getDashboardStats(timeframe);
 
-      if (transactionsResponse.success && transactionsResponse.data) {
-        const transactions = transactionsResponse.data;
-
-        // Filter today's transactions
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const todayTransactions = transactions.filter(t => {
-          const transactionDate = new Date(t.createdAt || t.date);
-          transactionDate.setHours(0, 0, 0, 0);
-          return transactionDate.getTime() === today.getTime() &&
-            t.status !== 'Voided' &&
-            t.paymentMethod !== 'return';
-        });
-
-        // Calculate total sales today
-        const totalSalesToday = todayTransactions.reduce((sum, t) => {
-          return sum + (t.totalAmount || t.total || 0);
-        }, 0);
-
-        // Calculate average transaction value
-        const averageTransactionValue = todayTransactions.length > 0
-          ? totalSalesToday / todayTransactions.length
-          : 0;
-
-        // Count low stock items (stock < 5)
-        let lowStockItems = 0;
-        if (productsResponse.success && productsResponse.data) {
-          lowStockItems = productsResponse.data.filter(p => {
-            const stock = p.stock || p.quantity || 0;
-            return stock > 0 && stock < 5;
-          }).length;
-        }
-
+      if (response && response.success && response.data) {
         setDashboardStats({
-          totalSalesToday,
-          totalTransactions: todayTransactions.length,
-          averageTransactionValue,
-          lowStockItems,
+          totalSalesToday: response.data.totalSalesToday,
+          totalTransactions: response.data.totalTransactions,
+          averageTransactionValue: response.data.totalTransactions > 0
+            ? response.data.totalSalesToday / response.data.totalTransactions
+            : 0,
+          lowStockItems: response.data.lowStockItems,
         });
       }
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
@@ -103,7 +70,10 @@ export default function Dashboard() {
     setSyncModalVisible(true);
 
     try {
-      await fetchDashboardStats();
+      await Promise.all([
+        fetchDashboardStats(chartType), // Use current chartType
+        fetchSalesData()
+      ]);
       setSyncMessage("Sync complete");
     } catch (error) {
       setSyncMessage("Sync failed");
@@ -143,21 +113,30 @@ export default function Dashboard() {
     }
   }, [syncModalVisible]);
 
+  // Fetch dashboard stats (loading spinner) on focus only
   useFocusEffect(
     useCallback(() => {
-      const loadData = async () => {
+      const loadStats = async () => {
         try {
           const storedUser = await AsyncStorage.getItem("currentEmployee");
           if (storedUser) {
             setCurrentUser(JSON.parse(storedUser));
           }
-          await fetchDashboardStats();
+          await fetchDashboardStats(chartType); // Use current chartType
         } catch (error) {
-          console.warn("Failed to load data:", error?.message);
+          console.warn("Failed to load stats:", error?.message);
         }
       };
-      loadData();
+      loadStats();
     }, [])
+  );
+
+  // Fetch chart data AND stats on focus AND when chartType changes (no global spinner)
+  useFocusEffect(
+    useCallback(() => {
+      fetchSalesData();
+      fetchDashboardStats(chartType, false); // Update stats without spinner
+    }, [chartType])
   );
 
   const welcomeName =
@@ -173,19 +152,36 @@ export default function Dashboard() {
     return `₱${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const chartData = {
-    daily: {
-      labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-      datasets: [{ data: [30, 45, 28, 80, 99, 43, 50] }],
-    },
-    monthly: {
-      labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"],
-      datasets: [{ data: [300, 450, 280, 800, 990, 430, 500, 650] }],
-    },
-    yearly: {
-      labels: ["2021", "2022", "2023", "2024", "2025"],
-      datasets: [{ data: [5000, 6500, 7000, 9000, 11000] }],
-    },
+  const [salesData, setSalesData] = useState({
+    labels: ["Loading..."],
+    datasets: [{ data: [0] }],
+  });
+
+  // Fetch chart data
+  const fetchSalesData = async () => {
+    try {
+      const response = await transactionAPI.getSalesOverTime(chartType);
+
+      if (response && response.success && response.data) {
+        const labels = response.data.map(item => item.period);
+        const data = response.data.map(item => item.revenue || item.totalSales || 0);
+
+        // If no data, show empty state or zeros
+        if (labels.length === 0) {
+          setSalesData({
+            labels: ["No Data"],
+            datasets: [{ data: [0] }],
+          });
+        } else {
+          setSalesData({
+            labels,
+            datasets: [{ data }],
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching sales data:", error);
+    }
   };
 
   // Platform-specific shadow styles
@@ -256,20 +252,20 @@ export default function Dashboard() {
               <View style={styles.statsRow}>
                 <View style={styles.statCard}>
                   <Text style={styles.statValue}>{formatCurrency(dashboardStats.totalSalesToday)}</Text>
-                  <Text style={styles.statLabel}>Total Sales Today</Text>
+                  <Text style={styles.statLabel}>Total Sales ({chartType.charAt(0).toUpperCase() + chartType.slice(1)})</Text>
                   <Text style={styles.statDesc}>Total sales from all transactions</Text>
                 </View>
                 <View style={styles.statCard}>
                   <Text style={styles.statValue}>{dashboardStats.totalTransactions}</Text>
-                  <Text style={styles.statLabel}>Total Transactions</Text>
-                  <Text style={styles.statDesc}>Sales made today</Text>
+                  <Text style={styles.statLabel}>Total Transactions ({chartType.charAt(0).toUpperCase() + chartType.slice(1)})</Text>
+                  <Text style={styles.statDesc}>Sales made this {chartType === 'daily' ? 'day' : chartType === 'monthly' ? 'month' : 'year'}</Text>
                 </View>
               </View>
               <View style={styles.statsRow}>
                 <View style={styles.statCard}>
                   <Text style={styles.statValue}>{formatCurrency(dashboardStats.averageTransactionValue)}</Text>
-                  <Text style={styles.statLabel}>Average Transaction Value</Text>
-                  <Text style={styles.statDesc}>Average customer spend today</Text>
+                  <Text style={styles.statLabel}>Avg. Transaction ({chartType.charAt(0).toUpperCase() + chartType.slice(1)})</Text>
+                  <Text style={styles.statDesc}>Average customer spend</Text>
                 </View>
                 <View style={styles.statCard}>
                   <Text style={[styles.statValue, dashboardStats.lowStockItems > 0 && styles.warningValue]}>
@@ -299,7 +295,7 @@ export default function Dashboard() {
             </View>
           </View>
           <LineChart
-            data={chartData[chartType]}
+            data={salesData}
             width={350}
             height={220}
             chartConfig={{

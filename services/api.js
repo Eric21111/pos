@@ -226,14 +226,20 @@ export const transactionAPI = {
   },
 
   // Get dashboard stats
-  getDashboardStats: async () => {
-    return apiCall('/transactions/dashboard/stats');
+  getDashboardStats: async (timeframe = 'daily') => {
+    return apiCall(`/transactions/dashboard/stats?timeframe=${encodeURIComponent(timeframe)}`);
   },
 
   // Get sales over time (for charts)
   getSalesOverTime: async (timeframe = 'daily') => {
     const tf = timeframe.toLowerCase();
     return apiCall(`/transactions/sales-over-time?timeframe=${encodeURIComponent(tf)}`);
+  },
+
+  // Get top selling products
+  getTopSelling: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiCall(`/transactions/top-selling${queryString ? `?${queryString}` : ''}`);
   },
 };
 
@@ -380,6 +386,11 @@ export const stockMovementAPI = {
       body: JSON.stringify(movementData),
     });
   },
+
+  // Get stock stats over time
+  getStockStatsOverTime: async (timeframe = 'daily') => {
+    return apiCall(`/stock-movements/stats/over-time?timeframe=${encodeURIComponent(timeframe)}`);
+  },
 };
 
 // ==================== ARCHIVE ====================
@@ -525,6 +536,14 @@ export const brandPartnerAPI = {
       method: 'POST',
       body: JSON.stringify(brandData),
     });
+  },
+};
+
+// ==================== STOCK ALERTS ====================
+export const stockAPI = {
+  // Get low stock and out of stock items
+  getLowStock: async () => {
+    return apiCall('/products/low-stock');
   },
 };
 

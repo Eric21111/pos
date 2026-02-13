@@ -1,50 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, FlatList, LayoutAnimation, Modal, Platform, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, UIManager, View } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, LayoutAnimation, Modal, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, UIManager, View } from 'react-native';
+import { archiveAPI } from '../services/api';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Mock data for archived items
-const archivedItems = [
-  {
-    id: 1,
-    sku: 'ARC001',
-    name: 'Winter Coat',
-    brand: 'North Face',
-    category: 'Tops',
-    price: 7999.99,
-    stock: 0,
-    dateArchived: '2025-10-15'
-  },
-  {
-    id: 2,
-    sku: 'ARC002',
-    name: 'Leather Boots',
-    brand: 'Dr. Martens',
-    category: 'Shoes',
-    price: 6499.99,
-    stock: 0,
-    dateArchived: '2025-11-01'
-  },
-  {
-    id: 3,
-    sku: 'ARC003',
-    name: 'Graphic T-Shirt',
-    brand: 'Supreme',
-    category: 'Tops',
-    price: 2499.99,
-    stock: 0,
-    dateArchived: '2025-11-10'
-  },
-];
-
 const CollapsibleItem = ({ item, isExpanded, onPress, onRestore }) => {
   const [animation] = useState(new Animated.Value(0));
-  
+
   useEffect(() => {
     Animated.timing(animation, {
       toValue: isExpanded ? 1 : 0,
@@ -59,22 +26,35 @@ const CollapsibleItem = ({ item, isExpanded, onPress, onRestore }) => {
   });
 
   const handleRestoreClick = (e) => {
-    e.stopPropagation(); // Prevent toggling the expand/collapse
-    onRestore(item.id);
+    e.stopPropagation(); // Prevent toggling the expand/collapse  
+    onRestore(item._id || item.id);
   };
+
+  // Map database fields to display
+  const name = item.itemName || item.name || 'Unknown Item';
+  const sku = item.sku || 'N/A';
+  const dateArchived = item.archivedAt || item.dateArchived || new Date();
+  const formattedDate = new Date(dateArchived).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+  const brand = item.brandName || item.brand || 'N/A';
+  const category = item.category || 'N/A';
+  const price = item.itemPrice || item.price || 0;
 
   return (
     <View style={styles.itemContainer}>
-      <TouchableOpacity 
-        style={styles.itemHeader} 
+      <TouchableOpacity
+        style={styles.itemHeader}
         onPress={onPress}
         activeOpacity={0.7}
       >
         <View style={styles.itemInfo}>
           <View style={styles.itemHeaderRow}>
             <View style={styles.nameAndRestoreContainer}>
-              <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-              <TouchableOpacity 
+              <Text style={styles.itemName} numberOfLines={1}>{name}</Text>
+              <TouchableOpacity
                 onPress={handleRestoreClick}
                 style={styles.restoreIcon}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -83,35 +63,35 @@ const CollapsibleItem = ({ item, isExpanded, onPress, onRestore }) => {
               </TouchableOpacity>
             </View>
           </View>
-          <Text style={styles.itemSku}>SKU: {item.sku}</Text>
-          <Text style={styles.itemDate}>Archived: {item.dateArchived}</Text>
+          <Text style={styles.itemSku}>SKU: {sku}</Text>
+          <Text style={styles.itemDate}>Archived: {formattedDate}</Text>
         </View>
-        <Ionicons 
-          name={isExpanded ? 'chevron-up' : 'chevron-down'} 
-          size={20} 
-          color="#666" 
+        <Ionicons
+          name={isExpanded ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color="#666"
         />
       </TouchableOpacity>
-      
+
       <Animated.View style={[styles.collapsibleContent, { height }]}>
         <View style={styles.detailsContainer}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Brand:</Text>
-            <Text style={styles.detailValue}>{item.brand}</Text>
+            <Text style={styles.detailValue}>{brand}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Category:</Text>
-            <Text style={styles.detailValue}>{item.category}</Text>
+            <Text style={styles.detailValue}>{category}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Price:</Text>
             <Text style={[styles.detailValue, styles.price]}>
-              ₱{item.price.toFixed(2)}
+              ₱{price.toFixed(2)}
             </Text>
           </View>
           <View style={styles.actionsContainer}>
             <Text style={styles.restoreLabel}>Restore this item?</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={handleRestoreClick}
               activeOpacity={0.9}
@@ -133,6 +113,33 @@ export default function ItemArchive() {
   const [expandedItems, setExpandedItems] = useState({});
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [itemToRestore, setItemToRestore] = useState(null);
+  const [archivedItems, setArchivedItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchArchivedItems = async () => {
+    try {
+      const response = await archiveAPI.getAll();
+      if (response.success && response.data) {
+        setArchivedItems(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching archived items:', error);
+      setArchivedItems([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchArchivedItems();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchArchivedItems();
+  };
 
   const toggleItem = (itemId) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -145,16 +152,32 @@ export default function ItemArchive() {
   // Sort items based on selected filter
   const getSortedItems = () => {
     const items = [...archivedItems];
-    
-    switch(sortBy) {
+
+    switch (sortBy) {
       case 'a-z':
-        return items.sort((a, b) => a.name.localeCompare(b.name));
+        return items.sort((a, b) => {
+          const nameA = a.itemName || a.name || '';
+          const nameB = b.itemName || b.name || '';
+          return nameA.localeCompare(nameB);
+        });
       case 'z-a':
-        return items.sort((a, b) => b.name.localeCompare(a.name));
+        return items.sort((a, b) => {
+          const nameA = a.itemName || a.name || '';
+          const nameB = b.itemName || b.name || '';
+          return nameB.localeCompare(nameA);
+        });
       case 'newest':
-        return items.sort((a, b) => new Date(b.dateArchived) - new Date(a.dateArchived));
+        return items.sort((a, b) => {
+          const dateA = new Date(a.archivedAt || a.dateArchived);
+          const dateB = new Date(b.archivedAt || b.dateArchived);
+          return dateB - dateA;
+        });
       case 'oldest':
-        return items.sort((a, b) => new Date(a.dateArchived) - new Date(b.dateArchived));
+        return items.sort((a, b) => {
+          const dateA = new Date(a.archivedAt || a.dateArchived);
+          const dateB = new Date(b.archivedAt || b.dateArchived);
+          return dateA - dateB;
+        });
       default:
         return items;
     }
@@ -184,8 +207,8 @@ export default function ItemArchive() {
   const renderItem = ({ item }) => (
     <CollapsibleItem
       item={item}
-      isExpanded={!!expandedItems[item.id]}
-      onPress={() => toggleItem(item.id)}
+      isExpanded={!!expandedItems[item._id || item.id]}
+      onPress={() => toggleItem(item._id || item.id)}
       onRestore={(itemId) => handleRestore(itemId)}
     />
   );
@@ -195,11 +218,21 @@ export default function ItemArchive() {
     setShowRestoreModal(true);
   };
 
-  const confirmRestore = () => {
-    console.log('Restoring item:', itemToRestore);
-    // Add your restore logic here
-    setShowRestoreModal(false);
-    setItemToRestore(null);
+  const confirmRestore = async () => {
+    try {
+      console.log('Restoring item:', itemToRestore);
+      // Call the restore API
+      const response = await archiveAPI.restore(itemToRestore);
+      if (response.success) {
+        // Refresh the list after successful restore
+        await fetchArchivedItems();
+      }
+    } catch (error) {
+      console.error('Error restoring item:', error);
+    } finally {
+      setShowRestoreModal(false);
+      setItemToRestore(null);
+    }
   };
 
   const cancelRestore = () => {
@@ -210,16 +243,16 @@ export default function ItemArchive() {
   return (
     <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.filterToggle}
           onPress={() => setIsFilterVisible(!isFilterVisible)}
         >
           <Ionicons name="filter" size={20} color="#333" />
           <Text style={styles.filterToggleText}>Sort</Text>
-          <Ionicons 
-            name={isFilterVisible ? "chevron-up" : "chevron-down"} 
-            size={16} 
-            color="#666" 
+          <Ionicons
+            name={isFilterVisible ? "chevron-up" : "chevron-down"}
+            size={16}
+            color="#666"
           />
         </TouchableOpacity>
       </View>
@@ -236,13 +269,35 @@ export default function ItemArchive() {
         </View>
       )}
 
-      <FlatList
-        data={getSortedItems()}
-        renderItem={renderItem}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={styles.listContent}
-        style={styles.list}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#8B4513" />
+          <Text style={styles.loadingText}>Loading archive...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={getSortedItems()}
+          renderItem={renderItem}
+          keyExtractor={item => (item._id || item.id).toString()}
+          contentContainerStyle={archivedItems.length === 0 ? styles.emptyListContent : styles.listContent}
+          style={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#8B4513']}
+              tintColor="#8B4513"
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="archive-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyText}>No archived items</Text>
+              <Text style={styles.emptySubtext}>Items removed from inventory will appear here</Text>
+            </View>
+          }
+        />
+      )}
 
       {/* Restore Confirmation Modal */}
       <Modal
@@ -260,13 +315,13 @@ export default function ItemArchive() {
                   Are you sure you want to restore this item? It will be moved back to your inventory.
                 </Text>
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.modalButton, styles.cancelButton]}
                     onPress={cancelRestore}
                   >
                     <Text style={styles.cancelButtonText}>Cancel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.modalButton, styles.confirmButton]}
                     onPress={confirmRestore}
                   >
@@ -520,5 +575,25 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     color: 'white',
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 14,
+  },
+  emptyListContent: {
+    flex: 1,
+  },
+  emptySubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#aaa',
+    textAlign: 'center',
   },
 });
