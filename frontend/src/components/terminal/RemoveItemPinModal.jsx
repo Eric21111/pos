@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { FaTimes, FaChevronDown } from 'react-icons/fa';
+import { useEffect, useRef, useState } from 'react';
+import { FaChevronDown, FaTimes } from 'react-icons/fa';
 import { useTheme } from '../../context/ThemeContext';
 
 const voidReasons = [
@@ -247,8 +247,8 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
                       type="button"
                       onClick={() => handleReasonSelect(voidReason)}
                       className={`w-full px-4 py-2 text-left text-sm transition-colors ${reason === voidReason
-                          ? (theme === 'dark' ? 'bg-red-900/30 text-red-400 font-semibold' : 'bg-red-50 text-red-600 font-semibold')
-                          : (theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50')
+                        ? (theme === 'dark' ? 'bg-red-900/30 text-red-400 font-semibold' : 'bg-red-50 text-red-600 font-semibold')
+                        : (theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50')
                         }`}
                     >
                       {voidReason}
@@ -265,6 +265,8 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
             </label>
             <input
               type="password"
+              id="void-transaction-pin"
+              name="void-transaction-pin"
               value={pin}
               onChange={handlePinChange}
               onBlur={(e) => {
@@ -278,7 +280,7 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
               placeholder="Enter 6-digit PIN"
               maxLength={6}
               autoFocus
-              autoComplete="off"
+              autoComplete="new-password"
             />
           </div>
 

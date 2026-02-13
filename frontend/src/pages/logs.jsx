@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { FaChevronLeft, FaChevronRight, FaEye, FaSearch } from 'react-icons/fa';
-import PullOutIcon from '../assets/logs/pull-out.svg';
+import PullOutIcon from '../assets/logs/pull_out.svg';
 import StockInIcon from '../assets/logs/stock-in.svg';
 import StockOutIcon from '../assets/logs/stock-out.svg';
 import ViewVoidLogModal from '../components/logs/ViewVoidLogModal';
