@@ -1,7 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import AddCategoryModal from './AddCategoryModal';
 import AddBrandModal from './AddBrandModal';
+import AddCategoryModal from './AddCategoryModal';
+
+// Common colors for variant dropdown
+const COMMON_COLORS = [
+  'Black', 'White', 'Red', 'Blue', 'Navy Blue', 'Green',
+  'Yellow', 'Orange', 'Pink', 'Purple', 'Brown', 'Gray',
+  'Beige', 'Cream', 'Maroon', 'Olive', 'Teal', 'Coral',
+  'Lavender', 'Mint', 'Gold', 'Silver', 'Rose Gold',
+  'Custom' // Allows custom color input
+];
 
 const AddProductModal = ({
   showAddModal,
@@ -28,6 +37,9 @@ const AddProductModal = ({
   const [showDraftNotice, setShowDraftNotice] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showBrandModal, setShowBrandModal] = useState(false);
+  const [customVariant, setCustomVariant] = useState('');
+  const [multipleVariantsPerSize, setMultipleVariantsPerSize] = useState({});
+  const [sizeMultiVariants, setSizeMultiVariants] = useState({});
 
   // Check if there's a recovered draft when modal opens
   useEffect(() => {
@@ -56,6 +68,28 @@ const AddProductModal = ({
     newProduct.brandName &&
     newProduct.brandName !== 'Default' &&
     !partnerNames.includes(newProduct.brandName);
+
+  // Wrapper function to include custom variant and multi-variant data
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+
+    //  Update newProduct with custom variant if applicable
+    if (newProduct.variant === 'Custom' && customVariant) {
+      setNewProduct(prev => ({ ...prev, variant: customVariant }));
+    }
+
+    // Store multi-variant data in newProduct for parent to access
+    if (Object.keys(sizeMultiVariants).length > 0) {
+      setNewProduct(prev => ({
+        ...prev,
+        sizeMultiVariants: sizeMultiVariants,
+        multipleVariantsPerSize: multipleVariantsPerSize
+      }));
+    }
+
+    // Call the parent's handleAddProduct with a slight delay to ensure state updates
+    setTimeout(() => handleAddProduct(e), 10);
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm pointer-events-none">
@@ -95,7 +129,7 @@ const AddProductModal = ({
           </div>
         )}
 
-        <form onSubmit={handleAddProduct}>
+        <form onSubmit={handleFormSubmit}>
           <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(95vh - 80px)' }}>
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-4">
@@ -217,18 +251,40 @@ const AddProductModal = ({
                         <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                           Variant <span className="text-gray-400">Optional</span>
                         </label>
-                        <input
-                          type="text"
+                        <select
                           name="variant"
-                          value={newProduct.variant}
-                          onChange={handleInputChange}
+                          value={newProduct.variant || ''}
+                          onChange={(e) => {
+                            handleInputChange(e);
+                            if (e.target.value !== 'Custom') {
+                              setCustomVariant('');
+                            }
+                          }}
                           disabled={newProduct.differentVariantsPerSize}
-                          placeholder={newProduct.differentVariantsPerSize ? "Multiple variants selected" : "Add Variant"}
                           className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${newProduct.differentVariantsPerSize
                             ? (theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-gray-500 cursor-not-allowed' : 'bg-gray-100 text-gray-400 cursor-not-allowed')
                             : (theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-white' : 'bg-gray-50 border-gray-300')
                             }`}
-                        />
+                        >
+                          <option value="" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>
+                            {newProduct.differentVariantsPerSize ? "Multiple variants selected" : "Select a color"}
+                          </option>
+                          {COMMON_COLORS.map((color) => (
+                            <option key={color} value={color} className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>
+                              {color}
+                            </option>
+                          ))}
+                        </select>
+                        {newProduct.variant === 'Custom' && !newProduct.differentVariantsPerSize && (
+                          <input
+                            type="text"
+                            value={customVariant}
+                            onChange={(e) => setCustomVariant(e.target.value)}
+                            placeholder="Enter custom color"
+                            className={`w-full px-3 py-2 text-sm border rounded-lg mt-2 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-white' : 'bg-gray-50 border-gray-300'
+                              }`}
+                          />
+                        )}
                       </div>
                     </div>
 
@@ -390,30 +446,117 @@ const AddProductModal = ({
                                   <label className={`block text-xs font-semibold mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                                     Variant per Size:
                                   </label>
-                                  <div className="grid grid-cols-2 gap-3">
-                                    {newProduct.selectedSizes.map((size) => (
-                                      <div key={size}>
-                                        <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{size}</label>
-                                        <input
-                                          type="text"
-                                          value={newProduct.sizeVariants?.[size] || ''}
-                                          onChange={(e) => {
-                                            setNewProduct(prev => ({
-                                              ...prev,
-                                              sizeVariants: {
-                                                ...prev.sizeVariants,
-                                                [size]: e.target.value
-                                              }
-                                            }));
-                                          }}
-                                          placeholder="Enter variant"
-                                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
-                                            ? 'bg-[#2A2724] border-gray-600 text-white'
-                                            : 'bg-white border-gray-300'
-                                            }`}
-                                        />
-                                      </div>
-                                    ))}
+                                  <div className="space-y-4">
+                                    {newProduct.selectedSizes.map((size) => {
+                                      const hasMultipleVariants = multipleVariantsPerSize[size] || false;
+                                      const variants = sizeMultiVariants[size] || [];
+                                      const singleVariant = newProduct.sizeVariants?.[size] || '';
+
+                                      return (
+                                        <div key={size} className={`p-3 rounded-lg border ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-white border-gray-200'}`}>
+                                          <label className={`block text-xs font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{size}</label>
+
+                                          {/* Checkbox for multiple variants in this size */}
+                                          <label className="flex items-center gap-2 cursor-pointer mb-2">
+                                            <input
+                                              type="checkbox"
+                                              checked={hasMultipleVariants}
+                                              onChange={(e) => {
+                                                setMultipleVariantsPerSize(prev => ({
+                                                  ...prev,
+                                                  [size]: e.target.checked
+                                                }));
+                                                if (e.target.checked) {
+                                                  // Initialize with single variant if any
+                                                  setSizeMultiVariants(prev => ({
+                                                    ...prev,
+                                                    [size]: singleVariant ? [singleVariant] : []
+                                                  }));
+                                                } else {
+                                                  // Clear multi-variants
+                                                  setSizeMultiVariants(prev => {
+                                                    const newState = { ...prev };
+                                                    delete newState[size];
+                                                    return newState;
+                                                  });
+                                                }
+                                              }}
+                                              className="w-4 h-4 text-[#AD7F65] border-gray-300 rounded focus:ring-[#AD7F65]"
+                                            />
+                                            <span className="text-xs text-gray-600">Different variant in this size?</span>
+                                          </label>
+
+                                          {!hasMultipleVariants ? (
+                                            /* Single variant dropdown */
+                                            <select
+                                              value={singleVariant}
+                                              onChange={(e) => {
+                                                setNewProduct(prev => ({
+                                                  ...prev,
+                                                  sizeVariants: {
+                                                    ...prev.sizeVariants,
+                                                    [size]: e.target.value
+                                                  }
+                                                }));
+                                              }}
+                                              className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-white' : 'bg-gray-50 border-gray-300'
+                                                }`}
+                                            >
+                                              <option value="" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>Select a color</option>
+                                              {COMMON_COLORS.filter(c => c !== 'Custom').map((color) => (
+                                                <option key={color} value={color} className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>{color}</option>
+                                              ))}
+                                            </select>
+                                          ) : (
+                                            /* Multiple variants UI */
+                                            <div className="space-y-2">
+                                              {/* Display current variants as chips */}
+                                              <div className="flex flex-wrap gap-2 min-h-[30px]">
+                                                {variants.map((v, index) => (
+                                                  <span key={index} className="inline-flex items-center gap-1 bg-[#AD7F65] text-white text-xs px-3 py-1 rounded-full">
+                                                    {v}
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                        setSizeMultiVariants(prev => ({
+                                                          ...prev,
+                                                          [size]: variants.filter((_, i) => i !== index)
+                                                        }));
+                                                      }}
+                                                      className="hover:opacity-80"
+                                                    >
+                                                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                      </svg>
+                                                    </button>
+                                                  </span>
+                                                ))}
+                                              </div>
+
+                                              {/* Add variant dropdown */}
+                                              <select
+                                                value=""
+                                                onChange={(e) => {
+                                                  if (e.target.value && !variants.includes(e.target.value)) {
+                                                    setSizeMultiVariants(prev => ({
+                                                      ...prev,
+                                                      [size]: [...(prev[size] || []), e.target.value]
+                                                    }));
+                                                  }
+                                                }}
+                                                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-white' : 'bg-gray-50 border-gray-300'
+                                                  }`}
+                                              >
+                                                <option value="" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>+ Add variant</option>
+                                                {COMMON_COLORS.filter(c => c !== 'Custom' && !variants.includes(c)).map((color) => (
+                                                  <option key={color} value={color} className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>{color}</option>
+                                                ))}
+                                              </select>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               )}

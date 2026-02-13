@@ -1,35 +1,31 @@
-import { useState, useEffect, useMemo, memo } from 'react';
-import Header from '../components/shared/header';
-import { useTheme } from '../context/ThemeContext';
-import { useDataCache } from '../context/DataCacheContext';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
   FaPlus,
   FaSearch
 } from 'react-icons/fa';
-import { MdCategory } from 'react-icons/md';
+import Header from '../components/shared/header';
+import { useDataCache } from '../context/DataCacheContext';
+import { useTheme } from '../context/ThemeContext';
 
 
+import accessoriesIcon from '../assets/inventory-icons/accesories.svg';
 import allIcon from '../assets/inventory-icons/ALL.svg';
-import topIcon from '../assets/inventory-icons/Top.svg';
 import bottomsIcon from '../assets/inventory-icons/Bottoms.svg';
 import dressesIcon from '../assets/inventory-icons/dresses.svg';
-import makeupIcon from '../assets/inventory-icons/make up.svg';
-import accessoriesIcon from '../assets/inventory-icons/accesories.svg';
-import shoesIcon from '../assets/inventory-icons/shoe.svg';
 import headWearIcon from '../assets/inventory-icons/head wear.svg';
-import printIcon from '../assets/inventory-icons/print.png';
-import exportIcon from '../assets/inventory-icons/Export.svg';
+import makeupIcon from '../assets/inventory-icons/make up.svg';
+import shoesIcon from '../assets/inventory-icons/shoe.svg';
+import topIcon from '../assets/inventory-icons/Top.svg';
 import AddProductModal from '../components/inventory/AddProductModal';
 import ConfirmAddProductModal from '../components/inventory/ConfirmAddProductModal';
-import SuccessModal from '../components/inventory/SuccessModal';
 import DeleteConfirmationModal from '../components/inventory/DeleteConfirmationModal';
 import EditConfirmationModal from '../components/inventory/EditConfirmationModal';
-import CategoryButtons from '../components/shared/CategoryButtons';
-import ProductTable from '../components/inventory/ProductTable';
-import ViewProductModal from '../components/inventory/ViewProductModal';
 import Pagination from '../components/inventory/Pagination';
+import ProductTable from '../components/inventory/ProductTable';
 import StockInModal from '../components/inventory/StockInModal';
 import StockOutModal from '../components/inventory/StockOutModal';
+import SuccessModal from '../components/inventory/SuccessModal';
+import ViewProductModal from '../components/inventory/ViewProductModal';
 
 const preferredExportFieldOrder = [
   '_id',
@@ -641,14 +637,56 @@ const Inventory = () => {
             const sizesWithPrices = {};
             newProduct.selectedSizes.forEach(size => {
               const sizePrice = parseFloat(newProduct.sizePrices[size]);
+
+              // Determine variant value for this size
+              let variantValue = '';
+              if (newProduct.differentVariantsPerSize) {
+                // Check if this size has multiple variants
+                if (newProduct.multipleVariantsPerSize?.[size]) {
+                  // Use array of variants
+                  variantValue = newProduct.sizeMultiVariants?.[size] || [];
+                } else {
+                  // Use single variant
+                  variantValue = newProduct.sizeVariants?.[size] || '';
+                }
+              } else {
+                // Use global variant
+                variantValue = newProduct.variant || '';
+              }
+
               sizesWithPrices[size] = {
                 quantity: newProduct.sizeQuantities[size] || 0,
-                price: sizePrice || defaultItemPrice || 0
+                price: sizePrice || defaultItemPrice || 0,
+                variant: variantValue
               };
             });
             payload.sizes = sizesWithPrices;
           } else {
-            payload.sizes = newProduct.sizeQuantities;
+            // No different prices, but may have variants
+            const sizesObject = {};
+            newProduct.selectedSizes.forEach(size => {
+              // Determine variant value for this size
+              let variantValue = '';
+              if (newProduct.differentVariantsPerSize) {
+                // Check if this size has multiple variants
+                if (newProduct.multipleVariantsPerSize?.[size]) {
+                  // Use array of variants
+                  variantValue = newProduct.sizeMultiVariants?.[size] || [];
+                } else {
+                  // Use single variant
+                  variantValue = newProduct.sizeVariants?.[size] || '';
+                }
+              } else {
+                // Use global variant
+                variantValue = newProduct.variant || '';
+              }
+
+              sizesObject[size] = {
+                quantity: newProduct.sizeQuantities[size] || 0,
+                variant: variantValue
+              };
+            });
+            payload.sizes = sizesObject;
           }
         } else {
           payload.sizes = null;
