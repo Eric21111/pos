@@ -1,18 +1,21 @@
 import React from 'react';
 import { FaTimes } from 'react-icons/fa';
+import { useTheme } from '../../context/ThemeContext';
 
 const ConfirmAddProductModal = ({ isOpen, onClose, onConfirm, productName }) => {
+  const { theme } = useTheme();
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[10000] p-4 backdrop-blur-sm">
-      <div 
-        className="bg-white rounded-2xl w-full max-w-md relative shadow-2xl"
+      <div
+        className={`rounded-2xl w-full max-w-md relative shadow-2xl ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-white'}`}
         style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
+          className={`absolute top-4 right-4 transition-colors z-10 ${theme === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'}`}
         >
           <FaTimes className="w-5 h-5" />
         </button>
@@ -26,11 +29,11 @@ const ConfirmAddProductModal = ({ isOpen, onClose, onConfirm, productName }) => 
             </div>
           </div>
 
-          <h3 className="text-xl font-bold text-gray-800 text-center mb-3">
+          <h3 className={`text-xl font-bold text-center mb-3 ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
             Are you sure you want to add this item?
           </h3>
 
-          <p className="text-sm text-gray-500 text-center mb-8">
+          <p className={`text-sm text-center mb-8 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
             This action will be apply to the inventory.
           </p>
 
@@ -38,7 +41,7 @@ const ConfirmAddProductModal = ({ isOpen, onClose, onConfirm, productName }) => 
             <button
               onClick={onConfirm}
               className="flex-1 py-3 px-6 rounded-lg font-bold text-white transition-all shadow-md hover:shadow-lg"
-              style={{ 
+              style={{
                 background: 'linear-gradient(135deg, #D4A59A 0%, #AD7F65 50%, #76462B 100%)'
               }}
             >
@@ -46,7 +49,10 @@ const ConfirmAddProductModal = ({ isOpen, onClose, onConfirm, productName }) => 
             </button>
             <button
               onClick={onClose}
-              className="flex-1 py-3 px-6 rounded-lg font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 transition-all shadow-sm"
+              className={`flex-1 py-3 px-6 rounded-lg font-bold transition-all shadow-sm ${theme === 'dark'
+                ? 'bg-[#2A2724] text-gray-300 hover:bg-[#322f2c]'
+                : 'text-gray-700 bg-gray-200 hover:bg-gray-300'
+                }`}
             >
               Cancel
             </button>

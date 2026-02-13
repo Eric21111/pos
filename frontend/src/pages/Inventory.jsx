@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, memo } from 'react';
 import Header from '../components/shared/header';
+import { useTheme } from '../context/ThemeContext';
 import { useDataCache } from '../context/DataCacheContext';
 import {
   FaPlus,
@@ -91,6 +92,7 @@ const fieldToHeaderMap = {
 const ADD_PRODUCT_STORAGE_KEY = 'addProductFormDraft';
 
 const Inventory = () => {
+  const { theme } = useTheme();
   const { getCachedData, setCachedData, isCacheValid, invalidateCache } = useDataCache();
   const [products, setProducts] = useState(() => getCachedData('products') || []);
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -1441,13 +1443,13 @@ const Inventory = () => {
   };
 
   return (
-    <div className="p-8 min-h-screen">
+    <div className={`p-8 min-h-screen ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-[#F5F5F5]'}`}>
       <Header pageName="Product & Stocks" showBorder={false} />
 
 
       <div className="mb-6">
         <div className="flex gap-4 flex-wrap">
-          <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
+          <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-500"></div>
             <div className="ml-2">
               <div className="text-3xl font-bold text-blue-500">{stockStats.totalItems.toLocaleString()}</div>
@@ -1460,7 +1462,7 @@ const Inventory = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
+          <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-green-500"></div>
             <div className="ml-2">
               <div className="text-3xl font-bold text-green-500">{stockStats.inStockItems.toLocaleString()}</div>
@@ -1474,7 +1476,7 @@ const Inventory = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
+          <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-orange-500"></div>
             <div className="ml-2">
               <div className="text-3xl font-bold text-orange-500">{stockStats.lowStockItems}</div>
@@ -1487,7 +1489,7 @@ const Inventory = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden" style={{ minWidth: '200px' }}>
+          <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-red-500"></div>
             <div className="ml-2">
               <div className="text-3xl font-bold text-red-500">{stockStats.outOfStockItems}</div>
@@ -1502,20 +1504,25 @@ const Inventory = () => {
 
           <button
             onClick={handleExportButtonClick}
-            className={`bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isExportSelectionMode ? 'border border-[#AD7F65] bg-[#AD7F65]/5' : 'hover:bg-gray-50'}`}
+            className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isExportSelectionMode
+              ? 'border border-[#AD7F65] bg-[#AD7F65]/5'
+              : (theme === 'dark' ? 'bg-[#2A2724] hover:bg-[#352F2A]' : 'bg-white hover:bg-gray-50')}`}
             style={{ minWidth: '100px' }}
           >
-            <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-8 h-8 mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <div className="text-xs font-medium text-gray-700">
+            <div className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`}>
               {isExportSelectionMode ? 'Export Selected' : 'Export'}
             </div>
           </button>
           {isExportSelectionMode && (
             <button
               onClick={handleCancelExportSelection}
-              className="bg-white rounded-2xl shadow-md px-4 py-2 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+              className={`rounded-2xl shadow-md px-4 py-2 text-xs font-medium border transition-colors ${theme === 'dark'
+                ? 'bg-[#2A2724] border-gray-600 text-gray-400 hover:bg-[#352F2A]'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
             >
               Cancel
             </button>
@@ -1523,13 +1530,14 @@ const Inventory = () => {
 
           <button
             onClick={() => document.getElementById('csv-file-input').click()}
-            className="bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 hover:bg-gray-50 transition-colors"
+            className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${theme === 'dark' ? 'bg-[#2A2724] hover:bg-[#352F2A]' : 'bg-white hover:bg-gray-50'
+              }`}
             style={{ minWidth: '100px' }}
           >
-            <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-8 h-8 mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <div className="text-xs font-medium text-gray-700">Import</div>
+            <div className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`}>Import</div>
           </button>
           <input
             id="csv-file-input"
@@ -1553,14 +1561,20 @@ const Inventory = () => {
               placeholder="Search For..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+              className={`w-full h-10 pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-500'
+                : 'bg-white border-gray-300'
+                }`}
             />
           </div>
 
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+            className={`h-10 px-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
+              ? 'bg-[#2A2724] border-gray-600 text-white'
+              : 'bg-white border-gray-300'
+              }`}
           >
             <option value="All">By Category</option>
             {categories.filter(c => c.name !== 'All').map(cat => (
@@ -1571,7 +1585,10 @@ const Inventory = () => {
           <select
             value={filterBrand}
             onChange={(e) => setFilterBrand(e.target.value)}
-            className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+            className={`h-10 px-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
+              ? 'bg-[#2A2724] border-gray-600 text-white'
+              : 'bg-white border-gray-300'
+              }`}
           >
             <option value="All">By Brand</option>
             {uniqueBrands.map(brand => (
@@ -1582,7 +1599,10 @@ const Inventory = () => {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+            className={`h-10 px-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
+              ? 'bg-[#2A2724] border-gray-600 text-white'
+              : 'bg-white border-gray-300'
+              }`}
           >
             <option value="All">By Status</option>
             <option value="In Stock">In Stock</option>
@@ -1593,7 +1613,10 @@ const Inventory = () => {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="h-10 px-4 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+            className={`h-10 px-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
+              ? 'bg-[#2A2724] border-gray-600 text-white'
+              : 'bg-white border-gray-300'
+              }`}
           >
             <option value="sku-new">SKU: Newest First</option>
             <option value="sku-old">SKU: Oldest First</option>

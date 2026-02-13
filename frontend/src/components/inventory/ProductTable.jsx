@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import { MdCategory } from 'react-icons/md';
 
 const ProductTable = ({
@@ -15,6 +16,7 @@ const ProductTable = ({
   allVisibleSelected = false,
   someVisibleSelected = false
 }) => {
+  const { theme } = useTheme();
   // Helper function to get price from size data
   const getSizePrice = (sizeData) => {
     if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
@@ -36,19 +38,19 @@ const ProductTable = ({
     // If product has sizes with different prices, calculate range
     if (product.sizes && typeof product.sizes === 'object') {
       const prices = [];
-      
+
       Object.values(product.sizes).forEach(sizeData => {
         const price = getSizePrice(sizeData);
         if (price !== null) {
           prices.push(price);
         }
       });
-      
+
       // If we have size-specific prices
       if (prices.length > 0) {
         const minPrice = Math.min(...prices);
         const maxPrice = Math.max(...prices);
-        
+
         // If prices are different, return range
         if (minPrice !== maxPrice) {
           return { min: minPrice, max: maxPrice, isRange: true };
@@ -57,12 +59,12 @@ const ProductTable = ({
         return { min: minPrice, max: maxPrice, isRange: false };
       }
     }
-    
+
     // Default: use product's itemPrice
     return { min: product.itemPrice || 0, max: product.itemPrice || 0, isRange: false };
   };
   return (
-    <div className="bg-white rounded-lg shadow">
+    <div className={`rounded-lg shadow ${theme === 'dark' ? 'bg-[#2A2724] border border-[#4A4037]' : 'bg-white'}`}>
       <div className="overflow-x-auto p-6">
         {loading ? (
           <div className="text-center py-10">Loading...</div>
@@ -72,8 +74,8 @@ const ProductTable = ({
           </div>
         ) : (
           <table className="w-full relative border-separate" style={{ borderSpacing: '0' }}>
-            <thead className="border-b">
-              <tr className="text-left text-sm text-gray-600">
+            <thead className={`border-b ${theme === 'dark' ? 'border-[#4A4037]' : 'border-gray-200'}`}>
+              <tr className={`text-left text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                 {showSelection && (
                   <th className="pb-3 pr-4 w-10">
                     <input
@@ -98,9 +100,12 @@ const ProductTable = ({
             </thead>
             <tbody className="relative">
               {filteredProducts.map((product) => (
-                <tr 
-                  key={product._id} 
-                  className="border-b hover:bg-gray-50 cursor-pointer"
+                <tr
+                  key={product._id}
+                  className={`border-b transition-colors cursor-pointer ${theme === 'dark'
+                      ? 'border-[#4A4037] hover:bg-[#352F2A] text-gray-300'
+                      : 'border-gray-100 hover:bg-gray-50 text-gray-800'
+                    }`}
                   onClick={() => handleViewProduct(product)}
                 >
                   {showSelection && (
@@ -117,7 +122,7 @@ const ProductTable = ({
                     {product.itemImage && product.itemImage.trim() !== '' ? (
                       <img src={product.itemImage} alt={product.itemName} className="w-12 h-12 object-cover rounded" />
                     ) : (
-                      <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-gray-400">
+                      <div className={`w-12 h-12 rounded flex items-center justify-center ${theme === 'dark' ? 'bg-[#352F2A] text-gray-500' : 'bg-gray-200 text-gray-400'}`}>
                         <MdCategory />
                       </div>
                     )}
@@ -129,28 +134,26 @@ const ProductTable = ({
                   <td className="py-3 px-4">
                     {(() => {
                       const priceRange = getPriceRange(product);
-                      return priceRange.isRange 
+                      return priceRange.isRange
                         ? `PHP ${priceRange.min.toFixed(2)} - ${priceRange.max.toFixed(2)}`
                         : `PHP ${priceRange.min.toFixed(2)}`;
                     })()}
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <span className={`px-2 py-1 rounded font-semibold ${
-                      product.currentStock === 0 
-                        ? 'bg-red-100 text-red-700' 
-                        : product.currentStock <= (product.reorderNumber || 10)
+                    <span className={`px-2 py-1 rounded font-semibold ${product.currentStock === 0
+                      ? 'bg-red-100 text-red-700'
+                      : product.currentStock <= (product.reorderNumber || 10)
                         ? 'bg-yellow-100 text-yellow-700'
                         : 'bg-green-100 text-green-700'
-                    }`}>
+                      }`}>
                       {product.currentStock}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <span className={`px-2 py-1 rounded text-sm font-medium ${
-                      product.displayInTerminal !== false
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
+                    <span className={`px-2 py-1 rounded text-sm font-medium ${product.displayInTerminal !== false
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-600'
+                      }`}>
                       {product.terminalStatus || (product.displayInTerminal !== false ? 'shown' : 'not shown')}
                     </span>
                   </td>
@@ -162,11 +165,11 @@ const ProductTable = ({
                           e.stopPropagation();
                           handleStockUpdate(product, 'in');
                         }}
-                        className="p-2 hover:bg-green-50 rounded-lg transition-colors group relative"
+                        className={`p-2 rounded-lg transition-colors group relative ${theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-green-50'}`}
                         title="Stock In"
                       >
                         <div className="relative w-6 h-6 flex items-center justify-center">
-                          <svg className="w-6 h-6 text-gray-600 group-hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-400 group-hover:text-green-500' : 'text-gray-600 group-hover:text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                           </svg>
                           <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center border border-white">
@@ -181,11 +184,11 @@ const ProductTable = ({
                           e.stopPropagation();
                           handleStockUpdate(product, 'out');
                         }}
-                        className="p-2 hover:bg-red-50 rounded-lg transition-colors group relative"
+                        className={`p-2 rounded-lg transition-colors group relative ${theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-red-50'}`}
                         title="Stock Out"
                       >
                         <div className="relative w-6 h-6 flex items-center justify-center">
-                          <svg className="w-6 h-6 text-gray-600 group-hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-400 group-hover:text-red-500' : 'text-gray-600 group-hover:text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                           </svg>
                           <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center border border-white">
@@ -200,7 +203,7 @@ const ProductTable = ({
                           e.stopPropagation();
                           handleEditProduct(product);
                         }}
-                        className="p-2 hover:bg-blue-50 rounded-lg transition-colors group"
+                        className={`p-2 rounded-lg transition-colors group ${theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-blue-50'}`}
                         title="Update"
                       >
                         <svg className="w-6 h-6 text-blue-500 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

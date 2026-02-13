@@ -1,12 +1,15 @@
 import React from 'react';
+import { useTheme } from '../../context/ThemeContext';
 
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+  const { theme } = useTheme();
+
   if (totalPages <= 1) return null;
 
   const getPageNumbers = () => {
     const pages = [];
     const maxVisible = 5;
-    
+
     if (totalPages <= maxVisible) {
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
@@ -34,34 +37,33 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
         pages.push(totalPages);
       }
     }
-    
+
     return pages;
   };
 
   return (
     <div className="flex items-center justify-center mt-6">
-      <div className="bg-white rounded-lg shadow-md px-6 py-3 flex items-center gap-4">
-     
+      <div className={`rounded-lg shadow-md px-6 py-3 flex items-center gap-4 ${theme === 'dark' ? 'bg-[#2A2724] border border-[#4A4037]' : 'bg-white'}`}>
+
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`text-gray-700 ${
-            currentPage === 1
-              ? 'text-gray-300 cursor-not-allowed'
-              : 'hover:text-gray-900 cursor-pointer'
-          }`}
+          className={`transition-colors ${currentPage === 1
+            ? (theme === 'dark' ? 'text-gray-600 cursor-not-allowed' : 'text-gray-300 cursor-not-allowed')
+            : (theme === 'dark' ? 'text-gray-400 hover:text-white cursor-pointer' : 'text-gray-700 hover:text-gray-900 cursor-pointer')
+            }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
 
-        
+
         <div className="flex items-center gap-3">
           {getPageNumbers().map((page, index) => {
             if (page === '...') {
               return (
-                <span key={`ellipsis-${index}`} className="text-gray-900">
+                <span key={`ellipsis-${index}`} className={theme === 'dark' ? 'text-gray-400' : 'text-gray-900'}>
                   ...
                 </span>
               );
@@ -71,11 +73,10 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
               <button
                 key={page}
                 onClick={() => onPageChange(page)}
-                className={`${
-                  currentPage === page
-                    ? 'bg-[#DDC9BC] text-gray-900 rounded shadow-sm'
-                    : 'text-gray-900 hover:text-gray-700'
-                } w-8 h-8 flex items-center justify-center font-medium`}
+                className={`${currentPage === page
+                  ? (theme === 'dark' ? 'bg-[#AD7F65] text-white shadow-md' : 'bg-[#DDC9BC] text-gray-900 rounded shadow-sm')
+                  : (theme === 'dark' ? 'text-gray-300 hover:text-white' : 'text-gray-900 hover:text-gray-700')
+                  } w-8 h-8 flex items-center justify-center font-medium rounded transition-colors`}
               >
                 {page}
               </button>
@@ -83,15 +84,14 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
           })}
         </div>
 
-      
+
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`text-gray-700 ${
-            currentPage === totalPages
-              ? 'text-gray-300 cursor-not-allowed'
-              : 'hover:text-gray-900 cursor-pointer'
-          }`}
+          className={`transition-colors ${currentPage === totalPages
+            ? (theme === 'dark' ? 'text-gray-600 cursor-not-allowed' : 'text-gray-300 cursor-not-allowed')
+            : (theme === 'dark' ? 'text-gray-400 hover:text-white cursor-pointer' : 'text-gray-700 hover:text-gray-900 cursor-pointer')
+            }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

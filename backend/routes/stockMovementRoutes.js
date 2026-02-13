@@ -4,12 +4,14 @@ const {
   createStockMovement,
   getStockMovements,
   getTodayStats,
-  getMovementsByProduct
+  getMovementsByProduct,
+  getStockStatsOverTime
 } = require('../controllers/stockMovementController');
 
 router.post('/', createStockMovement);
 router.get('/', getStockMovements);
 router.get('/stats/today', getTodayStats);
+router.get('/stats/over-time', getStockStatsOverTime);
 router.get('/product/:productId', getMovementsByProduct);
 
 module.exports = router;

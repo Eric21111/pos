@@ -110,7 +110,7 @@ exports.getStockMovements = async (req, res) => {
     if (date && date !== 'All') {
       const now = new Date();
       let startDate, endDate;
-      
+
       if (date === 'Today') {
         startDate = new Date(now);
         startDate.setHours(0, 0, 0, 0);
@@ -134,7 +134,7 @@ exports.getStockMovements = async (req, res) => {
         endDate = new Date(date);
         endDate.setHours(23, 59, 59, 999);
       }
-      
+
       query.createdAt = { $gte: startDate, $lte: endDate };
     }
 
@@ -159,9 +159,9 @@ exports.getStockMovements = async (req, res) => {
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     console.log('Stock movements query:', JSON.stringify(query));
-    
+
     const [movements, total] = await Promise.all([
       StockMovement.find(query)
         .sort(sort)
@@ -257,6 +257,143 @@ exports.getMovementsByProduct = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching product movements',
+      error: error.message
+    });
+  }
+};
+// Get stock stats over time for charts (with filters)
+exports.getStockStatsOverTime = async (req, res) => {
+  try {
+    const { timeframe = 'daily' } = req.query;
+    const now = new Date();
+
+    // Determine periods based on timeframe
+    let periods = []; // Array of { start, end, label }
+    let limit = 7;
+
+    switch (timeframe.toLowerCase()) {
+      case 'daily':
+        limit = 7;
+        for (let i = limit - 1; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+          const start = new Date(d);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(d);
+          end.setHours(23, 59, 59, 999);
+
+          periods.push({ start, end, label });
+        }
+        break;
+
+      case 'monthly':
+        // Show last 4-5 weeks? Or just current week broken down?
+        // Usually "Weekly" view shows days of the current week or last 7 days.
+        // But if filtering by "Weekly", maybe it means "This Week" vs "Last Week"?
+        // In the context of "Sales Over Time" chart in this app:
+        // "Daily" -> Last 7 days
+        // "Monthly" -> Last 6-12 months
+        // "Yearly" -> Last 3-5 years
+
+        // Let's follow the Sales Chart pattern (from analytics.jsx which sends "weekly" but means "This Week" broken down? No, it sends "daily" default)
+        // If user selects "Monthly" tab, it shows data aggregated by month.
+
+        // Let's implement:
+        // Daily: Last 7 days (Day labels)
+        // Monthly: Last 6 months (Month labels)
+        // Yearly: Last 5 years (Year labels)
+
+        // REVISIT: The tabs in Analytics.jsx are "daily", "monthly", "yearly".
+        // "daily" shows last 7 days.
+
+        // "monthly" usually shows breakdown BY MONTH for the last X months.
+        limit = 6;
+        for (let i = limit - 1; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const label = d.toLocaleDateString('en-US', { month: 'short' });
+
+          const start = new Date(d);
+          const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+          periods.push({ start, end, label });
+        }
+        break;
+
+      case 'yearly':
+        limit = 5;
+        for (let i = limit - 1; i >= 0; i--) {
+          const year = now.getFullYear() - i;
+          const label = year.toString();
+
+          const start = new Date(year, 0, 1, 0, 0, 0, 0);
+          const end = new Date(year, 11, 31, 23, 59, 59, 999);
+
+          periods.push({ start, end, label });
+        }
+        break;
+
+      default: // Default to daily
+        limit = 7;
+        for (let i = limit - 1; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+          const start = new Date(d);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(d);
+          end.setHours(23, 59, 59, 999);
+
+          periods.push({ start, end, label });
+        }
+    }
+
+    // Initialize data arrays
+    const stockIn = new Array(periods.length).fill(0);
+    const pullOut = new Array(periods.length).fill(0);
+    const labels = periods.map(p => p.label);
+
+    // Fetch and aggregate data
+    // We could do one big query and aggregate in code, or per-period queries.
+    // One big query is better for DB.
+
+    const globalStart = periods[0].start;
+    const globalEnd = periods[periods.length - 1].end;
+
+    const movements = await StockMovement.find({
+      createdAt: { $gte: globalStart, $lte: globalEnd }
+    }).lean();
+
+    movements.forEach(movement => {
+      const date = new Date(movement.createdAt);
+
+      // Find which period this falls into
+      const index = periods.findIndex(p => date >= p.start && date <= p.end);
+
+      if (index !== -1) {
+        if (movement.type === 'Stock-In' || movement.type === 'in' || movement.movementType === 'stock-in') {
+          stockIn[index] += movement.quantity || 0;
+        } else if (movement.type === 'Pull-Out' || movement.type === 'out' || movement.movementType === 'stock-out' || movement.movementType === 'pull-out') {
+          pullOut[index] += movement.quantity || 0;
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        labels,
+        stockIn,
+        pullOut
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching stock stats over time:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching stock stats over time',
       error: error.message
     });
   }

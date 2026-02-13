@@ -1,30 +1,33 @@
 import React from 'react';
 import { FaCheckCircle, FaQuestionCircle, FaExclamationTriangle } from 'react-icons/fa';
+import { useTheme } from '../../context/ThemeContext';
 
 const PrintCompleteModal = ({ isOpen, onConfirm, onRetry, error }) => {
+  const { theme } = useTheme();
+
   if (!isOpen) return null;
 
   return (
-     <div
-        className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 font-poppins p-4"
-      >
-      <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full">
+    <div
+      className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 font-poppins p-4"
+    >
+      <div className={`rounded-2xl p-6 shadow-2xl max-w-sm w-full ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-white'}`}>
         <div className="flex flex-col items-center">
           {error ? (
             <>
-              <FaExclamationTriangle 
+              <FaExclamationTriangle
                 className="text-6xl text-red-500 mb-4"
                 style={{
                   animation: 'pulseWarning 1s ease-in-out infinite'
                 }}
               />
-              <h3 className="text-xl font-bold text-gray-800 mb-2">
+              <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
                 Print Failed
               </h3>
-              <p className="text-gray-600 text-center mb-3">
+              <p className={`text-center mb-3 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                 {error}
               </p>
-              <p className="text-gray-500 text-center text-sm">
+              <p className={`text-center text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                 The transaction was saved. You can retry printing or continue with the next sale.
               </p>
               <style>{`
@@ -38,10 +41,10 @@ const PrintCompleteModal = ({ isOpen, onConfirm, onRetry, error }) => {
           ) : (
             <>
               <FaQuestionCircle className="text-6xl text-amber-500 mb-4" />
-              <h3 className="text-xl font-bold text-gray-800 mb-2">
+              <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
                 Print Complete?
               </h3>
-              <p className="text-gray-600 text-center mb-6">
+              <p className={`text-center mb-6 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                 Did the receipt print successfully?
               </p>
               <div className="flex gap-3 w-full">

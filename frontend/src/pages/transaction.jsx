@@ -13,6 +13,7 @@ import {
   FaExclamationTriangle
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from '../context/ThemeContext';
 import { useDataCache } from '../context/DataCacheContext';
 import ViewTransactionModal from '../components/transaction/ViewTransactionModal';
 import PrintReceiptModal from '../components/transaction/PrintReceiptModal';
@@ -74,6 +75,7 @@ const Dropdown = ({
   setIsOpen
 }) => {
   const dropdownRef = React.useRef(null);
+  const { theme } = useTheme();
 
   React.useEffect(() => {
     const handleClickOutside = (event) => {
@@ -99,10 +101,12 @@ const Dropdown = ({
           e.stopPropagation();
           setIsOpen((prev) => !prev);
         }}
-        className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${isOpen ? 'border-[#AD7F65] shadow-lg bg-white' : 'border-gray-200 bg-white hover:border-[#AD7F65]'
+        className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${isOpen
+          ? 'border-[#AD7F65] shadow-lg ' + (theme === 'dark' ? 'bg-[#2A2724] text-white' : 'bg-white text-gray-700')
+          : (theme === 'dark' ? 'border-gray-600 bg-[#2A2724] text-gray-300 hover:border-[#AD7F65]' : 'border-gray-200 bg-white hover:border-[#AD7F65] text-gray-700')
           }`}
       >
-        <span className="text-sm font-medium text-gray-700">{selected}</span>
+        <span className="text-sm font-medium">{selected === 'All' ? label : selected}</span>
         <FaChevronDown
           className={`text-xs text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />
@@ -113,7 +117,8 @@ const Dropdown = ({
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="absolute z-20 mt-2 w-44 bg-white rounded-xl border border-gray-100 shadow-2xl overflow-hidden"
+            className={`absolute z-20 mt-2 w-44 rounded-xl border border-gray-100 shadow-2xl overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-white border-gray-100'
+              }`}
             onClick={(e) => e.stopPropagation()}
           >
             {options.map((option) => (
@@ -123,7 +128,9 @@ const Dropdown = ({
                   onSelect(option);
                   setIsOpen(false);
                 }}
-                className={`px-4 py-2 text-sm cursor-pointer transition-colors ${option === selected ? 'bg-[#F6EEE7] text-[#76462B] font-semibold' : 'hover:bg-gray-50'
+                className={`px-4 py-2 text-sm cursor-pointer transition-colors ${option === selected
+                  ? 'bg-[#F6EEE7] text-[#76462B] font-semibold'
+                  : (theme === 'dark' ? 'text-gray-300 hover:bg-[#352F2A]' : 'text-gray-700 hover:bg-gray-50')
                   }`}
               >
                 {option}
@@ -137,6 +144,7 @@ const Dropdown = ({
 };
 
 const Transaction = () => {
+  const { theme } = useTheme();
   const { getCachedData, setCachedData, isCacheValid, invalidateCache } = useDataCache();
   // Initialize transactions state - use empty array initially to avoid hook issues
   const [transactions, setTransactions] = useState([]);
@@ -354,7 +362,7 @@ const Transaction = () => {
         const trxDate = new Date(trx.checkedOutAt || trx.createdAt);
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
+
         if (filters.date === 'Today') {
           const trxDay = new Date(trxDate.getFullYear(), trxDate.getMonth(), trxDate.getDate());
           matchesDate = trxDay.getTime() === today.getTime();
@@ -563,7 +571,7 @@ const Transaction = () => {
         const createdDate = trx.createdAt ? new Date(trx.createdAt) : null;
         const updatedDate = trx.updatedAt ? new Date(trx.updatedAt) : null;
         const voidedDate = trx.voidedAt ? new Date(trx.voidedAt) : null;
-        
+
         // Extract item details
         const itemNames = trx.items?.map(item => item.itemName || '').join('; ') || '';
         const itemSkus = trx.items?.map(item => item.sku || '').join('; ') || '';
@@ -572,7 +580,7 @@ const Transaction = () => {
         const itemQtys = trx.items?.map(item => item.quantity || 0).join('; ') || '';
         const itemPrices = trx.items?.map(item => item.price || 0).join('; ') || '';
         const itemSubtotals = trx.items?.map(item => (item.quantity || 0) * (item.price || 0)).join('; ') || '';
-        
+
         return [
           escapeCSV(trx.receiptNo || ''),
           escapeCSV(trx._id || ''),
@@ -615,7 +623,7 @@ const Transaction = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       alert('Transactions exported successfully!');
       setIsExportSelectionMode(false);
       setSelectedTransactionIds([]);
@@ -677,7 +685,7 @@ const Transaction = () => {
           const returnedItem = itemsToReturn.find(ri => ri.originalIndex === idx);
           const returnedQty = returnedItem?.quantity || item.quantity;
           const originalQty = item.quantity;
-          
+
           // If returning all quantity, mark as fully returned
           if (returnedQty >= originalQty) {
             return {
@@ -705,14 +713,14 @@ const Transaction = () => {
       const partiallyReturnedCount = updatedItems.filter(item => item.returnStatus === 'Partially Returned').length;
       const allItemsFullyReturned = fullyReturnedCount === updatedItems.length;
       const hasAnyReturns = fullyReturnedCount > 0 || partiallyReturnedCount > 0;
-      
+
       let newStatus = 'Completed';
       if (allItemsFullyReturned) {
         newStatus = 'Returned';
       } else if (hasAnyReturns) {
         newStatus = 'Partially Returned';
       }
-      
+
       // Calculate total amount from remaining quantities (excluding fully returned items)
       const newTotalAmount = updatedItems
         .filter(item => item.returnStatus !== 'Returned')
@@ -725,7 +733,7 @@ const Transaction = () => {
         totalAmount: newTotalAmount
       };
       console.log('Updating original transaction FIRST:', updatePayload);
-      
+
       const updateResponse = await fetch(`http://localhost:5000/api/transactions/${transaction._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -879,7 +887,7 @@ const Transaction = () => {
   }
 
   return (
-    <div className="p-6 min-h-screen" style={{ background: '#F5F5F5' }}>
+    <div className={`p-6 min-h-screen ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-[#F5F5F5]'}`}>
       <>
         <Header pageName="POS Transactions" showBorder={false} profileBackground="" />
 
@@ -893,11 +901,12 @@ const Transaction = () => {
               key={card.label}
               whileHover={{ y: -4 }}
               whileTap={{ scale: 0.98 }}
-              className="bg-white rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden text-left"
+              className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden text-left ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'
+                }`}
               style={{ minWidth: '200px' }}
             >
-              <div 
-                className="absolute left-0 top-0 bottom-0 w-2" 
+              <div
+                className="absolute left-0 top-0 bottom-0 w-2"
                 style={{ backgroundColor: card.borderColor }}
               />
               <div className="ml-2">
@@ -912,7 +921,7 @@ const Transaction = () => {
                 </motion.p>
                 <p className="text-xs mt-0.5" style={{ color: card.textColor }}>{card.label}</p>
               </div>
-              <div 
+              <div
                 className="w-16 h-16 rounded-full flex items-center justify-center text-2xl"
                 style={{ backgroundColor: card.iconBg, color: card.textColor }}
               >
@@ -921,36 +930,45 @@ const Transaction = () => {
             </motion.div>
           ))}
 
-          <button 
+          <button
             onClick={handleExportButtonClick}
-            className={`bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isExportSelectionMode ? 'border border-[#AD7F65] bg-[#AD7F65]/5' : 'hover:bg-gray-50'}`} 
+            className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isExportSelectionMode
+              ? 'border border-[#AD7F65] bg-[#AD7F65]/5'
+              : (theme === 'dark' ? 'bg-[#2A2724] hover:bg-[#352F2A]' : 'bg-white hover:bg-gray-50')
+              }`}
             style={{ minWidth: '100px' }}
           >
-            <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-8 h-8 mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <div className="text-xs font-medium text-gray-700">
+            <div className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`}>
               {isExportSelectionMode ? 'Export Selected' : 'Export'}
             </div>
           </button>
           {isExportSelectionMode && (
             <button
               onClick={handleCancelExportSelection}
-              className="bg-white rounded-2xl shadow-md px-4 py-2 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+              className={`rounded-2xl shadow-md px-4 py-2 text-xs font-medium border transition-colors ${theme === 'dark'
+                ? 'bg-[#2A2724] border-gray-600 text-gray-400 hover:bg-[#352F2A]'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
             >
               Cancel
             </button>
           )}
 
-          <button 
+          <button
             onClick={() => document.getElementById('transaction-csv-file-input').click()}
-            className="bg-white rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 hover:bg-gray-50 transition-colors" 
+            className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${theme === 'dark'
+              ? 'bg-[#2A2724] hover:bg-[#352F2A]'
+              : 'bg-white hover:bg-gray-50'
+              }`}
             style={{ minWidth: '100px' }}
           >
-            <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-8 h-8 mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <div className="text-xs font-medium text-gray-700">Import</div>
+            <div className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`}>Import</div>
           </button>
           <input
             id="transaction-csv-file-input"
@@ -962,7 +980,8 @@ const Transaction = () => {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          <div className="flex-1 bg-white rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.06)] p-6 border border-white/80">
+          <div className={`flex-1 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.06)] p-6 border ${theme === 'dark' ? 'bg-[#2A2724] border-[#4A4037]' : 'bg-white border-white/80'
+            }`}>
             <div className="flex flex-col xl:flex-row xl:items-center gap-4 mb-4">
               <div className="relative flex-1">
                 <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AD7F65]" />
@@ -973,12 +992,15 @@ const Transaction = () => {
                     setCurrentPage(1);
                   }}
                   placeholder="Search by reference, user or note..."
-                  className="w-full bg-white border border-gray-200 rounded-2xl h-12 pl-12 pr-4 shadow-inner focus:outline-none focus:border-[#AD7F65] focus:ring focus:ring-[#AD7F65]/20 transition-all"
+                  className={`w-full border rounded-2xl h-12 pl-12 pr-4 shadow-inner focus:outline-none focus:border-[#AD7F65] focus:ring focus:ring-[#AD7F65]/20 transition-all ${theme === 'dark'
+                    ? 'bg-[#1E1B18] border-gray-600 text-white placeholder-gray-500'
+                    : 'bg-white border-gray-200 text-gray-900'
+                    }`}
                 />
               </div>
               <div className="flex flex-wrap gap-3">
                 <Dropdown
-                  label="By Date"
+                  label="Date"
                   options={dateOptions}
                   selected={filters.date}
                   onSelect={(value) => setFilters((prev) => ({ ...prev, date: value }))}
@@ -986,7 +1008,7 @@ const Transaction = () => {
                   setIsOpen={(value) => setDropdownOpen((prev) => ({ ...prev, date: value }))}
                 />
                 <Dropdown
-                  label="By Pay Method"
+                  label="Payment Method"
                   options={paymentOptions}
                   selected={filters.method}
                   onSelect={(value) => setFilters((prev) => ({ ...prev, method: value }))}
@@ -994,7 +1016,7 @@ const Transaction = () => {
                   setIsOpen={(value) => setDropdownOpen((prev) => ({ ...prev, method: value }))}
                 />
                 <Dropdown
-                  label="By User"
+                  label="User"
                   options={userDropdownOptions}
                   selected={filters.user}
                   onSelect={(value) => setFilters((prev) => ({ ...prev, user: value }))}
@@ -1002,7 +1024,7 @@ const Transaction = () => {
                   setIsOpen={(value) => setDropdownOpen((prev) => ({ ...prev, user: value }))}
                 />
                 <Dropdown
-                  label="By status"
+                  label="Status"
                   options={statusOptions}
                   selected={filters.status}
                   onSelect={(value) => setFilters((prev) => ({ ...prev, status: value }))}
@@ -1015,10 +1037,10 @@ const Transaction = () => {
             <div className="relative overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="sticky top-0">
-                  <tr className="bg-[#F6EEE7] text-[#4A3B2F] text-xs uppercase tracking-wider">
+                  <tr className={`${theme === 'dark' ? 'bg-[#352F2A] text-[#C2A68C]' : 'bg-[#F6EEE7] text-[#4A3B2F]'} text-xs uppercase tracking-wider`}>
                     {isExportSelectionMode && (
                       <th className="px-4 py-3 font-semibold">
-                        <label className="flex items-center gap-2 text-[#4A3B2F]">
+                        <label className={`flex items-center gap-2 ${theme === 'dark' ? 'text-[#C2A68C]' : 'text-[#4A3B2F]'}`}>
                           <input
                             ref={selectAllTransactionsRef}
                             type="checkbox"
@@ -1058,7 +1080,10 @@ const Transaction = () => {
                       <tr
                         key={trx._id}
                         onClick={() => handleRowClick(trx)}
-                        className={`cursor-pointer border-b border-gray-100 transition-all ${isActive ? 'bg-[#FDF7F1] shadow-inner' : 'hover:bg-[#F9F2EC]'
+                        className={`cursor-pointer border-b transition-all ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'
+                          } ${isActive
+                            ? (theme === 'dark' ? 'bg-[#352F2A]' : 'bg-[#FDF7F1] shadow-inner')
+                            : (theme === 'dark' ? 'hover:bg-[#2A2521] text-gray-300' : 'hover:bg-[#F9F2EC]')
                           }`}
                       >
                         {isExportSelectionMode && (
@@ -1072,10 +1097,10 @@ const Transaction = () => {
                             />
                           </td>
                         )}
-                        <td className="px-4 py-3 font-semibold text-gray-800">
+                        <td className={`px-4 py-3 font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
                           {trx.receiptNo ? `#${trx.receiptNo}` : '---'}
                         </td>
-                        <td className="px-4 py-3 font-semibold text-gray-700 text-xs">
+                        <td className={`px-4 py-3 font-semibold text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`}>
                           {trx.referenceNo || trx._id?.substring(0, 12) || '---'}
                         </td>
                         <td className="px-4 py-3 text-gray-500">
@@ -1085,7 +1110,7 @@ const Transaction = () => {
                             year: 'numeric'
                           })}
                         </td>
-                        <td className="px-4 py-3 text-gray-700 flex items-center gap-2">
+                        <td className={`px-4 py-3 flex items-center gap-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                           <span className="w-8 h-8 rounded-full bg-[#F0E5DB] flex items-center justify-center text-xs font-bold text-[#8B6B55]">
                             {getInitials(trx.performedByName || 'Staff')}
                           </span>
@@ -1102,7 +1127,10 @@ const Transaction = () => {
                                 e.stopPropagation();
                                 handleViewClick(trx);
                               }}
-                              className="w-9 h-9 bg-white border border-gray-200 rounded-xl flex items-center justify-center shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-green-500 transition-all text-gray-500 hover:text-green-600"
+                              className={`w-9 h-9 border rounded-xl flex items-center justify-center shadow-sm hover:shadow-md hover:-translate-y-0.5 whitespace-nowrap transition-all ${theme === 'dark'
+                                ? 'bg-[#2A2724] border-gray-600 text-gray-400 hover:border-green-500 hover:text-green-500'
+                                : 'bg-white border-gray-200 text-gray-500 hover:border-green-500 hover:text-green-600'
+                                }`}
                             >
                               <FaEye />
                             </button>
@@ -1112,7 +1140,10 @@ const Transaction = () => {
                                 e.stopPropagation();
                                 handlePrintClick(trx);
                               }}
-                              className="w-9 h-9 bg-white border border-gray-200 rounded-xl flex items-center justify-center shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-blue-500 transition-all text-gray-500 hover:text-blue-600"
+                              className={`w-9 h-9 border rounded-xl flex items-center justify-center shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all ${theme === 'dark'
+                                ? 'bg-[#2A2724] border-gray-600 text-gray-400 hover:border-blue-500 hover:text-blue-500'
+                                : 'bg-white border-gray-200 text-gray-500 hover:border-blue-500 hover:text-blue-600'
+                                }`}
                             >
                               <FaPrint />
                             </button>
@@ -1123,7 +1154,10 @@ const Transaction = () => {
                                   e.stopPropagation();
                                   handleReturnClick(trx);
                                 }}
-                                className="w-9 h-9 bg-white border border-gray-200 rounded-xl flex items-center justify-center shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-orange-500 transition-all text-gray-500 hover:text-orange-600"
+                                className={`w-9 h-9 border rounded-xl flex items-center justify-center shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all ${theme === 'dark'
+                                  ? 'bg-[#2A2724] border-gray-600 text-gray-400 hover:border-orange-500 hover:text-orange-500'
+                                  : 'bg-white border-gray-200 text-gray-500 hover:border-orange-500 hover:text-orange-600'
+                                  }`}
                               >
                                 <FaUndoAlt />
                               </button>
@@ -1138,15 +1172,19 @@ const Transaction = () => {
             </div>
 
             <div className="flex items-center justify-between mt-5">
-              <div className="text-xs text-gray-500">
+              <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                 Showing {(currentPage - 1) * rowsPerPage + 1}-
                 {Math.min(currentPage * rowsPerPage, filteredTransactions.length)} of {filteredTransactions.length}
               </div>
-              <div className="flex items-center gap-2 bg-white rounded-full border border-gray-200 px-3 py-1 shadow-inner">
+              <div className={`flex items-center gap-2 rounded-full border px-3 py-1 shadow-inner ${theme === 'dark' ? 'bg-[#1E1B18] border-gray-600' : 'bg-white border-gray-200'
+                }`}>
                 <button
                   onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className={`p-2 rounded-full ${currentPage === 1 ? 'text-gray-300' : 'hover:bg-gray-50 text-gray-600'}`}
+                  className={`p-2 rounded-full ${currentPage === 1
+                    ? (theme === 'dark' ? 'text-gray-600' : 'text-gray-300')
+                    : (theme === 'dark' ? 'hover:bg-[#2A2724] text-gray-400' : 'hover:bg-gray-50 text-gray-600')
+                    }`}
                 >
                   <FaChevronLeft />
                 </button>
@@ -1157,8 +1195,8 @@ const Transaction = () => {
                       key={pageNumber}
                       onClick={() => setCurrentPage(pageNumber)}
                       className={`w-8 h-8 rounded-full text-sm font-semibold ${currentPage === pageNumber
-                          ? 'bg-[#AD7F65] text-white shadow-md'
-                          : 'text-gray-600 hover:bg-gray-50'
+                        ? 'bg-[#AD7F65] text-white shadow-md'
+                        : 'text-gray-600 hover:bg-gray-50'
                         }`}
                     >
                       {pageNumber}
@@ -1169,8 +1207,8 @@ const Transaction = () => {
                 <button
                   onClick={() => setCurrentPage(totalPages)}
                   className={`w-8 h-8 rounded-full text-sm font-semibold ${currentPage === totalPages
-                      ? 'bg-[#AD7F65] text-white shadow-md'
-                      : 'text-gray-600 hover:bg-gray-50'
+                    ? 'bg-[#AD7F65] text-white shadow-md'
+                    : 'text-gray-600 hover:bg-gray-50'
                     }`}
                 >
                   {totalPages}
@@ -1178,7 +1216,9 @@ const Transaction = () => {
                 <button
                   onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className={`p-2 rounded-full ${currentPage === totalPages ? 'text-gray-300' : 'hover:bg-gray-50 text-gray-600'
+                  className={`p-2 rounded-full ${currentPage === totalPages
+                    ? (theme === 'dark' ? 'text-gray-600' : 'text-gray-300')
+                    : (theme === 'dark' ? 'hover:bg-[#2A2724] text-gray-400' : 'hover:bg-gray-50 text-gray-600')
                     }`}
                 >
                   <FaChevronRight />
@@ -1188,12 +1228,13 @@ const Transaction = () => {
           </div>
 
           <div className="w-full lg:w-[380px] xl:w-[420px]">
-            <div className="bg-white rounded-2xl border border-white shadow-[0_20px_45px_rgba(0,0,0,0.08)] p-6 sticky top-8">
+            <div className={`rounded-2xl border shadow-[0_20px_45px_rgba(0,0,0,0.08)] p-6 sticky top-8 ${theme === 'dark' ? 'bg-[#2A2724] border-[#4A4037]' : 'bg-white border-white'
+              }`}>
               <div className="mb-4">
                 <p className="text-sm text-gray-400">Create Your Style</p>
                 <p className="text-xs text-gray-400">Pasonanca, Zamboanga City</p>
               </div>
-              <div className="font-mono text-xs space-y-2">
+              <div className={`font-mono text-xs space-y-2 ${theme === 'dark' ? 'text-gray-300' : ''}`}>
                 <div className="flex justify-between text-gray-500">
                   <span>Receipt No:</span>
                   <span className="font-bold text-[#AD7F65]">
@@ -1215,12 +1256,12 @@ const Transaction = () => {
                   <span>{selectedTransaction?.performedByName || '---'}</span>
                 </div>
               </div>
-              <div className="border-t border-b border-gray-200 my-4 py-3 font-mono text-sm">
+              <div className={`border-t border-b my-4 py-3 font-mono text-sm ${theme === 'dark' ? 'border-gray-700 text-gray-300' : 'border-gray-200'}`}>
                 <div className="flex justify-between font-semibold">
                   <span>Item</span>
                   <span>Qty x Price</span>
                 </div>
-                <div className="mt-2 space-y-1 text-gray-600">
+                <div className={`mt-2 space-y-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                   {selectedTransaction?.items?.map((item, idx) => (
                     <div key={idx} className="flex justify-between">
                       <span>{item.itemName}</span>
@@ -1231,12 +1272,12 @@ const Transaction = () => {
                   )) || <p className="text-center text-gray-400">No items</p>}
                 </div>
               </div>
-              <div className="font-mono text-xs space-y-1 text-gray-600">
+              <div className={`font-mono text-xs space-y-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                 <div className="flex justify-between">
                   <span>Payment Method:</span>
                   <span className="uppercase">{selectedTransaction?.paymentMethod}</span>
                 </div>
-                <div className="flex justify-between font-semibold text-base text-gray-800 pt-2 border-t border-gray-100">
+                <div className={`flex justify-between font-semibold text-base pt-2 border-t ${theme === 'dark' ? 'text-white border-gray-700' : 'text-gray-800 border-gray-100'}`}>
                   <span>Total</span>
                   <span>{formatCurrency(selectedTransaction?.totalAmount || 0)}</span>
                 </div>

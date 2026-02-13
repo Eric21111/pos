@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaTimes, FaChevronDown } from 'react-icons/fa';
+import { useTheme } from '../../context/ThemeContext';
 
 const voidReasons = [
   'Customer cancellation',
@@ -10,6 +11,7 @@ const voidReasons = [
 ];
 
 const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
+  const { theme } = useTheme();
   const [pin, setPin] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
@@ -65,9 +67,9 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
       e.preventDefault();
       e.stopPropagation();
     }
-    
+
     console.log('[RemoveItemPinModal] handleConfirm called, reason:', reason, 'pin length:', pin.length);
-    
+
     if (!reason) {
       setError('Please select a reason for void');
       return;
@@ -84,7 +86,7 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
     try {
       // Get current user email from localStorage
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      
+
       if (!currentUser.email) {
         setError('User information not found. Please log in again.');
         setLoading(false);
@@ -119,21 +121,21 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
       if (data.success) {
         // PIN verified successfully - proceed with void transaction
         console.log('[RemoveItemPinModal] PIN verified successfully, calling onConfirm with reason:', voidReason);
-        
+
         // Mark that we're in a successful confirmation flow - prevent double calls
         if (isConfirmingRef.current) {
           console.log('[RemoveItemPinModal] Already confirming, skipping duplicate call');
           return;
         }
         isConfirmingRef.current = true;
-        
+
         // Extract approver info from the verified employee
         const approverInfo = {
           approvedBy: data.data?.name || data.data?.firstName || 'Unknown',
           approvedById: data.data?._id || data.data?.id || '',
           approvedByRole: data.data?.role || null
         };
-        
+
         // Store reason in variable to ensure it's passed correctly
         // Call onConfirm with the reason and approver info - it will handle the void transaction and close the modal
         if (voidReason && onConfirm) {
@@ -182,8 +184,8 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
       className="fixed inset-0 flex items-center justify-center z-[10000] backdrop-blur-sm bg-opacity-50"
       onClick={onClose}
     >
-      <div 
-        className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+      <div
+        className={`rounded-2xl w-full max-w-md shadow-2xl overflow-hidden ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-white'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-8">
@@ -196,24 +198,24 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
                 <h2 className="text-xl font-bold text-red-600">
                   Void Transaction
                 </h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                   This action requires manager authorization.
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition"
+              className={`transition ${theme === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'}`}
             >
               <FaTimes className="w-5 h-5" />
             </button>
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className={`block text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
               Amount to Void:
             </label>
-            <div className="bg-red-50 rounded-lg p-4">
+            <div className={`rounded-lg p-4 ${theme === 'dark' ? 'bg-red-900/30' : 'bg-red-50'}`}>
               <span className="text-2xl font-bold text-red-600">
                 PHP {itemTotal}
               </span>
@@ -221,32 +223,33 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className={`block text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
               Reason for Void <span className="text-red-500">*</span>
             </label>
             <div className="relative" ref={reasonDropdownRef}>
               <button
                 type="button"
                 onClick={() => setIsReasonDropdownOpen(!isReasonDropdownOpen)}
-                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400 transition-all"
+                className={`w-full px-4 py-3 border rounded-lg text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400 transition-all ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-white border-gray-300'}`}
               >
-                <span className={reason ? 'text-gray-700' : 'text-gray-400'}>
+                <span className={reason ? (theme === 'dark' ? 'text-gray-200' : 'text-gray-700') : 'text-gray-400'}>
                   {reason || 'Select a reason...'}
                 </span>
-                <FaChevronDown 
+                <FaChevronDown
                   className={`text-gray-500 transition-transform ${isReasonDropdownOpen ? 'rotate-180' : ''}`}
                 />
               </button>
               {isReasonDropdownOpen && (
-                <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                <div className={`absolute z-10 w-full mt-2 border rounded-lg shadow-lg overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-white border-gray-200'}`}>
                   {voidReasons.map((voidReason) => (
                     <button
                       key={voidReason}
                       type="button"
                       onClick={() => handleReasonSelect(voidReason)}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
-                        reason === voidReason ? 'bg-red-50 text-red-600 font-semibold' : 'text-gray-700'
-                      }`}
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors ${reason === voidReason
+                          ? (theme === 'dark' ? 'bg-red-900/30 text-red-400 font-semibold' : 'bg-red-50 text-red-600 font-semibold')
+                          : (theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50')
+                        }`}
                     >
                       {voidReason}
                     </button>
@@ -257,7 +260,7 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className={`block text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
               Manager PIN <span className="text-red-500">*</span>
             </label>
             <input
@@ -271,7 +274,7 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
                   setPin(digitsOnly);
                 }
               }}
-              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400 transition-all"
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400 transition-all ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900'}`}
               placeholder="Enter 6-digit PIN"
               maxLength={6}
               autoFocus
@@ -280,7 +283,7 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg text-sm text-red-700 text-center">
+            <div className={`mb-4 p-3 border rounded-lg text-sm text-center ${theme === 'dark' ? 'bg-red-900/30 border-red-800 text-red-400' : 'bg-red-100 border-red-300 text-red-700'}`}>
               {error}
             </div>
           )}
@@ -288,7 +291,7 @@ const RemoveItemPinModal = ({ isOpen, onClose, onConfirm, item }) => {
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-3 rounded-lg bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-all"
+              className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-[#322f2c]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
               disabled={loading}
             >
               Cancel

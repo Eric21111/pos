@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import AddCategoryModal from './AddCategoryModal';
 import AddBrandModal from './AddBrandModal';
 
@@ -21,6 +22,7 @@ const AddProductModal = ({
   onCategoryAdd,
   onBrandAdd
 }) => {
+  const { theme } = useTheme();
   // Built-in categories that have specific size options
   const builtInCategories = ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods'];
   const [showDraftNotice, setShowDraftNotice] = useState(false);
@@ -57,15 +59,15 @@ const AddProductModal = ({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm pointer-events-none">
-      <div className="bg-white rounded-2xl w-full max-w-5xl relative pointer-events-auto" style={{ maxHeight: '95vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.1)' }}>
-        <div className="flex justify-between items-center px-6 py-4 border-b">
+      <div className={`rounded-2xl w-full max-w-5xl relative pointer-events-auto shadow-2xl ${theme === 'dark' ? 'bg-[#2A2724] text-white' : 'bg-white text-gray-900'}`} style={{ maxHeight: '95vh', boxShadow: theme === 'dark' ? '0 25px 50px -12px rgba(0, 0, 0, 0.7)' : '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.1)' }}>
+        <div className="flex justify-between items-center px-6 py-4">
           <h2 className="text-xl font-bold">{editingProduct ? 'Edit Product Details' : 'Add Product Details'}</h2>
           <button
             onClick={() => {
               setShowAddModal(false);
               // Don't clear storage when closing - keep the draft
             }}
-            className="text-gray-400 hover:text-gray-600 text-2xl"
+            className={`text-2xl hover:text-gray-500 transition-colors ${theme === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}
           >
             ×
           </button>
@@ -73,12 +75,12 @@ const AddProductModal = ({
 
         {/* Draft Recovery Notice */}
         {showDraftNotice && !editingProduct && (
-          <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+          <div className={`mx-6 mt-4 p-3 border rounded-lg flex items-center justify-between ${theme === 'dark' ? 'bg-amber-900/20 border-amber-800' : 'bg-amber-50 border-amber-200'}`}>
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-5 h-5 ${theme === 'dark' ? 'text-amber-500' : 'text-amber-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-sm text-amber-800">Draft recovered from your previous session</span>
+              <span className={`text-sm ${theme === 'dark' ? 'text-amber-200' : 'text-amber-800'}`}>Draft recovered from your previous session</span>
             </div>
             <button
               type="button"
@@ -86,7 +88,7 @@ const AddProductModal = ({
                 resetProductForm();
                 setShowDraftNotice(false);
               }}
-              className="text-xs text-amber-700 hover:text-amber-900 underline"
+              className={`text-xs underline hover:opacity-80 ${theme === 'dark' ? 'text-amber-300' : 'text-amber-700'}`}
             >
               Clear Draft
             </button>
@@ -101,7 +103,7 @@ const AddProductModal = ({
                   <h3 className="text-base font-semibold mb-3">Basic Info</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Product Name</label>
+                      <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Product Name</label>
                       <input
                         type="text"
                         name="itemName"
@@ -109,12 +111,15 @@ const AddProductModal = ({
                         onChange={handleInputChange}
                         required
                         placeholder="Product name"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                          ? 'bg-[#1E1B18] border-gray-600 text-white placeholder-gray-300'
+                          : 'bg-gray-50 border-gray-300 placeholder-gray-400'
+                          }`}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">Choose a Category</label>
+                        <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Choose a Category</label>
                         <select
                           name="category"
                           value={newProduct.category}
@@ -134,10 +139,13 @@ const AddProductModal = ({
                             }
                           }}
                           required
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                            ? 'bg-[#1E1B18] border-gray-600 text-white'
+                            : 'bg-gray-50 border-gray-300'
+                            }`}
                         >
                           {categories.filter(cat => cat.name !== 'All' && cat.name !== 'Others').map(category => (
-                            <option key={category.name} value={category.name}>
+                            <option key={category.name} value={category.name} className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>
                               {category.name}
                             </option>
                           ))}
@@ -145,7 +153,7 @@ const AddProductModal = ({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">Brand</label>
+                        <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Brand</label>
                         <select
                           name="brandName"
                           value={newProduct.brandName || 'Default'}
@@ -157,11 +165,14 @@ const AddProductModal = ({
                             }
                             handleInputChange(e);
                           }}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                            ? 'bg-[#1E1B18] border-gray-600 text-white'
+                            : 'bg-gray-50 border-gray-300'
+                            }`}
                         >
-                          <option value="Default">Default</option>
+                          <option value="Default" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>Default</option>
                           {partnerNames.map((name) => (
-                            <option key={name} value={name}>
+                            <option key={name} value={name} className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>
                               {name}
                             </option>
                           ))}
@@ -174,21 +185,24 @@ const AddProductModal = ({
                     </div>
                     {newProduct.category === 'Foods' && (
                       <div className="mt-3">
-                        <label className="block text-xs text-gray-600 mb-1">Food Type</label>
+                        <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Food Type</label>
                         <select
                           name="foodSubtype"
                           value={newProduct.foodSubtype || ''}
                           onChange={handleInputChange}
                           required
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                            ? 'bg-[#1E1B18] border-gray-600 text-white'
+                            : 'bg-gray-50 border-gray-300'
+                            }`}
                         >
-                          <option value="">Select Food Type</option>
-                          <option value="Beverages">Beverages</option>
-                          <option value="Snacks">Snacks</option>
-                          <option value="Meals">Meals</option>
-                          <option value="Desserts">Desserts</option>
-                          <option value="Ingredients">Ingredients</option>
-                          <option value="Other">Other</option>
+                          <option value="" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>Select Food Type</option>
+                          <option value="Beverages" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>Beverages</option>
+                          <option value="Snacks" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>Snacks</option>
+                          <option value="Meals" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>Meals</option>
+                          <option value="Desserts" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>Desserts</option>
+                          <option value="Ingredients" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>Ingredients</option>
+                          <option value="Other" className={theme === 'dark' ? 'bg-[#2A2724]' : ''}>Other</option>
                         </select>
                       </div>
                     )}
@@ -200,7 +214,7 @@ const AddProductModal = ({
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">
+                        <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                           Variant <span className="text-gray-400">Optional</span>
                         </label>
                         <input
@@ -210,7 +224,10 @@ const AddProductModal = ({
                           onChange={handleInputChange}
                           disabled={newProduct.differentVariantsPerSize}
                           placeholder={newProduct.differentVariantsPerSize ? "Multiple variants selected" : "Add Variant"}
-                          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${newProduct.differentVariantsPerSize ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${newProduct.differentVariantsPerSize
+                            ? (theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-gray-500 cursor-not-allowed' : 'bg-gray-100 text-gray-400 cursor-not-allowed')
+                            : (theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-white' : 'bg-gray-50 border-gray-300')
+                            }`}
                         />
                       </div>
                     </div>
@@ -218,7 +235,7 @@ const AddProductModal = ({
                     {!editingProduct && (
                       <>
                         <div>
-                          <label className="block text-xs text-gray-600 mb-2">
+                          <label className={`block text-xs mb-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                             Sizes <span className="text-gray-400">Optional - Select multiple sizes</span>
                           </label>
                           <div className="grid grid-cols-4 gap-2 mb-3">
@@ -347,8 +364,8 @@ const AddProductModal = ({
                                 </label>
                               </div>
 
-                              <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
-                                <label className="block text-xs font-semibold text-gray-700 mb-2">
+                              <div className={`space-y-2 mt-3 p-3 rounded-lg ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-gray-50'}`}>
+                                <label className={`block text-xs font-semibold mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                                   Quantity per Size:
                                 </label>
                                 <div className="grid grid-cols-2 gap-3">
@@ -369,14 +386,14 @@ const AddProductModal = ({
                               </div>
 
                               {newProduct.differentVariantsPerSize && (
-                                <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
-                                  <label className="block text-xs font-semibold text-gray-700 mb-2">
+                                <div className={`space-y-2 mt-3 p-3 rounded-lg ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-gray-50'}`}>
+                                  <label className={`block text-xs font-semibold mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                                     Variant per Size:
                                   </label>
                                   <div className="grid grid-cols-2 gap-3">
                                     {newProduct.selectedSizes.map((size) => (
                                       <div key={size}>
-                                        <label className="block text-xs text-gray-600 mb-1">{size}</label>
+                                        <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{size}</label>
                                         <input
                                           type="text"
                                           value={newProduct.sizeVariants?.[size] || ''}
@@ -390,7 +407,10 @@ const AddProductModal = ({
                                             }));
                                           }}
                                           placeholder="Enter variant"
-                                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                                            ? 'bg-[#2A2724] border-gray-600 text-white'
+                                            : 'bg-white border-gray-300'
+                                            }`}
                                         />
                                       </div>
                                     ))}
@@ -399,15 +419,15 @@ const AddProductModal = ({
                               )}
 
                               {newProduct.differentPricesPerSize && (
-                                <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
-                                  <label className="block text-xs font-semibold text-gray-700 mb-2">
+                                <div className={`space-y-2 mt-3 p-3 rounded-lg ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-gray-50'}`}>
+                                  <label className={`block text-xs font-semibold mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                                     Pricing per Size:
                                   </label>
                                   <div className="space-y-3">
                                     {newProduct.selectedSizes.map((size) => (
                                       <div key={size} className="grid grid-cols-2 gap-3">
                                         <div>
-                                          <label className="block text-xs text-gray-600 mb-1">{size} Cost Price</label>
+                                          <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{size} Cost Price</label>
                                           <input
                                             type="number"
                                             step="0.01"
@@ -423,11 +443,14 @@ const AddProductModal = ({
                                               }));
                                             }}
                                             placeholder="Enter cost price"
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                                              ? 'bg-[#2A2724] border-gray-600 text-white'
+                                              : 'bg-white border-gray-300'
+                                              }`}
                                           />
                                         </div>
                                         <div>
-                                          <label className="block text-xs text-gray-600 mb-1">{size} Selling Price</label>
+                                          <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{size} Selling Price</label>
                                           <input
                                             type="number"
                                             step="0.01"
@@ -435,7 +458,10 @@ const AddProductModal = ({
                                             value={newProduct.sizePrices?.[size] || ''}
                                             onChange={(e) => handleSizePriceChange(size, e.target.value)}
                                             placeholder="Enter selling price"
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                                              ? 'bg-[#2A2724] border-gray-600 text-white'
+                                              : 'bg-white border-gray-300'
+                                              }`}
                                           />
                                         </div>
                                       </div>
@@ -449,14 +475,17 @@ const AddProductModal = ({
 
                         {(!newProduct.selectedSizes || newProduct.selectedSizes.length === 0) && (
                           <div>
-                            <label className="block text-xs text-gray-600 mb-1">Stock</label>
+                            <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Stock</label>
                             <input
                               type="number"
                               name="currentStock"
                               value={newProduct.currentStock}
                               onChange={handleInputChange}
                               placeholder="Add Stock"
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                              className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                                ? 'bg-[#1E1B18] border-gray-600 text-white'
+                                : 'bg-gray-50 border-gray-300'
+                                }`}
                             />
                           </div>
                         )}
@@ -470,7 +499,7 @@ const AddProductModal = ({
                     <h3 className="text-base font-semibold mb-3">Pricing</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">Cost Price</label>
+                        <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Cost Price</label>
                         <input
                           type="number"
                           step="0.01"
@@ -478,11 +507,14 @@ const AddProductModal = ({
                           value={newProduct.costPrice}
                           onChange={handleInputChange}
                           placeholder="Enter cost price"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                            ? 'bg-[#1E1B18] border-gray-600 text-white'
+                            : 'bg-gray-50 border-gray-300'
+                            }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">Selling Price</label>
+                        <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Selling Price</label>
                         <input
                           type="number"
                           step="0.01"
@@ -491,7 +523,10 @@ const AddProductModal = ({
                           onChange={handleInputChange}
                           required={!newProduct.differentPricesPerSize}
                           placeholder="Enter selling price"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                            ? 'bg-[#1E1B18] border-gray-600 text-white'
+                            : 'bg-gray-50 border-gray-300'
+                            }`}
                         />
                       </div>
                     </div>
@@ -555,10 +590,10 @@ const AddProductModal = ({
                             </div>
                           </div>
                           <div>
-                            <span className={`text-sm font-medium ${isDisabled ? 'text-gray-400' : 'text-gray-700'}`}>
+                            <span className={`text-sm font-medium ${isDisabled ? 'text-gray-400 opacity-60' : (theme === 'dark' ? 'text-gray-300' : 'text-gray-700')}`}>
                               Display in Terminal
                             </span>
-                            <p className={`text-xs ${isDisabled ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <p className={`text-xs ${isDisabled ? 'text-gray-500 opacity-60' : (theme === 'dark' ? 'text-gray-500' : 'text-gray-500')}`}>
                               {isDisabled
                                 ? 'Add stock to enable this option'
                                 : 'Show this product in POS/terminal'}
@@ -575,7 +610,10 @@ const AddProductModal = ({
                 <div>
                   <div
                     onClick={() => document.getElementById('fileInput').click()}
-                    className="w-full border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center bg-gray-50 p-6 cursor-pointer hover:border-[#AD7F65] hover:bg-gray-100 transition-all"
+                    className={`w-full border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${theme === 'dark'
+                      ? 'bg-[#1E1B18] border-gray-600 hover:bg-[#2A2724] hover:border-[#AD7F65]'
+                      : 'bg-gray-50 border-gray-300 hover:bg-gray-100 hover:border-[#AD7F65]'
+                      }`}
                     style={{ height: '320px' }}
                   >
                     <input
@@ -608,13 +646,13 @@ const AddProductModal = ({
                       </div>
                     ) : (
                       <>
-                        <div className="w-20 h-20 bg-gray-300 rounded-lg flex items-center justify-center mb-3">
-                          <svg className="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className={`w-20 h-20 rounded-lg flex items-center justify-center mb-3 ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-gray-300'}`}>
+                          <svg className={`w-10 h-10 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
                         </div>
-                        <p className="text-gray-500 text-sm mb-3">Upload an Image</p>
-                        <p className="text-gray-400 text-xs">Click to browse or paste URL below</p>
+                        <p className={`text-sm mb-3 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Upload an Image</p>
+                        <p className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>Click to browse or paste URL below</p>
                       </>
                     )}
                   </div>
@@ -626,7 +664,10 @@ const AddProductModal = ({
                         value={newProduct.itemImage}
                         onChange={handleInputChange}
                         placeholder="Or paste image URL"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
+                          ? 'bg-[#1E1B18] border-gray-600 text-white placeholder-gray-300'
+                          : 'bg-white border-gray-300 placeholder-gray-400'
+                          }`}
                       />
                     </div>
                   )}
@@ -644,9 +685,9 @@ const AddProductModal = ({
                 </div>
               </div>
             </div>
-          </div>
-        </form>
-      </div>
+          </div >
+        </form >
+      </div >
 
       <AddCategoryModal
         show={showCategoryModal}
@@ -671,7 +712,7 @@ const AddProductModal = ({
           setNewProduct(prev => ({ ...prev, brandName: newBrandName }));
         }}
       />
-    </div>
+    </div >
   );
 };
 

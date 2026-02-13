@@ -5,21 +5,23 @@ import PrintingModal from './PrintingModal';
 import PrintCompleteModal from './PrintCompleteModal';
 import '../../styles/print.css';
 import { sendReceiptToPrinter } from '../../utils/printBridge';
+import { useTheme } from '../../context/ThemeContext';
 
-const ReceiptModal = ({ 
-  isOpen, 
-  onClose, 
-  receiptData, 
+const ReceiptModal = ({
+  isOpen,
+  onClose,
+  receiptData,
   onNewTransaction,
   initialPrintError = null,
   onPrintSuccess = null,
   disableAutoPrint = false
 }) => {
+  const { theme } = useTheme();
   const [isPrinting, setIsPrinting] = useState(false);
   const [showPrintComplete, setShowPrintComplete] = useState(false);
   const [printAttempts, setPrintAttempts] = useState(0);
   const [printError, setPrintError] = useState(null);
-  
+
   const receipt = receiptData || {
     receiptNo: '000000',
     items: [],
@@ -104,13 +106,13 @@ const ReceiptModal = ({
 
   return (
     <>
-     
-      <div 
-        className="receipt-print-content" 
-        id="receipt-to-print" 
-        style={{ 
-          position: 'fixed', 
-          left: '-9999px', 
+
+      <div
+        className="receipt-print-content"
+        id="receipt-to-print"
+        style={{
+          position: 'fixed',
+          left: '-9999px',
           top: '0',
           width: '58mm',
           background: 'white',
@@ -125,12 +127,12 @@ const ReceiptModal = ({
           </div>
           <p style={{ fontSize: '10px', margin: '2px 0' }}>Pasonanca, Zamboanga City</p>
         </div>
-        
+
         <div style={{ textAlign: 'center', margin: '10px 0', border: '1px dashed #000', padding: '8px 5px' }}>
           <p style={{ fontSize: '10px', margin: '2px 0' }}>Receipt No:</p>
           <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '2px 0' }}>#{receipt.receiptNo}</p>
         </div>
-        
+
         <table style={{ width: '100%', fontSize: '10px', marginBottom: '10px' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #000' }}>
@@ -151,7 +153,7 @@ const ReceiptModal = ({
             ))}
           </tbody>
         </table>
-        
+
         <div style={{ borderTop: '1px dashed #000', paddingTop: '5px', fontSize: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
             <span>Transaction/Reference:</span>
@@ -199,7 +201,7 @@ const ReceiptModal = ({
             <span>PHP {receipt.change.toFixed(2)}</span>
           </div>
         </div>
-        
+
         <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '10px', fontWeight: 'bold' }}>
           <p>This is not an official receipt</p>
         </div>
@@ -209,136 +211,136 @@ const ReceiptModal = ({
       <div
         className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 font-poppins p-4 no-print"
       >
-        <div className="bg-white rounded-2xl w-full max-w-md relative shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className={`rounded-2xl w-full max-w-md relative shadow-2xl max-h-[90vh] overflow-y-auto ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-white'}`}>
           <div className="p-6">
-          {/* Header */}
-          <div className="text-center mb-4">
-            <h2 className="text-lg font-bold">Create Your Style</h2>
-            <div className="flex justify-between text-xs text-gray-600 mt-2">
-              <span>{receipt.time || '12:00PM'}</span>
-              <span>{receipt.contactNumber || '+631112224444'}</span>
+            {/* Header */}
+            <div className="text-center mb-4">
+              <h2 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Create Your Style</h2>
+              <div className={`flex justify-between text-xs mt-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                <span>{receipt.time || '12:00PM'}</span>
+                <span>{receipt.contactNumber || '+631112224444'}</span>
+              </div>
+              <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Pasonanca, Zamboanga City</p>
             </div>
-            <p className="text-xs text-gray-600">Pasonanca, Zamboanga City</p>
-          </div>
 
-          {/* Receipt Number */}
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 mb-4 text-center">
-            <p className="text-xs text-gray-600 mb-1">Receipt No:</p>
-            <p className="text-2xl font-bold">#{receipt.receiptNo}</p>
-          </div>
+            {/* Receipt Number */}
+            <div className={`border-2 border-dashed rounded-lg p-3 mb-4 text-center ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}>
+              <p className={`text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Receipt No:</p>
+              <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>#{receipt.receiptNo}</p>
+            </div>
 
-          {/* Items Table */}
-          <div className="mb-4">
-            {receipt.items && receipt.items.length > 0 ? (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">Item</th>
-                    <th className="text-center py-2">Qty</th>
-                    <th className="text-right py-2">Price</th>
-                    <th className="text-right py-2">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {receipt.items.map((item, index) => (
-                    <tr key={index} className="border-b">
-                      <td className="py-2 text-left">{item.name}</td>
-                      <td className="py-2 text-center">{item.qty}</td>
-                      <td className="py-2 text-right">PHP {item.price.toFixed(2)}</td>
-                      <td className="py-2 text-right">PHP {item.total.toFixed(2)}</td>
+            {/* Items Table */}
+            <div className="mb-4">
+              {receipt.items && receipt.items.length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className={`border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <th className={`text-left py-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Item</th>
+                      <th className={`text-center py-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Qty</th>
+                      <th className={`text-right py-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Price</th>
+                      <th className={`text-right py-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="text-center text-gray-500 py-4">No items in this transaction</p>
-            )}
-          </div>
-
-          {/* Transaction Details */}
-          <div className="border-t border-dashed pt-3 mb-4 space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Transaction/Reference</span>
-              <span>{receipt.referenceNo || receipt.reference || '-'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Payment Method</span>
-              <span>{receipt.paymentMethod || 'CASH'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Subtotal</span>
-              <span>PHP {receipt.subtotal.toFixed(2)}</span>
-            </div>
-            <div className="border-t border-dashed pt-2 mt-2">
-              {receipt.discounts && receipt.discounts.length > 0 ? (
-                <>
-                  {receipt.discounts.map((d, idx) => (
-                    <div key={idx} className="flex justify-between text-xs text-gray-500">
-                      <span>{d.title}</span>
-                      <span>{d.value}</span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between mt-1">
-                    <span className="text-gray-600">Total Discount</span>
-                    <span>PHP {receipt.discount.toFixed(2)}</span>
-                  </div>
-                </>
+                  </thead>
+                  <tbody>
+                    {receipt.items.map((item, index) => (
+                      <tr key={index} className={`border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+                        <td className={`py-2 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>{item.name}</td>
+                        <td className={`py-2 text-center ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>{item.qty}</td>
+                        <td className={`py-2 text-right ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>PHP {item.price.toFixed(2)}</td>
+                        <td className={`py-2 text-right ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>PHP {item.total.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               ) : (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Discount</span>
-                  <span>PHP {receipt.discount.toFixed(2)}</span>
-                </div>
+                <p className="text-center text-gray-500 py-4">No items in this transaction</p>
               )}
             </div>
-            <div className="flex justify-between font-bold text-base pt-2">
-              <span>Total</span>
-              <span>PHP {receipt.total.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Cash</span>
-              <span>PHP {receipt.cash.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Change</span>
-              <span>PHP {receipt.change.toFixed(2)}</span>
-            </div>
-          </div>
 
-          {/* Footer Message */}
-          <div className="text-center py-4 mb-4">
-            <p className="text-sm font-bold">This is not an official receipt</p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="space-y-3">
-            {printError && (
-              <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">
-                {printError}
+            {/* Transaction Details */}
+            <div className={`border-t border-dashed pt-3 mb-4 space-y-1 text-sm ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}>
+              <div className="flex justify-between">
+                <span className={theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}>Transaction/Reference</span>
+                <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}>{receipt.referenceNo || receipt.reference || '-'}</span>
               </div>
-            )}
-            <button
-              onClick={handlePrint}
-              className="w-full py-3 px-6 rounded-lg font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
-            >
-              <FaPrint />
-              {printError ? 'Print Again' : 'Print Receipt'}
-            </button>
-            <button
-              onClick={onNewTransaction}
-              className="w-full py-3 px-6 rounded-lg font-semibold text-white bg-green-500 hover:bg-green-600 transition-all flex items-center justify-center gap-2"
-            >
-              <MdRefresh />
-              New Transaction
-            </button>
+              <div className="flex justify-between">
+                <span className={theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}>Payment Method</span>
+                <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}>{receipt.paymentMethod || 'CASH'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className={theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}>Subtotal</span>
+                <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}>PHP {receipt.subtotal.toFixed(2)}</span>
+              </div>
+              <div className={`border-t border-dashed pt-2 mt-2 ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}>
+                {receipt.discounts && receipt.discounts.length > 0 ? (
+                  <>
+                    {receipt.discounts.map((d, idx) => (
+                      <div key={idx} className={`flex justify-between text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
+                        <span>{d.title}</span>
+                        <span>{d.value}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between mt-1">
+                      <span className={theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}>Total Discount</span>
+                      <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}>PHP {receipt.discount.toFixed(2)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className={theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}>Discount</span>
+                    <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}>PHP {receipt.discount.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+              <div className={`flex justify-between font-bold text-base pt-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                <span>Total</span>
+                <span>PHP {receipt.total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className={theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}>Cash</span>
+                <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}>PHP {receipt.cash.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className={theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}>Change</span>
+                <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}>PHP {receipt.change.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Footer Message */}
+            <div className="text-center py-4 mb-4">
+              <p className={`text-sm font-bold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>This is not an official receipt</p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              {printError && (
+                <div className={`p-3 rounded-lg text-sm ${theme === 'dark' ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-600'}`}>
+                  {printError}
+                </div>
+              )}
+              <button
+                onClick={handlePrint}
+                className="w-full py-3 px-6 rounded-lg font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
+              >
+                <FaPrint />
+                {printError ? 'Print Again' : 'Print Receipt'}
+              </button>
+              <button
+                onClick={onNewTransaction}
+                className="w-full py-3 px-6 rounded-lg font-semibold text-white bg-green-500 hover:bg-green-600 transition-all flex items-center justify-center gap-2"
+              >
+                <MdRefresh />
+                New Transaction
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
         {/* Printing Animation Modal */}
         <PrintingModal isOpen={isPrinting} />
-        
+
         {/* Print Completion Confirmation */}
-        <PrintCompleteModal 
+        <PrintCompleteModal
           isOpen={showPrintComplete}
           onConfirm={handlePrintSuccess}
           onRetry={handlePrintRetry}

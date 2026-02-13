@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 
 const Header = ({
   pageName,
+  subtitle,
   showSearch = false,
   showFilter = false,
   searchValue = '',
@@ -212,7 +213,12 @@ const Header = ({
       <div className="flex items-center gap-4">
         {showSearch ? (
           <>
-            {!hidePageName && <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{pageName}</h1>}
+            {!hidePageName && (
+              <div>
+                <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{pageName}</h1>
+                {subtitle && <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{subtitle}</p>}
+              </div>
+            )}
             <div className={`relative transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-[472px]' : 'w-178'}`}>
               <div className="absolute left-1 top-1/2 transform -translate-y-1/2 w-10 h-9 flex items-center justify-center text-white rounded-xl" style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}>
                 <FaSearch className="text-sm" />
@@ -239,7 +245,12 @@ const Header = ({
           </>
         ) : (
           <>
-            {!hidePageName && <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{pageName}</h1>}
+            {!hidePageName && (
+              <div>
+                <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{pageName}</h1>
+                {subtitle && <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{subtitle}</p>}
+              </div>
+            )}
             {/* Timeframe Filter for Dashboard */}
             {showTimeframeFilter && (
               <div
@@ -413,17 +424,19 @@ const Header = ({
           <div className="relative" ref={sortButtonRef}>
             <button
               onClick={() => setShowSortDropdown(!showSortDropdown)}
-              className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center border shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] ${sortOption !== 'newest' ? 'border-[#AD7F65] bg-[#AD7F65]/10' : 'border-gray-100'
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] ${sortOption !== 'newest'
+                ? 'border-[#AD7F65] bg-[#AD7F65]/10'
+                : theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-white border-gray-100'
                 }`}
             >
-              <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
+              <img src={filterIcon} alt="Filter" className={`w-5 h-5 ${theme === 'dark' ? 'opacity-90 invert' : 'opacity-90'}`} />
             </button>
 
             {/* Sort Dropdown */}
             {showSortDropdown && (
-              <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-[9999]">
-                <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
-                  <span className="text-xs font-semibold text-gray-600">Sort By</span>
+              <div className={`absolute top-full right-0 mt-2 w-48 rounded-xl shadow-2xl border overflow-hidden z-[9999] ${theme === 'dark' ? 'bg-[#1E1B18] border-gray-600' : 'bg-white border-gray-200'}`}>
+                <div className={`px-3 py-2 border-b ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                  <span className={`text-xs font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Sort By</span>
                 </div>
                 <div className="py-1">
                   <button
@@ -431,7 +444,9 @@ const Header = ({
                       onSortChange && onSortChange('a-z');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${sortOption === 'a-z' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${sortOption === 'a-z'
+                      ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5'
+                      : theme === 'dark' ? 'text-gray-300 hover:bg-[#2A2724]' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                   >
                     Name (A-Z)
@@ -442,7 +457,9 @@ const Header = ({
                       onSortChange && onSortChange('z-a');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${sortOption === 'z-a' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${sortOption === 'z-a'
+                      ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5'
+                      : theme === 'dark' ? 'text-gray-300 hover:bg-[#2A2724]' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                   >
                     Name (Z-A)
@@ -453,7 +470,9 @@ const Header = ({
                       onSortChange && onSortChange('newest');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${sortOption === 'newest' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${sortOption === 'newest'
+                      ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5'
+                      : theme === 'dark' ? 'text-gray-300 hover:bg-[#2A2724]' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                   >
                     Newest First
@@ -464,7 +483,9 @@ const Header = ({
                       onSortChange && onSortChange('oldest');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${sortOption === 'oldest' ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5' : 'text-gray-700'
+                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${sortOption === 'oldest'
+                      ? 'text-[#AD7F65] font-medium bg-[#AD7F65]/5'
+                      : theme === 'dark' ? 'text-gray-300 hover:bg-[#2A2724]' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                   >
                     Oldest First

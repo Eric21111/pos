@@ -1,5 +1,6 @@
 import { FaTimes, FaMinus, FaPlus } from 'react-icons/fa';
 import { MdCategory, MdShoppingBag } from 'react-icons/md';
+import { useTheme } from '../../context/ThemeContext';
 
 const ProductDetailsModal = ({
   isOpen,
@@ -12,6 +13,8 @@ const ProductDetailsModal = ({
   selectedSize,
   onSelectSize
 }) => {
+  const { theme } = useTheme();
+
   if (!isOpen || !product) return null;
 
   // Helper function to get quantity from size data
@@ -98,18 +101,18 @@ const ProductDetailsModal = ({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden mx-4"
+        className={`rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden mx-4 ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-white'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 flex items-center gap-3 border-b border-gray-100">
+        <div className={`px-6 py-4 flex items-center gap-3 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
           <div className="w-10 h-10 rounded-lg bg-[#AD7F65] flex items-center justify-center">
             <MdShoppingBag className="text-white text-xl" />
           </div>
-          <h2 className="text-xl font-bold text-gray-800">Product Details</h2>
+          <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>Product Details</h2>
           <button
             onClick={onClose}
-            className="ml-auto text-gray-400 hover:text-gray-600 transition"
+            className={`ml-auto transition ${theme === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'}`}
           >
             <FaTimes className="w-5 h-5" />
           </button>
@@ -119,7 +122,7 @@ const ProductDetailsModal = ({
         <div className="p-6">
           <div className="flex gap-6">
             {/* Product Image */}
-            <div className="w-64 h-64 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
+            <div className={`w-64 h-64 rounded-xl overflow-hidden flex-shrink-0 ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-gray-100'}`}>
               {product.itemImage && product.itemImage.trim() !== '' ? (
                 <img
                   src={product.itemImage}
@@ -135,21 +138,21 @@ const ProductDetailsModal = ({
 
             {/* Product Info */}
             <div className="flex-1">
-              <p className="text-sm text-gray-500 mb-1">Product Name</p>
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">
+              <p className={`text-sm mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Product Name</p>
+              <h3 className={`text-2xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
                 {product.itemName}{product.variant ? ` (${product.variant})` : ''}
               </h3>
 
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <p className="text-sm text-gray-500">Category</p>
-                  <p className="font-medium text-gray-800 flex items-center gap-1">
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Category</p>
+                  <p className={`font-medium flex items-center gap-1 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>
                     <MdShoppingBag className="text-gray-500" />
                     {product.category || 'N/A'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Size</p>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Size</p>
                   <div className="flex gap-1 mt-1">
                     {availableSizes.length > 0 ? (
                       availableSizes.map((size) => {
@@ -160,62 +163,59 @@ const ProductDetailsModal = ({
                             key={size}
                             onClick={() => !isOutOfStock && onSelectSize(size)}
                             disabled={isOutOfStock}
-                            className={`px-3 py-1 rounded text-xs font-medium transition-all ${
-                              selectedSize === size
+                            className={`px-3 py-1 rounded text-xs font-medium transition-all ${selectedSize === size
                                 ? 'bg-[#AD7F65] text-white'
                                 : isOutOfStock
-                                ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                                  ? theme === 'dark' ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                  : theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
                           >
                             {size}
                           </button>
                         );
                       })
                     ) : (
-                      <span className="text-gray-500 text-sm">N/A</span>
+                      <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>N/A</span>
                     )}
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">SKU/Item Code</p>
-                  <p className="font-medium text-gray-800">{product.sku || 'N/A'}</p>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>SKU/Item Code</p>
+                  <p className={`font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>{product.sku || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Price</p>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Price</p>
                   <p className="font-bold text-[#AD7F65] text-lg">
                     PHP {getDisplayPrice().toFixed(2)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Variant</p>
-                  <p className="font-medium text-gray-800">{product.variant || 'N/A'}</p>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Variant</p>
+                  <p className={`font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>{product.variant || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Quantity</p>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Quantity</p>
                   <div className="flex items-center gap-2 mt-1">
                     <button
                       onClick={onDecrement}
                       disabled={isDecrementDisabled()}
-                      className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${
-                        isDecrementDisabled()
-                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${isDecrementDisabled()
+                          ? theme === 'dark' ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                           : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
-                      }`}
+                        }`}
                     >
                       <FaMinus className="text-xs" />
                     </button>
-                    <span className="w-8 text-center font-semibold text-gray-800">
+                    <span className={`w-8 text-center font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
                       {productQuantity}
                     </span>
                     <button
                       onClick={onIncrement}
                       disabled={isIncrementDisabled()}
-                      className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${
-                        isIncrementDisabled()
-                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${isIncrementDisabled()
+                          ? theme === 'dark' ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                           : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
-                      }`}
+                        }`}
                     >
                       <FaPlus className="text-xs" />
                     </button>
@@ -225,7 +225,7 @@ const ProductDetailsModal = ({
 
               {/* Stock per Size */}
               <div className="mb-4">
-                <p className="text-sm text-gray-500 mb-2">Stock</p>
+                <p className={`text-sm mb-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Stock</p>
                 {availableSizes.length > 0 ? (
                   <div className="flex flex-wrap gap-4">
                     {availableSizes.map((size) => {
@@ -233,9 +233,8 @@ const ProductDetailsModal = ({
                       return (
                         <span
                           key={size}
-                          className={`text-sm ${
-                            sizeStock > 0 ? 'text-gray-700' : 'text-gray-400'
-                          }`}
+                          className={`text-sm ${sizeStock > 0 ? (theme === 'dark' ? 'text-gray-300' : 'text-gray-700') : 'text-gray-400'
+                            }`}
                         >
                           {size}: {sizeStock}
                         </span>
@@ -243,7 +242,7 @@ const ProductDetailsModal = ({
                     })}
                   </div>
                 ) : (
-                  <span className="text-sm text-gray-700">
+                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                     {getTotalStock()}
                   </span>
                 )}
@@ -253,11 +252,10 @@ const ProductDetailsModal = ({
               <button
                 onClick={handleAdd}
                 disabled={isAddButtonDisabled()}
-                className={`w-full py-3 rounded-lg font-semibold text-white transition-all ${
-                  isAddButtonDisabled()
+                className={`w-full py-3 rounded-lg font-semibold text-white transition-all ${isAddButtonDisabled()
                     ? 'bg-gray-300 cursor-not-allowed'
                     : 'bg-green-500 hover:bg-green-600'
-                }`}
+                  }`}
               >
                 Add to Cart
               </button>

@@ -24,7 +24,7 @@ const formatShortDate = (dateString) => {
 const ViewTransactionModal = ({ isOpen, onClose, transaction, onReturnItems, onPrintReceipt }) => {
   if (!isOpen || !transaction) return null;
 
-  const transactionId = transaction.transactionNumber 
+  const transactionId = transaction.transactionNumber
     ? `TRX-${String(transaction.transactionNumber).padStart(3, '0')}`
     : transaction.referenceNo || transaction._id?.substring(0, 8);
 
@@ -90,11 +90,11 @@ const ViewTransactionModal = ({ isOpen, onClose, transaction, onReturnItems, onP
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 flex items-center justify-center z-[10000] bg-black/50"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
@@ -115,15 +115,14 @@ const ViewTransactionModal = ({ isOpen, onClose, transaction, onReturnItems, onP
                 <span className="text-sm text-gray-500">
                   Payment: {transaction.paymentMethod?.charAt(0).toUpperCase() + transaction.paymentMethod?.slice(1) || 'N/A'}
                 </span>
-                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                  transaction.status === 'Completed' 
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${transaction.status === 'Completed'
                     ? 'bg-green-100 text-green-700'
                     : transaction.status === 'Returned'
-                    ? 'bg-orange-100 text-orange-700'
-                    : transaction.status === 'Partially Returned'
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-red-100 text-red-600'
-                }`}>
+                      ? 'bg-orange-100 text-orange-700'
+                      : transaction.status === 'Partially Returned'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-red-100 text-red-600'
+                  }`}>
                   ● {transaction.status || 'Completed'}
                 </span>
               </div>
@@ -156,28 +155,27 @@ const ViewTransactionModal = ({ isOpen, onClose, transaction, onReturnItems, onP
                   const isFullyReturned = item.returnStatus === 'Returned';
                   const isPartiallyReturned = item.returnStatus === 'Partially Returned';
                   const hasReturnInfo = returnInfo !== null || isFullyReturned || isPartiallyReturned;
-                  
+
                   // Calculate display values
                   const displayQty = item.quantity;
                   const returnedQty = item.returnedQuantity || (returnInfo?.quantity || 0);
-                  
+
                   return (
                     <div key={idx}>
                       <div
-                        className={`grid grid-cols-12 gap-2 px-4 py-3 items-center ${
-                          isFullyReturned 
-                            ? 'bg-orange-50 border-l-4 border-l-orange-400' 
+                        className={`grid grid-cols-12 gap-2 px-4 py-3 items-center ${isFullyReturned
+                            ? 'bg-orange-50 border-l-4 border-l-orange-400'
                             : isPartiallyReturned
                               ? 'bg-amber-50 border-l-4 border-l-amber-400'
                               : 'bg-white border-b border-gray-100 last:border-b-0'
-                        }`}
+                          }`}
                       >
                         {/* Item Name */}
                         <div className={`col-span-4 text-sm ${isFullyReturned ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
                           {item.itemName}
                           {item.selectedSize && <span className="text-gray-500 text-xs ml-1">({item.selectedSize})</span>}
                         </div>
-                        
+
                         {/* Quantity */}
                         <div className="col-span-2 text-sm text-gray-600 text-center">
                           {isPartiallyReturned ? (
@@ -188,17 +186,17 @@ const ViewTransactionModal = ({ isOpen, onClose, transaction, onReturnItems, onP
                             <span>x{displayQty}</span>
                           )}
                         </div>
-                        
+
                         {/* Price */}
                         <div className="col-span-2 text-sm text-gray-600 text-center">
                           ₱{(item.price || item.itemPrice || 0).toLocaleString()}
                         </div>
-                        
+
                         {/* Total */}
                         <div className="col-span-2 text-sm text-gray-600 text-center">
                           ₱{((item.price || item.itemPrice || 0) * displayQty).toLocaleString()}
                         </div>
-                        
+
                         {/* Status */}
                         <div className="col-span-2 text-center">
                           {isFullyReturned ? (
@@ -214,12 +212,12 @@ const ViewTransactionModal = ({ isOpen, onClose, transaction, onReturnItems, onP
                           )}
                         </div>
                       </div>
-                      
+
                       {/* Return details row */}
                       {(isFullyReturned || isPartiallyReturned) && (
                         <div className={`px-4 py-2 border-b border-gray-100 ${isFullyReturned ? 'bg-orange-50 border-l-4 border-l-orange-400' : 'bg-amber-50 border-l-4 border-l-amber-400'}`}>
                           <p className={`text-xs italic ${isFullyReturned ? 'text-orange-600' : 'text-amber-600'}`}>
-                            Reason: {item.returnReason || returnInfo?.reason || 'N/A'} 
+                            Reason: {item.returnReason || returnInfo?.reason || 'N/A'}
                             {returnedQty > 0 && ` • ${returnedQty} item(s) returned`}
                             {returnInfo?.date ? ` • ${formatShortDate(returnInfo.date)}` : ''}
                           </p>

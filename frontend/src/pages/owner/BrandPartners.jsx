@@ -1,6 +1,7 @@
 import { useEffect, useState, memo } from 'react';
 import Header from '../../components/shared/header';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaPlus } from 'react-icons/fa';
 import filterIcon from '../../assets/filter.svg';
@@ -9,6 +10,7 @@ import AddBrandPartnerModal from '../../components/owner/AddBrandPartnerModal';
 
 const BrandPartners = () => {
   const { isOwner } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState(null);
@@ -48,7 +50,7 @@ const BrandPartners = () => {
   );
 
   return (
-    <div className="p-8 min-h-screen">
+    <div className={`p-8 min-h-screen ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-gray-50'}`}>
       <Header pageName="Brand Partners" showBorder={false} />
 
       <div className="flex items-center justify-between mb-6 mt-10">
@@ -62,11 +64,17 @@ const BrandPartners = () => {
               placeholder="Search For..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-16 pr-4 py-3 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+              className={`w-full h-10 pl-16 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                  ? 'bg-[#2A2724] border-[#4A4037] text-white placeholder-gray-500'
+                  : 'bg-white border-gray-300 text-gray-900'
+                }`}
             />
           </div>
-          <button className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <img src={filterIcon} alt="Filter" className="w-5 h-5 opacity-90" />
+          <button className={`w-10 h-10 rounded-lg flex items-center justify-center border shadow-sm hover:shadow-md transition-shadow ${theme === 'dark'
+              ? 'bg-[#2A2724] border-[#4A4037] text-gray-300'
+              : 'bg-white border-gray-200'
+            }`}>
+            <img src={filterIcon} alt="Filter" className={`w-5 h-5 ${theme === 'dark' ? 'opacity-70 invert' : 'opacity-90'}`} />
           </button>
         </div>
 
@@ -95,7 +103,10 @@ const BrandPartners = () => {
       <div className="grid grid-cols-3 gap-6">
         {!loading && filteredBrandPartners.length === 0 && (
           <div className="col-span-3">
-            <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-10 text-center text-gray-500">
+            <div className={`rounded-2xl border border-dashed p-10 text-center ${theme === 'dark'
+                ? 'bg-[#2A2724] border-[#4A4037] text-gray-400'
+                : 'bg-white border-gray-200 text-gray-500'
+              }`}>
               No brand partners found. Add your first brand partner to get started.
             </div>
           </div>
@@ -104,15 +115,16 @@ const BrandPartners = () => {
         {filteredBrandPartners.map((brand) => (
           <div
             key={brand._id || brand.id}
-            className="bg-white rounded-xl shadow-lg overflow-hidden border-t-2"
+            className={`rounded-xl shadow-lg overflow-hidden border-t-2 ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'
+              }`}
             style={{ borderTopColor: '#AD7F65' }}
           >
             <div className="flex p-6 items-center">
               <div className="w-32 h-32 shrink-0 flex items-center justify-center mr-6">
                 <div className="w-28 h-28 bg-gray-200 rounded-full flex items-center justify-center">
                   {brand.logo ? (
-                    <img 
-                      src={brand.logo} 
+                    <img
+                      src={brand.logo}
                       alt={brand.brandName}
                       className="w-full h-full object-cover rounded-full"
                     />
@@ -126,10 +138,10 @@ const BrandPartners = () => {
 
               <div className="flex-1 flex flex-col justify-center">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">
+                  <h3 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {brand.brandName}
                   </h3>
-                  <div className="space-y-2 text-sm text-gray-600">
+                  <div className={`space-y-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                     <div>
                       <span className="font-medium">Email:</span> {brand.email}
                     </div>

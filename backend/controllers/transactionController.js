@@ -21,12 +21,12 @@ const toObjectId = (id) => {
 const generateUniqueReceiptNumber = async () => {
   const timestamp = Date.now().toString().slice(-6);
   let receiptNo = timestamp.padStart(6, '0');
-  
+
   const existing = await SalesTransaction.findOne({ receiptNo });
   if (existing) {
     receiptNo = (timestamp + Math.floor(Math.random() * 10)).slice(-6);
   }
-  
+
   return receiptNo;
 };
 
@@ -36,25 +36,25 @@ const generateVoidId = async () => {
   let voidId;
   let isUnique = false;
   let attempts = 0;
-  
+
   while (!isUnique && attempts < 10) {
     voidId = 'VOID-';
     for (let i = 0; i < 6; i++) {
       voidId += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    
+
     const existing = await SalesTransaction.findOne({ voidId });
     if (!existing) {
       isUnique = true;
     }
     attempts++;
   }
-  
+
   if (!isUnique) {
     const timestamp = Date.now().toString().slice(-4);
     voidId = `VOID-${timestamp}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
   }
-  
+
   return voidId;
 };
 
@@ -63,7 +63,7 @@ exports.getAllTransactions = async (req, res) => {
     const transactions = await SalesTransaction.find({})
       .sort({ createdAt: -1 })
       .lean();
-    
+
     res.json({
       success: true,
       count: transactions.length,
@@ -82,14 +82,14 @@ exports.getAllTransactions = async (req, res) => {
 exports.getTransactionById = async (req, res) => {
   try {
     const transaction = await SalesTransaction.findById(req.params.id).lean();
-    
+
     if (!transaction) {
       return res.status(404).json({
         success: false,
         message: 'Transaction not found'
       });
     }
-    
+
     res.json({
       success: true,
       data: transaction
@@ -109,7 +109,7 @@ exports.updateTransaction = async (req, res) => {
     const updateData = req.body;
 
     const transaction = await SalesTransaction.findById(id);
-    
+
     if (!transaction) {
       return res.status(404).json({
         success: false,
@@ -129,7 +129,7 @@ exports.updateTransaction = async (req, res) => {
     }
 
     await transaction.save();
-    
+
     res.json({
       success: true,
       message: 'Transaction updated successfully',
@@ -387,12 +387,12 @@ exports.returnItems = async (req, res) => {
     const returnItems = items.map(item => {
       const originalItem = originalTransaction.items.find(
         oi => oi.productId?.toString() === item.productId?.toString() &&
-              oi.selectedSize === item.selectedSize
+          oi.selectedSize === item.selectedSize
       );
-      
+
       const price = originalItem?.price || item.price || 0;
       returnAmount += price * item.quantity;
-      
+
       return {
         productId: item.productId,
         itemName: item.itemName,
@@ -484,14 +484,14 @@ exports.returnItems = async (req, res) => {
 exports.getTransactionStats = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    
+
     const query = { status: 'completed', paymentMethod: { $ne: 'return' } };
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
       if (endDate) query.createdAt.$lte = new Date(endDate);
     }
-    
+
     const [totalTransactions, totalSales, byPaymentMethod] = await Promise.all([
       SalesTransaction.countDocuments(query),
       SalesTransaction.aggregate([
@@ -503,7 +503,7 @@ exports.getTransactionStats = async (req, res) => {
         { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$totalAmount' } } }
       ])
     ]);
-    
+
     res.json({
       success: true,
       data: {
@@ -526,67 +526,111 @@ exports.getTransactionStats = async (req, res) => {
 };
 
 // Get dashboard stats (sales, transactions, profit, low stock) with timeframe support
+// Get dashboard stats (sales, transactions, profit, low stock) with timeframe support and growth rate
 exports.getDashboardStats = async (req, res) => {
   try {
-    const { timeframe = 'daily' } = req.query;
-    
-    // Calculate date range based on timeframe
+    const { timeframe = 'daily', startDate: customStartDate, endDate: customEndDate } = req.query;
     const now = new Date();
-    let startDate, endDate;
-    
-    switch (timeframe.toLowerCase()) {
-      case 'daily':
-        // Today only
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 1);
-        break;
-      case 'weekly':
-        // Current week (Sunday to Saturday)
-        startDate = new Date(now);
-        const dayOfWeek = startDate.getDay();
-        startDate.setDate(startDate.getDate() - dayOfWeek);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 7);
-        break;
-      case 'monthly':
-        // Current month
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        break;
-      default:
-        // Default to daily
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 1);
+
+    // Helper to get date range
+    const getDateRange = (tf, date = new Date()) => {
+      let start, end;
+      const d = new Date(date);
+
+      // Check if custom dates are provided and timeframe is 'custom'
+      if (tf.toLowerCase() === 'custom' && customStartDate && customEndDate) {
+        start = new Date(customStartDate);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(customEndDate);
+        end.setHours(23, 59, 59, 999);
+        return { start, end };
+      }
+
+      switch (tf.toLowerCase()) {
+        case 'daily':
+          start = new Date(d);
+          start.setHours(0, 0, 0, 0);
+          end = new Date(start);
+          end.setDate(end.getDate() + 1);
+          break;
+        case 'weekly':
+          start = new Date(d);
+          const day = start.getDay();
+          start.setDate(start.getDate() - day);
+          start.setHours(0, 0, 0, 0);
+          end = new Date(start);
+          end.setDate(end.getDate() + 7);
+          break;
+        case 'monthly':
+          start = new Date(d.getFullYear(), d.getMonth(), 1);
+          start.setHours(0, 0, 0, 0);
+          end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+          break;
+        case 'yearly':
+          // Show current calendar year (Jan 1 - Dec 31 of current year)
+          start = new Date(d.getFullYear(), 0, 1); // Jan 1st of current year
+          start.setHours(0, 0, 0, 0);
+          end = new Date(d.getFullYear() + 1, 0, 1); // Jan 1st of next year
+          break;
+        default: // daily
+          start = new Date(d);
+          start.setHours(0, 0, 0, 0);
+          end = new Date(start);
+          end.setDate(end.getDate() + 1);
+      }
+      return { start, end };
+    };
+
+    // Current period
+    const current = getDateRange(timeframe, now);
+
+    // Previous period (for growth rate)
+    let previousDate = new Date(now);
+    let previous = { start: new Date(), end: new Date() };
+
+    if (timeframe.toLowerCase() === 'custom' && customStartDate && customEndDate) {
+      // Calculate duration of custom range
+      const duration = current.end.getTime() - current.start.getTime();
+      // Previous period ends just before current start
+      const previousEnd = new Date(current.start.getTime() - 1);
+      const previousStart = new Date(previousEnd.getTime() - duration);
+      previous = { start: previousStart, end: previousEnd };
+    } else {
+      if (timeframe === 'daily') previousDate.setDate(previousDate.getDate() - 1);
+      else if (timeframe === 'weekly') previousDate.setDate(previousDate.getDate() - 7);
+      else if (timeframe === 'monthly') previousDate.setMonth(previousDate.getMonth() - 1);
+      else if (timeframe === 'yearly') previousDate.setFullYear(previousDate.getFullYear() - 1);
+
+      previous = getDateRange(timeframe, previousDate);
     }
 
-    // Get transactions for the timeframe (excluding returns and voided)
-    // Use $or to check both checkedOutAt and createdAt for consistency with sales chart
-    const transactions = await SalesTransaction.find({
-      $or: [
-        { checkedOutAt: { $gte: startDate, $lt: endDate } },
-        { checkedOutAt: { $exists: false }, createdAt: { $gte: startDate, $lt: endDate } }
-      ],
-      status: { $not: { $regex: /^voided$/i } },
-      paymentMethod: { $ne: 'return' }
-    }).lean();
+    // Fetch transactions
+    const getTransactions = async (start, end) => {
+      return SalesTransaction.find({
+        $or: [
+          { checkedOutAt: { $gte: start, $lte: end } },
+          { checkedOutAt: { $exists: false }, createdAt: { $gte: start, $lte: end } }
+        ],
+        status: { $not: { $regex: /^voided$/i } },
+        paymentMethod: { $ne: 'return' }
+      }).lean();
+    };
 
-    // Calculate total sales
-    const totalSalesToday = transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
-    
-    // Count transactions
-    const totalTransactions = transactions.length;
+    const [currentTransactions, previousTransactions] = await Promise.all([
+      getTransactions(current.start, current.end),
+      getTransactions(previous.start, previous.end)
+    ]);
 
-    // Calculate profit (need to get cost from products)
+    // Calculate Metrics
+    const totalSalesToday = currentTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+    const totalTransactions = currentTransactions.length;
+
+    // Calculate Profit
     let profit = 0;
-    for (const transaction of transactions) {
+    for (const transaction of currentTransactions) {
       for (const item of transaction.items || []) {
-        const product = await Product.findById(item.productId).lean();
+        // Optimizing this would require populating products or mapped lookup, keeping simple for now
+        const product = await Product.findById(item.productId).select('costPrice').lean();
         if (product) {
           const costPrice = product.costPrice || 0;
           const sellingPrice = item.price || 0;
@@ -595,12 +639,23 @@ exports.getDashboardStats = async (req, res) => {
       }
     }
 
-    // Get low stock items count (this is not timeframe dependent)
-    const products = await Product.find({}).lean();
+    // Previous Period Sales for Growth Rate
+    const totalSalesPrevious = previousTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+
+    // Calculate Growth Rate
+    let growthRate = 0;
+    if (totalSalesPrevious > 0) {
+      growthRate = ((totalSalesToday - totalSalesPrevious) / totalSalesPrevious) * 100;
+    } else if (totalSalesToday > 0) {
+      growthRate = 100; // 100% growth if previous was 0 and now we have sales
+    }
+
+    // Low stock items (independent of timeframe)
+    const products = await Product.find({}).select('currentStock reorderNumber').lean();
     const lowStockItems = products.filter(p => {
       const stock = p.currentStock || 0;
       const reorder = p.reorderNumber || 5;
-      return stock <= reorder && stock >= 0;
+      return stock <= reorder;
     }).length;
 
     res.json({
@@ -609,7 +664,9 @@ exports.getDashboardStats = async (req, res) => {
         totalSalesToday,
         totalTransactions,
         profit,
-        lowStockItems
+        lowStockItems,
+        growthRate: parseFloat(growthRate.toFixed(1)),
+        totalSalesPrevious
       }
     });
   } catch (error) {
@@ -622,55 +679,132 @@ exports.getDashboardStats = async (req, res) => {
   }
 };
 
+// Get sales by category
+exports.getSalesByCategory = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query; // Optional custom range
+
+    // Default to last 30 days if no range provided, or use logic from design if it implies all time?
+    // Design says "Sales By Cactegory" without explicit timeframe selector, usually implies current dashboard timeframe or all time.
+    // Let's assume it follows dashboard timeframe if simpler, but for now let's do all time or large window if not specified.
+    // Actually, normally specific period. Let's look at getTopSellingProducts.
+    // Let's default to 'all time' or 'this month' if not specified.
+
+    let matchStage = {
+      status: { $nin: ['Voided', 'voided'] },
+      paymentMethod: { $nin: ['return', 'void'] }
+    };
+
+    if (startDate && endDate) {
+      matchStage.$or = [
+        { checkedOutAt: { $gte: new Date(startDate), $lt: new Date(endDate) } },
+        { checkedOutAt: { $exists: false }, createdAt: { $gte: new Date(startDate), $lt: new Date(endDate) } }
+      ];
+    }
+
+    const salesByCategory = await SalesTransaction.aggregate([
+      { $match: matchStage },
+      { $unwind: '$items' },
+      // Lookup product to get category
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'items.productId',
+          foreignField: '_id',
+          as: 'product'
+        }
+      },
+      { $unwind: '$product' },
+      {
+        $group: {
+          _id: '$product.category',
+          totalSales: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
+        }
+      },
+      { $sort: { totalSales: -1 } }
+    ]);
+
+    // Format for frontend
+    const result = salesByCategory.map(item => ({
+      name: item._id || 'Uncategorized',
+      value: item.totalSales
+    }));
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error fetching sales by category:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch sales by category',
+      error: error.message
+    });
+  }
+};
+
 
 // Get top selling products based on transaction data
 exports.getTopSellingProducts = async (req, res) => {
   try {
     const { sort = 'most', limit = 5, period = 'daily' } = req.query;
-    
+
     // Calculate date range based on period
     const now = new Date();
     let startDate, endDate;
-    
-    switch (period.toLowerCase()) {
-      case 'daily':
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 1);
-        break;
-      case 'weekly':
-        startDate = new Date(now);
-        const dayOfWeek = startDate.getDay();
-        startDate.setDate(startDate.getDate() - dayOfWeek);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 7);
-        break;
-      case 'monthly':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        break;
-      default:
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 1);
+
+    if (period.toLowerCase() === 'custom' && req.query.startDate && req.query.endDate) {
+      startDate = new Date(req.query.startDate);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(req.query.endDate);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      switch (period.toLowerCase()) {
+        case 'daily':
+          startDate = new Date(now);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + 1);
+          break;
+        case 'weekly':
+          startDate = new Date(now);
+          const dayOfWeek = startDate.getDay();
+          startDate.setDate(startDate.getDate() - dayOfWeek);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + 7);
+          break;
+        case 'monthly':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          break;
+        case 'yearly':
+          startDate = new Date(now.getFullYear(), 0, 1); // Jan 1st of current year
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(now.getFullYear() + 1, 0, 1); // Jan 1st of next year
+          break;
+        default:
+          startDate = new Date(now);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + 1);
+      }
     }
-    
+
     // Aggregate sales data from completed transactions
     const salesData = await SalesTransaction.aggregate([
       // Only include completed transactions (not voided or returns) within the time period
-      { 
-        $match: { 
+      {
+        $match: {
           status: { $nin: ['Voided', 'voided'] },
           paymentMethod: { $nin: ['return', 'void'] },
           $or: [
             { checkedOutAt: { $gte: startDate, $lt: endDate } },
             { checkedOutAt: { $exists: false }, createdAt: { $gte: startDate, $lt: endDate } }
           ]
-        } 
+        }
       },
       // Unwind items array to get individual product sales
       { $unwind: '$items' },
@@ -728,109 +862,182 @@ exports.getTopSellingProducts = async (req, res) => {
 
 // Get sales over time data for charts
 // Uses the same logic as getDashboardStats for consistency
+// Get sales over time data for charts (updated for composed chart)
 exports.getSalesOverTime = async (req, res) => {
   try {
-    const { timeframe = 'daily' } = req.query;
-    
+    const { timeframe = 'daily', startDate: customStartDate, endDate: customEndDate } = req.query;
+
     let limit;
-    switch (timeframe.toLowerCase()) {
-      case 'daily':
-        limit = 7;
-        break;
-      case 'weekly':
-        limit = 8;
-        break;
-      case 'monthly':
-        limit = 12;
-        break;
-      default:
-        limit = 7;
+    let periodType = timeframe.toLowerCase();
+
+    // Determine period type and limit for custom range
+    if (periodType === 'custom' && customStartDate && customEndDate) {
+      const start = new Date(customStartDate);
+      const end = new Date(customEndDate);
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 31) {
+        periodType = 'daily-custom';
+        limit = diffDays;
+      } else if (diffDays <= 180) { // Approx 6 months
+        periodType = 'weekly-custom';
+        limit = Math.ceil(diffDays / 7);
+      } else {
+        periodType = 'monthly-custom';
+        limit = Math.ceil(diffDays / 30);
+      }
+    } else {
+      switch (periodType) {
+        case 'daily': limit = 7; break;
+        case 'weekly': limit = 12; break; // 12 weeks
+        case 'monthly': limit = 12; break; // 12 months
+        case 'yearly': limit = 5; break; // 5 years
+        default: limit = 7;
+      }
     }
 
-    // Generate date ranges for each period (same logic as getDashboardStats)
+    // Generate date ranges for each period
     const periods = [];
     const now = new Date();
-    
-    for (let i = limit - 1; i >= 0; i--) {
-      let startDate, endDate, label;
-      
-      if (timeframe.toLowerCase() === 'daily') {
-        startDate = new Date(now);
-        startDate.setDate(startDate.getDate() - i);
-        startDate.setHours(0, 0, 0, 0);
-        
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 1);
-        
-        label = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      } else if (timeframe.toLowerCase() === 'weekly') {
-        // Start of week (Sunday)
-        startDate = new Date(now);
-        const dayOfWeek = startDate.getDay();
-        startDate.setDate(startDate.getDate() - dayOfWeek - (i * 7));
-        startDate.setHours(0, 0, 0, 0);
-        
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 7);
-        
-        const weekNum = Math.ceil((startDate.getDate() + new Date(startDate.getFullYear(), startDate.getMonth(), 1).getDay()) / 7);
-        label = `Week ${weekNum}`;
-      } else if (timeframe.toLowerCase() === 'monthly') {
-        startDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        startDate.setHours(0, 0, 0, 0);
-        
-        endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
-        
-        label = startDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+
+    if (periodType.includes('custom')) {
+      const end = new Date(customEndDate);
+      end.setHours(23, 59, 59, 999);
+
+      for (let i = limit - 1; i >= 0; i--) {
+        let startDate, endDate, label;
+
+        if (periodType === 'daily-custom') {
+          startDate = new Date(end);
+          startDate.setDate(startDate.getDate() - i);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + 1);
+          label = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } else if (periodType === 'weekly-custom') {
+          startDate = new Date(end);
+          startDate.setDate(startDate.getDate() - (i * 7));
+          // Adjust to start of week if needed, but for custom range just rolling back 7 days is fine for trend
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + 7);
+          label = `Week of ${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+        } else { // monthly-custom
+          startDate = new Date(end);
+          startDate.setMonth(startDate.getMonth() - i);
+          startDate.setDate(1);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate);
+          endDate.setMonth(endDate.getMonth() + 1);
+          label = startDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        }
+        periods.push({ startDate, endDate, label });
       }
-      
-      periods.push({ startDate, endDate, label });
+
+    } else {
+      // Standard logic
+      for (let i = limit - 1; i >= 0; i--) {
+        let startDate, endDate, label;
+
+        if (timeframe.toLowerCase() === 'daily') {
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - i);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + 1);
+          label = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } else if (timeframe.toLowerCase() === 'weekly') {
+          startDate = new Date(now);
+          const dayOfWeek = startDate.getDay();
+          startDate.setDate(startDate.getDate() - dayOfWeek - (i * 7));
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + 7);
+          label = `Week ${startDate.getDate()}`; // Simplified label
+        } else if (timeframe.toLowerCase() === 'monthly') {
+          startDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
+          label = startDate.toLocaleDateString('en-US', { month: 'short' });
+        } else { // yearly
+          // Show last 5 rolling years matching the dashboard stats logic (kind of)
+          // But for chart, we want 5 distinct points.
+          // Let's do: This year, Last year, etc.
+          startDate = new Date(now);
+          startDate.setFullYear(startDate.getFullYear() - i);
+          startDate.setMonth(0, 1); // Jan 1st of that year
+          startDate.setHours(0, 0, 0, 0);
+
+          endDate = new Date(startDate);
+          endDate.setFullYear(endDate.getFullYear() + 1); // Jan 1st of next year
+
+          label = startDate.getFullYear().toString();
+        }
+
+        periods.push({ startDate, endDate, label });
+      }
     }
 
-    // Fetch sales for each period using the SAME query logic as getDashboardStats
-    const salesData = await Promise.all(
+    // Fetch sales for each period
+    const rawSalesData = await Promise.all(
       periods.map(async ({ startDate, endDate, label }) => {
         const transactions = await SalesTransaction.find({
           $or: [
             { checkedOutAt: { $gte: startDate, $lt: endDate } },
+            { checkedOutAt: null, createdAt: { $gte: startDate, $lt: endDate } },
             { checkedOutAt: { $exists: false }, createdAt: { $gte: startDate, $lt: endDate } }
           ],
           status: { $not: { $regex: /^voided$/i } },
           paymentMethod: { $ne: 'return' }
-        }).lean();
+        }).select('totalAmount').lean();
 
         const totalSales = transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
-        const transactionCount = transactions.length;
-
         return {
           period: label,
-          totalSales,
-          transactionCount
+          revenue: totalSales
         };
       })
     );
 
-    // Calculate growth (absolute difference, not percentage)
-    const formattedData = salesData.map((item, index, arr) => {
-      const prevSales = index > 0 ? arr[index - 1].totalSales : item.totalSales;
-      const growth = item.totalSales - prevSales;
+    // Post-process to calculate growth and add target
+    // Calculate dynamic target based on highest revenue
+    const maxRevenue = Math.max(...rawSalesData.map(item => item.revenue || 0));
+    const dynamicTarget = maxRevenue > 0 ? maxRevenue : 10000; // Exact max revenue, or default to 10k if no sales
+
+    const salesData = rawSalesData.map((item, index) => {
+      let growth = 0;
+      if (index > 0) {
+        const prevRevenue = rawSalesData[index - 1].revenue;
+        if (prevRevenue > 0) {
+          growth = ((item.revenue - prevRevenue) / prevRevenue) * 100;
+        } else if (item.revenue > 0) {
+          growth = 100;
+        }
+      }
 
       return {
         ...item,
-        growth
+        target: Math.round(dynamicTarget), // Dynamic target based on max revenue
+        growth: Math.round(growth)
       };
     });
 
+    // If we only have 1 data point or first point has no prev, growth is 0. 
+    // To make chart look nice, maybe mock growth for first point or leave 0.
+
     res.json({
       success: true,
-      data: formattedData
+      data: salesData
     });
   } catch (error) {
     console.error('Error fetching sales over time:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch sales data',
+      message: 'Failed to fetch sales over time',
       error: error.message
     });
   }
 };
+
+

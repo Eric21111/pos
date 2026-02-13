@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 
 const StockInModal = ({
   isOpen,
@@ -11,13 +12,14 @@ const StockInModal = ({
   const [sizeQuantities, setSizeQuantities] = useState({});
   const [reason, setReason] = useState('Restock');
   const [otherReason, setOtherReason] = useState('');
+  const { theme } = useTheme();
 
   const allSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Free Size'];
   const reasons = ['Restock', 'Returned Item', 'Exchange', 'Other'];
 
   // Always show all sizes - user can add any size to the product
   const hasSizes = product.sizes && typeof product.sizes === 'object' && Object.keys(product.sizes).length > 0;
-  
+
   // Helper function to get quantity from size data (handles both number and object formats)
   const getSizeQuantity = (sizeData) => {
     if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
@@ -74,7 +76,7 @@ const StockInModal = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (selectedSizes.length === 0) {
       alert('Please select at least one size');
       return;
@@ -107,9 +109,9 @@ const StockInModal = ({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm pointer-events-none">
-      <div className="bg-white rounded-2xl w-full max-w-5xl relative pointer-events-auto overflow-hidden" 
-           style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.1)' }}>
-        
+      <div className={`rounded-2xl w-full max-w-5xl relative pointer-events-auto overflow-hidden ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-white'}`}
+        style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.1)' }}>
+
         <div className="h-2 bg-gradient-to-r from-[#AD7F65] to-[#C99B7F]"></div>
 
         <div className="flex justify-between items-center px-6 py-4 border-b">
@@ -122,11 +124,11 @@ const StockInModal = ({
                 <span className="text-white text-[8px] font-bold leading-none">+</span>
               </span>
             </div>
-            <h2 className="text-xl font-bold">Stock In</h2>
+            <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Stock In</h2>
           </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl font-light"
+            className={`text-2xl font-light ${theme === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'}`}
           >
             ×
           </button>
@@ -134,11 +136,11 @@ const StockInModal = ({
 
         <form onSubmit={handleSubmit}>
           <div className="flex">
-            <div className="w-1/2 p-6 bg-gray-50 flex items-center justify-center" style={{ minHeight: '500px' }}>
+            <div className={`w-1/2 p-6 flex items-center justify-center ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-gray-50'}`} style={{ minHeight: '500px' }}>
               {product.itemImage && product.itemImage.trim() !== '' ? (
-                <img 
-                  src={product.itemImage} 
-                  alt={product.itemName} 
+                <img
+                  src={product.itemImage}
+                  alt={product.itemName}
                   className="max-w-full max-h-full object-contain rounded-lg"
                 />
               ) : (
@@ -154,7 +156,7 @@ const StockInModal = ({
             <div className="w-1/2 p-6 flex flex-col justify-between">
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900">
+                  <h3 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {product.itemName}
                     {product.size && !product.sizes && ` (${product.size})`}
                   </h3>
@@ -162,17 +164,17 @@ const StockInModal = ({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">SKU/Item Code</label>
-                    <p className="text-sm font-medium text-gray-900">{product.sku || '-'}</p>
+                    <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>SKU/Item Code</label>
+                    <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{product.sku || '-'}</p>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Brand Partner <span className="text-gray-400">(optional)</span></label>
-                    <p className="text-sm font-medium text-gray-900">{product.supplierName || '-'}</p>
+                    <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Brand Partner <span className="text-gray-400">(optional)</span></label>
+                    <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{product.supplierName || '-'}</p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-500 mb-2">
+                  <label className={`block text-xs mb-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                     Sizes Optional - Select multiple sizes
                   </label>
                   <div className="grid grid-cols-4 gap-2 mb-3">
@@ -189,16 +191,16 @@ const StockInModal = ({
                               accentColor: '#AD7F65'
                             }}
                           />
-                          <span className="text-sm text-gray-900">
+                          <span className={`text-sm ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>
                             {size} <span className="text-xs text-gray-500">({currentQty})</span>
                           </span>
                         </label>
                       );
                     })}
                   </div>
-                  
-                  <div className="space-y-2 mt-3 p-3 bg-gray-50 rounded-lg">
-                    <label className="block text-xs font-semibold text-gray-700 mb-2">
+
+                  <div className={`space-y-2 mt-3 p-3 rounded-lg ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-gray-50'}`}>
+                    <label className={`block text-xs font-semibold mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       Quantity per Size:
                     </label>
                     <div className="grid grid-cols-2 gap-3">
@@ -207,7 +209,7 @@ const StockInModal = ({
                           const currentQty = hasSizes && product.sizes[size] ? getSizeQuantity(product.sizes[size]) : 0;
                           return (
                             <div key={size}>
-                              <label className="block text-xs text-gray-600 mb-1">
+                              <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                                 {size} <span className="text-gray-500">(Current: {currentQty})</span>
                               </label>
                               <input
@@ -216,7 +218,7 @@ const StockInModal = ({
                                 value={sizeQuantities[size] || ''}
                                 onChange={(e) => handleSizeQuantityChange(size, e.target.value)}
                                 placeholder="Enter quantity"
-                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark' ? 'bg-[#1E1B18] border-gray-700 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900'}`}
                               />
                             </div>
                           );
@@ -231,7 +233,7 @@ const StockInModal = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                     Reason
                   </label>
                   <div className="relative">
@@ -243,7 +245,7 @@ const StockInModal = ({
                           setOtherReason('');
                         }
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent appearance-none cursor-pointer"
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent appearance-none cursor-pointer ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                     >
                       {reasons.map((r) => (
                         <option key={r} value={r}>{r}</option>
@@ -261,17 +263,17 @@ const StockInModal = ({
                       value={otherReason}
                       onChange={(e) => setOtherReason(e.target.value)}
                       placeholder="Please specify the reason"
-                      className="w-full mt-2 px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                      className={`w-full mt-2 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900'}`}
                     />
                   )}
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-8 pt-6 border-t">
+              <div className={`flex justify-end gap-3 mt-8 pt-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700 transition-colors"
+                  className={`px-6 py-3 border rounded-lg font-medium transition-colors ${theme === 'dark' ? 'border-gray-600 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
                 >
                   Cancel
                 </button>

@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import Header from '../../components/shared/header';
 import { useAuth } from '../../context/AuthContext';
 import { FaSearch, FaPlus, FaEdit, FaTrash, FaUndo } from 'react-icons/fa';
@@ -6,6 +7,7 @@ import ViewCategoryProductsModal from '../../components/owner/ViewCategoryProduc
 
 const Categories = () => {
   const { currentUser } = useAuth();
+  const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('All'); // All, Active, Archived
   const [showAddModal, setShowAddModal] = useState(false);
@@ -29,18 +31,18 @@ const Categories = () => {
   const initializeBuiltInCategories = async () => {
     try {
       setLoading(true);
-      
+
       // First, fetch existing categories
       const response = await fetch('http://localhost:5000/api/categories');
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       const existingCategories = data.success && Array.isArray(data.data) ? data.data : [];
       const existingCategoryNames = existingCategories.map(cat => cat.name);
-      
+
       // Archive any existing "Others" categories
       const othersCategories = existingCategories.filter(cat => cat.name === 'Others');
       if (othersCategories.length > 0) {
@@ -54,12 +56,12 @@ const Categories = () => {
         );
         await Promise.all(archivePromises);
       }
-      
+
       // Create missing built-in categories
       const missingCategories = builtInCategories.filter(
         categoryName => !existingCategoryNames.includes(categoryName)
       );
-      
+
       // Create all missing categories
       const createPromises = missingCategories.map(categoryName =>
         fetch('http://localhost:5000/api/categories', {
@@ -76,9 +78,9 @@ const Categories = () => {
           return null;
         })
       );
-      
+
       await Promise.all(createPromises);
-      
+
       // Fetch all categories again after creating missing ones
       await fetchCategories();
     } catch (error) {
@@ -92,13 +94,13 @@ const Categories = () => {
     try {
       setLoading(true);
       const response = await fetch('http://localhost:5000/api/categories');
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success && Array.isArray(data.data)) {
         setCategories(data.data);
       } else {
@@ -133,7 +135,7 @@ const Categories = () => {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         setCategoryName('');
         setShowAddModal(false);
@@ -166,7 +168,7 @@ const Categories = () => {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         setCategoryName('');
         setEditingCategory(null);
@@ -188,7 +190,7 @@ const Categories = () => {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         fetchCategories();
       } else {
@@ -204,15 +206,15 @@ const Categories = () => {
     if (!window.confirm('Are you sure you want to archive this category? It will be hidden from POS/Terminal and Inventory filters.')) {
       return;
     }
-    
+
     try {
       // Archive the category (set status to inactive) instead of deleting
       const response = await fetch(`http://localhost:5000/api/categories/${id}/archive`, {
         method: 'PATCH'
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         fetchCategories();
       } else {
@@ -242,17 +244,17 @@ const Categories = () => {
       return false;
     }
     const matchesSearch = category.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === 'All' || 
+    const matchesFilter = filterStatus === 'All' ||
       (filterStatus === 'Active' && category.status === 'active') ||
       (filterStatus === 'Archived' && category.status === 'inactive');
     return matchesSearch && matchesFilter;
   });
 
   return (
-    <div className="p-8 min-h-screen" style={{ backgroundColor: '#F5F5F5' }}>
-      <Header 
+    <div className={`p-8 min-h-screen ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-[#F5F5F5]'}`}>
+      <Header
         pageName="Categories"
-        profileBackground="bg-gray-100"
+        profileBackground={theme === 'dark' ? 'bg-[#2A2724]' : 'bg-gray-100'}
         showBorder={false}
         userName={currentUser?.name || 'Owner'}
         userRole="Owner"
@@ -270,7 +272,10 @@ const Categories = () => {
               placeholder="Search For..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-[500px] h-11 pl-14 pr-4 border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent rounded-xl"
+              className={`w-[500px] h-11 pl-14 pr-4 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent transition-colors ${theme === 'dark'
+                  ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-400'
+                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                }`}
             />
           </div>
 
@@ -278,33 +283,30 @@ const Categories = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setFilterStatus('All')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                filterStatus === 'All'
-                  ? 'text-white shadow-md'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              className={`px-6 py-2 rounded-lg font-medium transition-all ${filterStatus === 'All'
+                ? 'text-white shadow-md'
+                : theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               style={filterStatus === 'All' ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' } : {}}
             >
               All
             </button>
             <button
               onClick={() => setFilterStatus('Active')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                filterStatus === 'Active'
-                  ? 'text-white shadow-md'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              className={`px-6 py-2 rounded-lg font-medium transition-all ${filterStatus === 'Active'
+                ? 'text-white shadow-md'
+                : theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               style={filterStatus === 'Active' ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' } : {}}
             >
               Active
             </button>
             <button
               onClick={() => setFilterStatus('Archived')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                filterStatus === 'Archived'
-                  ? 'text-white shadow-md'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              className={`px-6 py-2 rounded-lg font-medium transition-all ${filterStatus === 'Archived'
+                ? 'text-white shadow-md'
+                : theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               style={filterStatus === 'Archived' ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' } : {}}
             >
               Archived
@@ -341,12 +343,13 @@ const Categories = () => {
           {filteredCategories.map((category) => (
             <div
               key={category._id}
-              className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+              className={`rounded-xl shadow-lg border overflow-hidden transition-colors ${theme === 'dark' ? 'bg-[#2A2724] border-[#4A4037]' : 'bg-white border-gray-200'
+                }`}
             >
               <div className="flex">
                 {/* Left Side - Category Name */}
                 <div className="flex-1 p-4">
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">
+                  <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
                     {category.name}
                   </h3>
                 </div>
@@ -357,20 +360,18 @@ const Categories = () => {
                 {/* Right Side - Details */}
                 <div className="flex-1 p-4">
                   <div className="mb-2">
-                    <p className="text-2xl font-bold text-gray-800">{category.productCount || 0}</p>
-                    <p className="text-xs text-gray-600">Products in category</p>
+                    <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>{category.productCount || 0}</p>
+                    <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Products in category</p>
                   </div>
 
                   {/* Status Indicator */}
                   <div className="flex items-center gap-2 mb-2">
                     <div
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        category.status === 'active' ? 'bg-green-500' : 'bg-gray-400'
-                      }`}
+                      className={`w-2.5 h-2.5 rounded-full ${category.status === 'active' ? 'bg-green-500' : 'bg-gray-400'
+                        }`}
                     ></div>
-                    <span className={`text-xs font-medium ${
-                      category.status === 'active' ? 'text-green-600' : 'text-gray-500'
-                    }`}>
+                    <span className={`text-xs font-medium ${category.status === 'active' ? 'text-green-600' : 'text-gray-500'
+                      }`}>
                       {category.status === 'active' ? 'Active' : 'Inactive'}
                     </span>
                   </div>
@@ -379,7 +380,10 @@ const Categories = () => {
                   <div className="flex items-center gap-2 mt-2">
                     <button
                       onClick={() => handleViewProducts(category)}
-                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                      className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${theme === 'dark'
+                          ? 'bg-[#3A3734] text-gray-300 hover:bg-[#4A4440]'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
                     >
                       View Products
                     </button>
@@ -417,10 +421,10 @@ const Categories = () => {
       {/* Add Category Modal */}
       {showAddModal && (
         <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className={`rounded-xl p-6 w-full max-w-md ${theme === 'dark' ? 'bg-[#1E1B18] text-white' : 'bg-white text-gray-900'}`}>
             <h2 className="text-2xl font-bold mb-4">Add Category</h2>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                 Category Name
               </label>
               <input
@@ -430,7 +434,10 @@ const Categories = () => {
                   setCategoryName(e.target.value);
                   setError('');
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
+                    ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-400'
+                    : 'bg-white border-gray-300 text-gray-900'
+                  }`}
                 placeholder="Enter category name"
                 autoFocus
               />
@@ -443,7 +450,10 @@ const Categories = () => {
                   setCategoryName('');
                   setError('');
                 }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                className={`px-4 py-2 rounded-lg transition-colors ${theme === 'dark'
+                    ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
               >
                 Cancel
               </button>
@@ -462,10 +472,10 @@ const Categories = () => {
       {/* Edit Category Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className={`rounded-xl p-6 w-full max-w-md ${theme === 'dark' ? 'bg-[#1E1B18] text-white' : 'bg-white text-gray-900'}`}>
             <h2 className="text-2xl font-bold mb-4">Edit Category</h2>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                 Category Name
               </label>
               <input
@@ -475,7 +485,10 @@ const Categories = () => {
                   setCategoryName(e.target.value);
                   setError('');
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65]"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
+                    ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-400'
+                    : 'bg-white border-gray-300 text-gray-900'
+                  }`}
                 placeholder="Enter category name"
                 autoFocus
               />
@@ -489,7 +502,10 @@ const Categories = () => {
                   setCategoryName('');
                   setError('');
                 }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                className={`px-4 py-2 rounded-lg transition-colors ${theme === 'dark'
+                    ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
               >
                 Cancel
               </button>

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { FaTimes } from 'react-icons/fa';
+import { useTheme } from '../../context/ThemeContext';
 
 const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
+  const { theme } = useTheme();
   const [formData, setFormData] = useState({
     discountName: '',
     discountCode: '',
@@ -63,16 +65,16 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4 backdrop-blur-sm">
-      <div         className="bg-white rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+      <div className={`rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`}>
         <div
           className="h-6"
-          style={{ 
+          style={{
             background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)'
           }}
         />
-        
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-black">Create New Discount</h2>
+
+        <div className={`px-6 py-4 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+          <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Create New Discount</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -85,11 +87,11 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
           <div className="p-6">
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <h3 className="text-lg font-bold text-black mb-4">Basic Info</h3>
-                
+                <h3 className={`text-lg font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Basic Info</h3>
+
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       Discount Name
                     </label>
                     <input
@@ -98,13 +100,16 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                       value={formData.discountName}
                       onChange={handleChange}
                       placeholder="e.g ANNIVERSARY SALE"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                        ? 'bg-[#1E1B18] border-gray-600 text-white placeholder-gray-500'
+                        : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       <span>Discount Code</span>
                       <span className="ml-2 text-xs text-gray-400 font-normal">Optional</span>
                     </label>
@@ -114,12 +119,15 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                       value={formData.discountCode}
                       onChange={handleChange}
                       placeholder="e.g DRESS10"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                          ? 'bg-[#1E1B18] border-gray-600 text-white placeholder-gray-500'
+                          : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       Discount Type
                     </label>
                     <div className="flex gap-6">
@@ -132,7 +140,7 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                           onChange={handleChange}
                           className="w-4 h-4 text-[#AD7F65] focus:ring-[#AD7F65]"
                         />
-                        <span className="text-sm text-gray-700">Percentage</span>
+                        <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Percentage</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -143,13 +151,13 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                           onChange={handleChange}
                           className="w-4 h-4 text-[#AD7F65] focus:ring-[#AD7F65]"
                         />
-                        <span className="text-sm text-gray-700">Fixed Amount</span>
+                        <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Fixed Amount</span>
                       </label>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       Discount Value
                     </label>
                     <div className="flex items-center gap-2">
@@ -159,17 +167,20 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                         value={formData.discountValue}
                         onChange={handleChange}
                         placeholder="e.g 15"
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                        className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                          ? 'bg-[#1E1B18] border-gray-600 text-white placeholder-gray-500'
+                          : 'bg-white border-gray-300 text-gray-900'
+                          }`}
                         required
                       />
-                      <span className="text-sm font-medium text-black">
+                      <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-black'}`}>
                         {formData.discountType === 'percentage' ? '% OFF' : '₱ OFF'}
                       </span>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       Applies to
                     </label>
                     <div className="space-y-2">
@@ -182,7 +193,7 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                           onChange={handleChange}
                           className="w-4 h-4 text-[#AD7F65] focus:ring-[#AD7F65]"
                         />
-                        <span className="text-sm text-gray-700">All Products</span>
+                        <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>All Products</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -193,7 +204,7 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                           onChange={handleChange}
                           className="w-4 h-4 text-[#AD7F65] focus:ring-[#AD7F65]"
                         />
-                        <span className="text-sm text-gray-700">Specific Category</span>
+                        <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Specific Category</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -204,19 +215,22 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                           onChange={handleChange}
                           className="w-4 h-4 text-[#AD7F65] focus:ring-[#AD7F65]"
                         />
-                        <span className="text-sm text-gray-700">Specific Products</span>
+                        <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Specific Products</span>
                       </label>
                     </div>
                     {formData.appliesTo === 'category' && (
                       <div className="mt-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                           Select Category <span className="text-red-500">*</span>
                         </label>
                         <select
                           name="category"
                           value={formData.category}
                           onChange={handleChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                          className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                            ? 'bg-[#1E1B18] border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900'
+                            }`}
                           required={formData.appliesTo === 'category'}
                         >
                           <option value="">Select a category</option>
@@ -229,7 +243,7 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       Validity Period
                     </label>
                     <div className="grid grid-cols-2 gap-3 mb-2">
@@ -241,7 +255,10 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                           value={formData.validFrom}
                           onChange={handleChange}
                           disabled={formData.noExpiration}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed ${theme === 'dark'
+                            ? 'bg-[#1E1B18] border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900 disabled:bg-gray-100'
+                            }`}
                         />
                       </div>
                       <div>
@@ -252,7 +269,10 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                           value={formData.validUntil}
                           onChange={handleChange}
                           disabled={formData.noExpiration}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed ${theme === 'dark'
+                            ? 'bg-[#1E1B18] border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900 disabled:bg-gray-100'
+                            }`}
                         />
                       </div>
                     </div>
@@ -264,18 +284,18 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                         onChange={handleChange}
                         className="w-4 h-4 text-[#AD7F65] rounded focus:ring-[#AD7F65]"
                       />
-                      <span className="text-sm text-gray-700">No expiration date</span>
+                      <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>No expiration date</span>
                     </label>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h3 className="text-lg font-bold text-black mb-4">Advanced Option</h3>
-                
+                <h3 className={`text-lg font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Advanced Option</h3>
+
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       <span>Minimum Purchase Amount</span>
                       <span className="ml-2 text-xs text-gray-400 font-normal">Optional</span>
                     </label>
@@ -294,7 +314,7 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       <span>Maximum Purchase Amount</span>
                       <span className="ml-2 text-xs text-gray-400 font-normal">Optional</span>
                     </label>
@@ -313,7 +333,7 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       <span>Usage Limit</span>
                       <span className="ml-2 text-xs text-gray-400 font-normal">Optional</span>
                     </label>
@@ -323,13 +343,16 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                       value={formData.usageLimit}
                       onChange={handleChange}
                       min="0"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                        ? 'bg-[#1E1B18] border-gray-600 text-white'
+                        : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                     />
                     <p className="text-xs text-gray-400 mt-1">Total number of times this discount can be used</p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       Description / Notes
                     </label>
                     <textarea
@@ -338,7 +361,10 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                       onChange={handleChange}
                       placeholder="Notes about this discount..."
                       rows="4"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent resize-none"
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent resize-none ${theme === 'dark'
+                        ? 'bg-[#1E1B18] border-gray-600 text-white placeholder-gray-500'
+                        : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                     />
                   </div>
                 </div>
@@ -346,11 +372,11 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
             </div>
           </div>
 
-          <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+          <div className={`px-6 py-4 border-t flex justify-end ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
             <button
               type="submit"
               className="px-8 py-3 text-white rounded-lg font-bold text-lg shadow-md hover:shadow-lg transition-all"
-              style={{ 
+              style={{
                 background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)'
               }}
             >

@@ -7,6 +7,7 @@ import qrIcon from '../../assets/qr.png';
 import RemoveItemPinModal from './RemoveItemPinModal';
 import VoidTransactionModal from './VoidTransactionModal';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 
 const OrderSummary = ({
   cart,
@@ -26,6 +27,7 @@ const OrderSummary = ({
   onOpenDiscountModal,
   onSelectDiscount
 }) => {
+  const { theme } = useTheme();
   const { currentUser } = useAuth();
   const userId = currentUser?._id || currentUser?.id || currentUser?.email || 'guest';
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -39,7 +41,7 @@ const OrderSummary = ({
   const isProcessingVoidRef = useRef(false);
   // Track pending quantity changes per item (key: item._id + selectedSize)
   const [pendingQuantities, setPendingQuantities] = useState({});
-  
+
   const handleProceed = () => {
     if (selectedPaymentMethod === 'cash' && onCashPayment) {
       onCashPayment();
@@ -71,7 +73,7 @@ const OrderSummary = ({
   const handleMinusClick = (item) => {
     const key = getItemKey(item);
     const currentPending = pendingQuantities[key] !== undefined ? pendingQuantities[key] : item.quantity;
-    
+
     if (currentPending > 1) {
       setPendingQuantities(prev => ({
         ...prev,
@@ -84,7 +86,7 @@ const OrderSummary = ({
   const handlePlusClickPending = (item) => {
     const key = getItemKey(item);
     const currentPending = pendingQuantities[key] !== undefined ? pendingQuantities[key] : item.quantity;
-    
+
     // Check max stock
     let maxQty = item.currentStock;
     if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
@@ -93,7 +95,7 @@ const OrderSummary = ({
         ? sizeData.quantity
         : (typeof sizeData === 'number' ? sizeData : 0);
     }
-    
+
     if (!maxQty || currentPending < maxQty) {
       setPendingQuantities(prev => ({
         ...prev,
@@ -116,7 +118,7 @@ const OrderSummary = ({
   const handleConfirmPending = (item) => {
     const key = getItemKey(item);
     const pendingQty = pendingQuantities[key];
-    
+
     if (pendingQty < item.quantity) {
       // Reducing quantity - need PIN verification for void
       const voidQuantity = item.quantity - pendingQty;
@@ -183,7 +185,7 @@ const OrderSummary = ({
       });
 
       const data = await response.json();
-      
+
       if (!data.success) {
         console.error('Failed to record void transaction:', data.message);
         // Still proceed with removing the item even if logging fails
@@ -210,7 +212,7 @@ const OrderSummary = ({
         });
 
         const voidLogData = await voidLogResponse.json();
-        
+
         if (!voidLogData.success) {
           console.error('Failed to create void log:', voidLogData.message);
         }
@@ -226,7 +228,7 @@ const OrderSummary = ({
         // Update to the new quantity
         updateQuantity(itemToRemove, newQuantity);
       }
-      
+
       // Clear pending quantity for this item
       const key = getItemKey(itemToRemove);
       setPendingQuantities(prev => {
@@ -296,7 +298,7 @@ const OrderSummary = ({
       console.log('[OrderSummary] Already processing void, skipping');
       return;
     }
-    
+
     if (!itemsToVoid || itemsToVoid.length === 0) {
       setIsRemoveModalOpen(false);
       setItemsToVoid([]);
@@ -355,7 +357,7 @@ const OrderSummary = ({
       });
 
       const data = await response.json();
-      
+
       if (!data.success) {
         console.error('Failed to record void transaction:', data.message);
       }
@@ -381,7 +383,7 @@ const OrderSummary = ({
         });
 
         const voidLogData = await voidLogResponse.json();
-        
+
         if (!voidLogData.success) {
           console.error('Failed to create void log:', voidLogData.message);
         }
@@ -421,11 +423,11 @@ const OrderSummary = ({
 
     try {
       setApplyingDiscount(true);
-      
+
       // Fetch all discounts
       const response = await fetch('http://localhost:5000/api/discounts');
       const data = await response.json();
-      
+
       if (!data.success || !Array.isArray(data.data)) {
         alert('Failed to fetch discounts. Please try again.');
         return;
@@ -459,18 +461,17 @@ const OrderSummary = ({
     }
   };
   return (
-    <div className="h-full bg-white rounded-[22px] border border-gray-200 flex flex-col" style={{ boxShadow: '5px 0 15px rgba(0,0,0,0.08), 0 7px 17px rgba(0,0,0,0.05)' }}>
+    <div className={`h-full rounded-[22px] border flex flex-col ${theme === 'dark' ? 'bg-[#1E1B18] border-gray-700' : 'bg-white border-gray-200'}`} style={{ boxShadow: '5px 0 15px rgba(0,0,0,0.08), 0 7px 17px rgba(0,0,0,0.05)' }}>
       <div className="px-6 py-5 flex items-center justify-between">
         <div className="w-8"></div> {/* Spacer for centering */}
-        <h2 className="text-xl font-bold text-center">Order Summary</h2>
+        <h2 className={`text-xl font-bold text-center ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Order Summary</h2>
         <button
           onClick={handleVoidButtonClick}
           disabled={cart.length === 0}
-          className={`w-8 h-8 flex items-center justify-center transition-all ${
-            cart.length === 0
+          className={`w-8 h-8 flex items-center justify-center transition-all ${cart.length === 0
               ? 'text-gray-300 cursor-not-allowed'
               : 'text-red-500 hover:text-red-700'
-          }`}
+            }`}
           title="Void Transaction"
         >
           <HiDocumentRemove className="w-6 h-6" />
@@ -488,135 +489,136 @@ const OrderSummary = ({
               const displayQty = getDisplayQuantity(item);
               const hasPending = hasPendingChange(item);
               const isReducing = hasPending && displayQty < item.quantity;
-              
+
               return (
-              <div key={item._id || item.productId || `cart-item-${index}`} className={`relative bg-white rounded-xl border shadow-[0_3px_8px_rgba(0,0,0,0.04)] p-3 ${hasPending ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 bg-gray-100 rounded-lg shrink-0 overflow-hidden">
-                    {item.itemImage && item.itemImage.trim() !== '' ? (
-                      <img 
-                        src={item.itemImage} 
-                        alt={item.itemName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <MdCategory className="text-2xl text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium text-sm mb-1 pr-4">
-                      {item.itemName}{item.variant ? ` (${item.variant})` : ''}
-                    </h3>
-                    <p className="text-xs text-gray-500 mb-2">
-                      SKU: {item.sku}<br />
-                      Size: {item.selectedSize || item.size || 'N/A'}<br />
-                      Color: {item.selectedVariation || item.variant || 'N/A'}
-                    </p>
-                    <p className="text-sm font-bold text-[#AD7F65]">
-                      PHP {((item.itemPrice || 0) * displayQty).toFixed(2)}
-                    </p>
-                    {displayQty > 1 && (
-                      <p className="text-xs text-gray-400">
-                        ₱{(item.itemPrice || 0).toFixed(2)} × {displayQty}
-                      </p>
-                    )}
-                    {hasPending && isReducing && (
-                      <p className="text-xs text-orange-600 mt-1">
-                        Voiding {item.quantity - displayQty} item(s)
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end justify-end gap-2">
-                    <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleMinusClick(item)}
-                      disabled={displayQty <= 1}
-                      className={`w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-all ${
-                        displayQty <= 1
-                          ? 'bg-gray-300 text-white cursor-not-allowed'
-                          : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
-                      }`}
-                    >
-                      <FaMinus className="text-[10px]" />
-                    </button>
-                    <span className={`font-semibold min-w-[18px] text-center text-sm ${hasPending ? 'text-orange-600' : 'text-gray-800'}`}>
-                      {displayQty}
-                    </span>
-                    <button
-                      onClick={() => handlePlusClickPending(item)}
-                      className={`w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-all ${
-                        (() => {
-                          if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
-                            const sizeData = item.sizes[item.selectedSize];
-                            const maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
-                              ? sizeData.quantity
-                              : (typeof sizeData === 'number' ? sizeData : 0);
-                            return displayQty >= maxQty;
-                          }
-                          return false;
-                        })()
-                          ? 'bg-gray-300 text-white cursor-not-allowed'
-                          : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
-                      }`}
-                      disabled={
-                        (() => {
-                          if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
-                            const sizeData = item.sizes[item.selectedSize];
-                            const maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
-                              ? sizeData.quantity
-                              : (typeof sizeData === 'number' ? sizeData : 0);
-                            return displayQty >= maxQty;
-                          }
-                          return false;
-                        })()
-                      }
-                    >
-                      <FaPlus className="text-[10px]" />
-                    </button>
+                <div key={item._id || item.productId || `cart-item-${index}`} className={`relative rounded-xl border shadow-[0_3px_8px_rgba(0,0,0,0.04)] p-3 ${hasPending
+                    ? (theme === 'dark' ? 'border-orange-700 bg-orange-900/20' : 'border-orange-300 bg-orange-50')
+                    : (theme === 'dark' ? 'bg-[#2A2724] border-gray-700' : 'bg-white border-gray-200')
+                  }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-16 h-16 rounded-lg shrink-0 overflow-hidden ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-gray-100'}`}>
+                      {item.itemImage && item.itemImage.trim() !== '' ? (
+                        <img
+                          src={item.itemImage}
+                          alt={item.itemName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <MdCategory className="text-2xl text-gray-400" />
+                        </div>
+                      )}
                     </div>
-                    {/* Confirm/Cancel buttons when there's a pending change */}
-                    {hasPending && (
-                      <div className="flex items-center gap-1 mt-1">
+                    <div className="flex-1">
+                      <h3 className={`font-medium text-sm mb-1 pr-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {item.itemName}{item.variant ? ` (${item.variant})` : ''}
+                      </h3>
+                      <p className={`text-xs mb-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        SKU: {item.sku}<br />
+                        Size: {item.selectedSize || item.size || 'N/A'}<br />
+                        Color: {item.selectedVariation || item.variant || 'N/A'}
+                      </p>
+                      <p className="text-sm font-bold text-[#AD7F65]">
+                        PHP {((item.itemPrice || 0) * displayQty).toFixed(2)}
+                      </p>
+                      {displayQty > 1 && (
+                        <p className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+                          ₱{(item.itemPrice || 0).toFixed(2)} × {displayQty}
+                        </p>
+                      )}
+                      {hasPending && isReducing && (
+                        <p className="text-xs text-orange-600 mt-1">
+                          Voiding {item.quantity - displayQty} item(s)
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end justify-end gap-2">
+                      <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleCancelPending(item)}
-                          className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-all"
+                          onClick={() => handleMinusClick(item)}
+                          disabled={displayQty <= 1}
+                          className={`w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-all ${displayQty <= 1
+                              ? 'bg-gray-300 text-white cursor-not-allowed'
+                              : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
+                            }`}
                         >
-                          Cancel
+                          <FaMinus className="text-[10px]" />
                         </button>
+                        <span className={`font-semibold min-w-[18px] text-center text-sm ${hasPending ? 'text-orange-600' : (theme === 'dark' ? 'text-white' : 'text-gray-800')}`}>
+                          {displayQty}
+                        </span>
                         <button
-                          onClick={() => handleConfirmPending(item)}
-                          className="px-2 py-1 text-xs bg-[#AD7F65] text-white rounded hover:bg-[#8B5F45] transition-all"
+                          onClick={() => handlePlusClickPending(item)}
+                          className={`w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-all ${(() => {
+                              if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
+                                const sizeData = item.sizes[item.selectedSize];
+                                const maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
+                                  ? sizeData.quantity
+                                  : (typeof sizeData === 'number' ? sizeData : 0);
+                                return displayQty >= maxQty;
+                              }
+                              return false;
+                            })()
+                              ? 'bg-gray-300 text-white cursor-not-allowed'
+                              : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
+                            }`}
+                          disabled={
+                            (() => {
+                              if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
+                                const sizeData = item.sizes[item.selectedSize];
+                                const maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
+                                  ? sizeData.quantity
+                                  : (typeof sizeData === 'number' ? sizeData : 0);
+                                return displayQty >= maxQty;
+                              }
+                              return false;
+                            })()
+                          }
                         >
-                          Confirm
+                          <FaPlus className="text-[10px]" />
                         </button>
                       </div>
-                    )}
+                      {/* Confirm/Cancel buttons when there's a pending change */}
+                      {hasPending && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <button
+                            onClick={() => handleCancelPending(item)}
+                            className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-all"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleConfirmPending(item)}
+                            className="px-2 py-1 text-xs bg-[#AD7F65] text-white rounded hover:bg-[#8B5F45] transition-all"
+                          >
+                            Confirm
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
+              );
             })}
           </div>
         )}
       </div>
 
-      <div className="px-6 py-6  bg-white">
+      <div className={`px-6 py-6 ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-white'}`}>
         <div className="mb-6">
           <label className="block text-xs font-semibold text-[#8B7355] mb-2">Discount</label>
-          
+
           {/* Display applied discounts */}
           {selectedDiscounts.length > 0 && (
             <div className="space-y-2 mb-3">
               {selectedDiscounts.map((discount) => (
-                <div key={discount._id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-[#d6c1b5]">
+                <div key={discount._id} className={`flex items-center gap-2 p-2 rounded-lg border ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-gray-50 border-[#d6c1b5]'}`}>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <FaTag className="text-[#AD7F65] text-sm" />
-                      <span className="text-sm font-medium text-gray-800">{discount.title}</span>
+                      <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{discount.title}</span>
                     </div>
-                    <div className="text-xs text-gray-600 mt-0.5">
+                    <div className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                       {discount.discountValue}
                     </div>
                   </div>
@@ -631,7 +633,7 @@ const OrderSummary = ({
               ))}
             </div>
           )}
-          
+
           {/* Always show discount input to add more discounts */}
           <div className="flex items-center gap-2">
             <input
@@ -644,11 +646,14 @@ const OrderSummary = ({
                   applyDiscountCode();
                 }
               }}
-              className="flex-1 px-4 py-2 rounded-lg border border-[#d6c1b5] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
+              className={`flex-1 px-4 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                  ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-500'
+                  : 'bg-white border-[#d6c1b5] text-gray-900'
+                }`}
             />
             <button
               onClick={onOpenDiscountModal}
-              className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-all"
+              className={`p-2 rounded-lg transition-all ${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-[#322f2c]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               title="Browse discounts"
             >
               <FaTag className="w-4 h-4" />
@@ -666,16 +671,16 @@ const OrderSummary = ({
 
         <div className="space-y-2 mb-6 text-xs">
           <div className="flex justify-between">
-            <span className="text-gray-600">Subtotal</span>
-            <span className="font-medium text-gray-800">PHP {calculateSubtotal().toFixed(2)}</span>
+            <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Subtotal</span>
+            <span className={`font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>PHP {calculateSubtotal().toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Discount</span>
-            <span className="font-medium text-gray-800">PHP {calculateDiscount().toFixed(2)}</span>
+            <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Discount</span>
+            <span className={`font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>PHP {calculateDiscount().toFixed(2)}</span>
           </div>
-          <div className="border-t border-gray-300 my-3"></div>
+          <div className={`border-t my-3 ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'}`}></div>
           <div className="flex justify-between">
-            <span className="text-sm font-bold text-black">Total</span>
+            <span className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Total</span>
             <span className="text-sm font-bold" style={{ color: 'rgba(255, 133, 88, 1)' }}>PHP {calculateTotal().toFixed(2)}</span>
           </div>
         </div>
@@ -684,25 +689,23 @@ const OrderSummary = ({
           <div className="flex gap-2 justify-center">
             <button
               onClick={() => setSelectedPaymentMethod('cash')}
-              className={`w-24 flex flex-col items-center justify-center py-2 rounded-lg border-2 transition-all ${
-                selectedPaymentMethod === 'cash'
+              className={`w-24 flex flex-col items-center justify-center py-2 rounded-lg border-2 transition-all ${selectedPaymentMethod === 'cash'
                   ? 'border-[#AD7F65] bg-[#f5f0ed]'
-                  : 'border-gray-300 bg-white hover:border-gray-400'
-              }`}
+                  : (theme === 'dark' ? 'border-gray-600 bg-[#2A2724] hover:border-gray-500' : 'border-gray-300 bg-white hover:border-gray-400')
+                }`}
             >
               <img src={cashIcon} alt="Cash" className="w-7 h-7 mb-1" />
-              <span className="text-xs font-medium text-gray-700">Cash</span>
+              <span className={`text-xs font-medium ${selectedPaymentMethod === 'cash' ? 'text-gray-900' : (theme === 'dark' ? 'text-gray-300' : 'text-gray-700')}`}>Cash</span>
             </button>
             <button
               onClick={() => setSelectedPaymentMethod('qr')}
-              className={`w-24 flex flex-col items-center justify-center py-0 rounded-lg border-2 transition-all ${
-                selectedPaymentMethod === 'qr'
+              className={`w-24 flex flex-col items-center justify-center py-0 rounded-lg border-2 transition-all ${selectedPaymentMethod === 'qr'
                   ? 'border-[#AD7F65] bg-[#f5f0ed]'
-                  : 'border-gray-300 bg-white hover:border-gray-400'
-              }`}
+                  : (theme === 'dark' ? 'border-gray-600 bg-[#2A2724] hover:border-gray-500' : 'border-gray-300 bg-white hover:border-gray-400')
+                }`}
             >
               <img src={qrIcon} alt="QR Code" className="w-12 h-12 mb-4 " />
-              <span className=" absolute text-xs font-medium text-gray-700 translate-y-4">Gcash</span>
+              <span className={`absolute text-xs font-medium translate-y-4 ${selectedPaymentMethod === 'qr' ? 'text-gray-900' : (theme === 'dark' ? 'text-gray-300' : 'text-gray-700')}`}>Gcash</span>
             </button>
           </div>
         </div>

@@ -10,7 +10,8 @@ const {
   getTransactionStats,
   getDashboardStats,
   getTopSellingProducts,
-  getSalesOverTime
+  getSalesOverTime,
+  getSalesByCategory
 } = require('../controllers/transactionController');
 
 router.get('/', getAllTransactions);
@@ -18,6 +19,7 @@ router.get('/stats', getTransactionStats);
 router.get('/dashboard/stats', getDashboardStats);
 router.get('/top-selling', getTopSellingProducts);
 router.get('/sales-over-time', getSalesOverTime);
+router.get('/sales-by-category', getSalesByCategory);
 router.post('/', createTransaction);
 router.get('/:id', getTransactionById);
 router.put('/:id', updateTransaction);
