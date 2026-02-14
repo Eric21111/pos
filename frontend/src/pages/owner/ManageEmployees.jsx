@@ -1,7 +1,6 @@
 import { memo, useEffect, useState } from 'react';
-import { FaEllipsisV, FaPlus, FaSearch } from 'react-icons/fa';
+import { FaEdit, FaPlus, FaRedo, FaSearch, FaTrash, FaUndo } from 'react-icons/fa';
 import defaultAvatar from '../../assets/default.jpeg';
-import filterIcon from '../../assets/filter.svg';
 import Pagination from '../../components/inventory/Pagination';
 import SuccessModal from '../../components/inventory/SuccessModal';
 import AddEmployeeModal from '../../components/owner/AddEmployeeModal';
@@ -18,7 +17,7 @@ const ManageEmployees = () => {
   const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [openDropdown, setOpenDropdown] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('All'); // All, Active, Archived
   const [viewingEmployee, setViewingEmployee] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -38,9 +37,6 @@ const ManageEmployees = () => {
   const [newEmployeePin, setNewEmployeePin] = useState('');
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [roleFilter, setRoleFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
   const itemsPerPage = 12;
 
   // Fetch employees from database
@@ -73,19 +69,16 @@ const ManageEmployees = () => {
 
   const filteredEmployees = employees.filter(employee => {
     // Search filter
-    const matchesSearch = employee.name.toLowerCase().includes(searchQuery.toLowerCase());
-
-    // Role filter
-    const matchesRole = roleFilter === 'All' || employee.role === roleFilter;
+    const matchesSearch = employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (employee.role && employee.role.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Status filter
-    const matchesStatus = statusFilter === 'All' || employee.status === statusFilter;
+    let matchesStatus = true;
+    if (filterStatus === 'Active') matchesStatus = employee.status === 'Active';
+    if (filterStatus === 'Archived') matchesStatus = employee.status === 'Inactive'; // Assuming Inactive = Archived
 
-    return matchesSearch && matchesRole && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
-
-  // Get unique roles from employees for filter options
-  const availableRoles = ['All', ...new Set(employees.map(emp => emp.role).filter(Boolean))];
 
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
   const paginatedEmployees = filteredEmployees.slice(
@@ -93,50 +86,14 @@ const ManageEmployees = () => {
     currentPage * itemsPerPage
   );
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Handle employee action dropdown
-      if (openDropdown !== null) {
-        const buttonElement = document.getElementById(`dropdown-btn-${openDropdown}`);
-        const dropdownElement = document.getElementById(`dropdown-menu-${openDropdown}`);
-
-        if (
-          buttonElement &&
-          dropdownElement &&
-          !buttonElement.contains(event.target) &&
-          !dropdownElement.contains(event.target)
-        ) {
-          setOpenDropdown(null);
-        }
-      }
-
-      // Handle filter dropdown
-      if (showFilterDropdown) {
-        const filterButton = event.target.closest('[data-filter-button]');
-        const filterDropdown = event.target.closest('[data-filter-dropdown]');
-
-        if (!filterButton && !filterDropdown) {
-          setShowFilterDropdown(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [openDropdown, showFilterDropdown]);
-
   const handleViewEmployee = (employee) => {
     setViewingEmployee(employee);
     setShowViewModal(true);
-    setOpenDropdown(null);
   };
 
   const handleEditEmployee = (employee) => {
     setEditingEmployee(employee);
     setShowEditModal(true);
-    setOpenDropdown(null);
   };
 
   const generateRandomPin = () => {
@@ -144,7 +101,6 @@ const ManageEmployees = () => {
   };
 
   const handleResetPin = (employee) => {
-    setOpenDropdown(null);
     setResettingEmployee(employee);
     setShowResetPinModal(true);
   };
@@ -183,7 +139,6 @@ const ManageEmployees = () => {
   };
 
   const handleToggleStatus = (employee) => {
-    setOpenDropdown(null);
     setTogglingEmployee(employee);
     const action = employee.status === 'Active' ? 'disable' : 'enable';
     setToggleAction(action);
@@ -227,7 +182,6 @@ const ManageEmployees = () => {
   const handleDeleteEmployee = (employee) => {
     setDeletingEmployee(employee);
     setShowDeleteModal(true);
-    setOpenDropdown(null);
   };
 
   const confirmDeleteEmployee = async () => {
@@ -262,126 +216,62 @@ const ManageEmployees = () => {
         showBorder={false}
       />
 
-      <div className="mt-6">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="flex shadow-md overflow-hidden" style={{ maxWidth: '400px', width: '100%', borderRadius: '15px' }}>
-              <button
-                type="button"
-                className="px-4 flex items-center justify-center self-stretch"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(173, 127, 101, 1) 0%, rgba(118, 70, 43, 1) 100%)',
-                  borderTopLeftRadius: '15px',
-                  borderBottomLeftRadius: '15px'
-                }}
-              >
-                <FaSearch className="text-white text-sm" />
-              </button>
-
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <div className="relative" style={{ width: '450px' }}>
+              <div className="absolute left-1 top-1/2 transform -translate-y-1/2 w-12 h-9 flex items-center justify-center text-white rounded-lg" style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}>
+                <FaSearch className="text-sm" />
+              </div>
               <input
                 type="text"
-                placeholder="Search by name..."
+                placeholder="Search For..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`flex-1 px-4 py-3 focus:outline-none ${theme === 'dark'
-                    ? 'bg-[#2A2724] text-white placeholder-white'
-                    : 'bg-white text-gray-700 placeholder-gray-400'
+                className={`w-full h-10 pl-16 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
+                  ? 'bg-[#2A2724] border-[#4A4037] text-white placeholder-gray-500'
+                  : 'bg-white border-gray-300 text-gray-900'
                   }`}
-                style={{
-                  borderTopRightRadius: '15px',
-                  borderBottomRightRadius: '15px'
-                }}
               />
             </div>
-            <div className="relative">
+
+            <div className="flex gap-3 ml-4">
               <button
-                data-filter-button
-                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`p-2 border rounded-lg transition-colors ${(roleFilter !== 'All' || statusFilter !== 'All')
-                    ? 'border-[#AD7F65] bg-[#AD7F65]/10'
-                    : theme === 'dark'
-                      ? 'border-gray-600 hover:bg-[#352F2A]'
-                      : 'border-gray-300 hover:bg-gray-50'
+                onClick={() => setFilterStatus('All')}
+                className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all shadow-sm border ${filterStatus === 'All'
+                  ? 'bg-white text-[#AD7F65] border-gray-100 border-b-[4px] border-b-[#AD7F65]'
+                  : 'bg-white text-gray-800 border-gray-200 border-b-[4px] border-b-gray-200 hover:bg-gray-50'
                   }`}
               >
-                <img src={filterIcon} alt="Filter" className={`w-5 h-5 ${theme === 'dark' ? 'brightness-0 invert opacity-90' : 'opacity-90'
-                  }`} />
+                All
               </button>
-
-              {showFilterDropdown && (
-                <div data-filter-dropdown className={`absolute top-full left-0 mt-2 w-64 rounded-lg shadow-lg border z-50 p-4 ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-white border-gray-200'
-                  }`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className={`font-semibold ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                      }`}>Filters</h4>
-                    <button
-                      onClick={() => {
-                        setRoleFilter('All');
-                        setStatusFilter('All');
-                      }}
-                      className={`text-xs ${theme === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
-                      Clear All
-                    </button>
-                  </div>
-
-                  {/* Role Filter */}
-                  <div className="mb-4">
-                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                      }`}>Role</label>
-                    <select
-                      value={roleFilter}
-                      onChange={(e) => {
-                        setRoleFilter(e.target.value);
-                        setCurrentPage(1);
-                      }}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-gray-200' : 'border-gray-300'
-                        }`}
-                    >
-                      {availableRoles.map(role => (
-                        <option key={role} value={role}>{role}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Status Filter */}
-                  <div className="mb-3">
-                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                      }`}>Status</label>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => {
-                        setStatusFilter(e.target.value);
-                        setCurrentPage(1);
-                      }}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark' ? 'bg-[#1E1B18] border-gray-600 text-gray-200' : 'border-gray-300'
-                        }`}
-                    >
-                      <option value="All">All</option>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={() => setShowFilterDropdown(false)}
-                    className="w-full py-2 text-white rounded-lg text-sm font-medium"
-                    style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
-                  >
-                    Apply Filters
-                  </button>
-                </div>
-              )}
+              <button
+                onClick={() => setFilterStatus('Active')}
+                className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all shadow-sm border ${filterStatus === 'Active'
+                  ? 'bg-white text-[#AD7F65] border-gray-100 border-b-[4px] border-b-[#AD7F65]'
+                  : 'bg-white text-gray-800 border-gray-200 border-b-[4px] border-b-gray-200 hover:bg-gray-50'
+                  }`}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => setFilterStatus('Archived')}
+                className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all shadow-sm border ${filterStatus === 'Archived'
+                  ? 'bg-white text-[#AD7F65] border-gray-100 border-b-[4px] border-b-[#AD7F65]'
+                  : 'bg-white text-gray-800 border-gray-200 border-b-[4px] border-b-gray-200 hover:bg-gray-50'
+                  }`}
+              >
+                Archived
+              </button>
             </div>
           </div>
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-6 py-2 text-white rounded-lg font-medium hover:opacity-90 transition-all shadow-md"
-            style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+            className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all"
+            style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}
           >
-            <FaPlus className="inline mr-2" />
+            <FaPlus className="w-4 h-4" />
             Add Employee
           </button>
         </div>
@@ -392,151 +282,109 @@ const ManageEmployees = () => {
           </div>
         ) : employees.length === 0 ? (
           <div className={`flex flex-col items-center justify-center py-20 rounded-2xl shadow-inner border border-dashed ${theme === 'dark'
-              ? 'bg-[#2A2724] border-gray-600'
-              : 'bg-white border-gray-300'
+            ? 'bg-[#2A2724] border-gray-600'
+            : 'bg-white border-gray-300'
             }`}>
             <p className={`text-2xl font-semibold mb-3 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
               }`}>No accounts yet</p>
-            <p className={`mb-6 text-center max-w-md ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-              }`}>
-              You haven&apos;t added any employees. Click below to create the first account and assign access.
-            </p>
             <button
               onClick={() => setShowAddModal(true)}
               className="px-6 py-3 text-white rounded-lg font-medium hover:opacity-90 transition-all shadow-md"
-              style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+              style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}
             >
               + Add Your First Employee
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-6 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-4">
             {paginatedEmployees.map((employee) => (
               <div
                 key={employee.id}
-                className={`rounded-lg shadow-sm hover:shadow-md transition-shadow relative ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'
-                  }`}
+                className={`rounded-xl shadow-md p-4 flex gap-4 items-center relative transition-all ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`}
               >
-                <div className="overflow-hidden rounded-t-lg">
+                {/* Avatar with Status Dot */}
+                <div className="relative shrink-0">
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200">
+                    <img
+                      src={employee.image}
+                      alt={employee.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div
+                    className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-2 border-white ${employee.status === 'Active' ? 'bg-green-500' : 'bg-red-500'
+                      }`}
+                  ></div>
                 </div>
 
-                {/* Hide 3-dot menu for Owner */}
-                {employee.role !== 'Owner' && (
-                  <div className="absolute top-4 right-4 z-10">
-                    <button
-                      id={`dropdown-btn-${employee.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenDropdown(openDropdown === employee.id ? null : employee.id);
-                      }}
-                      className={theme === 'dark' ? 'text-gray-500 hover:text-gray-300 transition-colors' : 'text-gray-400 hover:text-gray-600 transition-colors'}
-                    >
-                      <FaEllipsisV />
-                    </button>
-
-                    {openDropdown === employee.id && (
-                      <div
-                        id={`dropdown-menu-${employee.id}`}
-                        className={`fixed w-48 rounded-lg border shadow-lg ${theme === 'dark' ? 'bg-[#2A2724] border-gray-600' : 'bg-white border-gray-200'
-                          }`}
-                        style={{
-                          zIndex: 9999,
-                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                          top: `${(document.getElementById(`dropdown-btn-${employee.id}`)?.getBoundingClientRect().top || 0) + 30}px`,
-                          left: `${(document.getElementById(`dropdown-btn-${employee.id}`)?.getBoundingClientRect().left || 0) - 170}px`
-                        }}
-                      >
-                        <button
-                          onClick={() => handleViewEmployee(employee)}
-                          className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 border-b rounded-t-lg ${theme === 'dark'
-                              ? 'hover:bg-[#352F2A] border-gray-600 text-gray-200'
-                              : 'hover:bg-gray-50 text-gray-700'
-                            }`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          View
-                        </button>
-                        <button
-                          onClick={() => handleEditEmployee(employee)}
-                          className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 border-b ${theme === 'dark'
-                              ? 'hover:bg-[#352F2A] border-gray-600 text-gray-200'
-                              : 'hover:bg-gray-50 text-gray-700'
-                            }`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          Update
-                        </button>
-                        <button
-                          onClick={() => handleResetPin(employee)}
-                          className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 border-b text-blue-600 ${theme === 'dark'
-                              ? 'hover:bg-[#352F2A] border-gray-600'
-                              : 'hover:bg-gray-50'
-                            }`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                          </svg>
-                          Reset PIN
-                        </button>
-                        <button
-                          onClick={() => handleToggleStatus(employee)}
-                          className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 rounded-b-lg ${employee.status === 'Active' ? 'text-orange-600' : 'text-green-600'
-                            } ${theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
-                            }`}
-                        >
-                          {employee.status === 'Active' ? (
-                            <>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                              </svg>
-                              Disable
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              Enable
-                            </>
-                          )}
-                        </button>
-                      </div>
+                {/* Info & Actions */}
+                <div className="flex-1 min-w-0 flex flex-col justify-between h-full gap-2">
+                  <div>
+                    <h3 className={`font-bold text-lg leading-tight truncate ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      {employee.name}
+                    </h3>
+                    <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {employee.role}
+                    </p>
+                    {employee.contactNumber && (
+                      <p className={`text-xs mt-1 flex items-center gap-1 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+                        📞 {employee.contactNumber}
+                      </p>
+                    )}
+                    {employee.createdAt && (
+                      <p className={`text-xs flex items-center gap-1 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+                        📅 {new Date(employee.createdAt).toLocaleDateString()}
+                      </p>
                     )}
                   </div>
-                )}
 
-                <div className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-30 h-30 rounded-full overflow-hidden shrink-0">
-                      <img
-                        src={employee.image}
-                        alt={employee.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-bold text-base mb-2 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
-                        }`}>
-                        {employee.name}
-                      </h3>
-                      <p className={`text-sm mb-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                        }`}>{employee.role}</p>
-                      <span
-                        className={`inline-block px-3 py-1 rounded text-xs font-medium ${employee.status === 'Active'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
-                          }`}
+                  {employee.role !== 'Owner' && (
+                    <div className="flex items-center gap-2 mt-1">
+                      {/* View Button */}
+                      <button
+                        onClick={() => handleViewEmployee(employee)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex-1 text-center bg-gray-200 text-gray-700 hover:bg-gray-300`}
                       >
-                        {employee.status}
+                        View
+                      </button>
+
+                      {/* Edit Button */}
+                      <button
+                        onClick={() => handleEditEmployee(employee)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#007AFF] text-white hover:bg-blue-600 transition-colors shadow-sm"
+                        title="Edit Details"
+                      >
+                        <FaEdit className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Reset PIN Button */}
+                      <button
+                        onClick={() => handleResetPin(employee)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#10B981] text-white hover:bg-green-600 transition-colors shadow-sm"
+                        title="Reset PIN"
+                      >
+                        <FaRedo className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Archive/Toggle Status Button */}
+                      <button
+                        onClick={() => handleToggleStatus(employee)}
+                        className={`w-8 h-8 flex items-center justify-center rounded-lg text-white hover:opacity-90 transition-colors shadow-sm ${employee.status === 'Active' ? 'bg-[#FFA500]' : 'bg-[#10B981]'
+                          }`}
+                        title={employee.status === 'Active' ? 'Disable Account' : 'Enable Account'}
+                      >
+                        {employee.status === 'Active' ? <FaTrash className="w-3.5 h-3.5" /> : <FaUndo className="w-3.5 h-3.5" />}
+                      </button>
+
+                    </div>
+                  )}
+                  {employee.role === 'Owner' && (
+                    <div className="mt-2">
+                      <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">
+                        Owner Access
                       </span>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             ))}

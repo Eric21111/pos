@@ -182,13 +182,20 @@ const Logs = () => {
 
   const getTypeBadge = (type) => {
     const styles = {
-      'Stock-In': 'bg-green-500 text-white',
-      'Stock-Out': 'bg-red-500 text-white',
-      'Pull-Out': 'bg-orange-500 text-white'
+      'Stock-In': 'bg-green-100 text-green-700',
+      'Stock-Out': 'bg-red-100 text-red-700',
+      'Pull-Out': 'bg-orange-100 text-orange-700'
+    };
+
+    const dotStyles = {
+      'Stock-In': 'bg-green-600',
+      'Stock-Out': 'bg-red-600',
+      'Pull-Out': 'bg-orange-600'
     };
 
     return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${styles[type] || 'bg-gray-500 text-white'}`}>
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${styles[type] || 'bg-gray-100 text-gray-700'}`}>
+        <span className={`w-2 h-2 rounded-full ${dotStyles[type] || 'bg-gray-500'}`}></span>
         {type}
       </span>
     );
