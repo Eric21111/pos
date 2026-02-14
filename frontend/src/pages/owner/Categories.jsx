@@ -1,9 +1,9 @@
-import { useState, useEffect, memo } from 'react';
-import { useTheme } from '../../context/ThemeContext';
+import { memo, useEffect, useState } from 'react';
+import { FaEdit, FaPlus, FaSearch, FaTimes, FaTrash, FaUndo } from 'react-icons/fa';
+import ViewCategoryProductsModal from '../../components/owner/ViewCategoryProductsModal';
 import Header from '../../components/shared/header';
 import { useAuth } from '../../context/AuthContext';
-import { FaSearch, FaPlus, FaEdit, FaTrash, FaUndo } from 'react-icons/fa';
-import ViewCategoryProductsModal from '../../components/owner/ViewCategoryProductsModal';
+import { useTheme } from '../../context/ThemeContext';
 
 const Categories = () => {
   const { currentUser } = useAuth();
@@ -19,6 +19,8 @@ const Categories = () => {
   const [loading, setLoading] = useState(true);
   const [categoryName, setCategoryName] = useState('');
   const [error, setError] = useState('');
+  const [showArchiveCategoryModal, setShowArchiveCategoryModal] = useState(false);
+  const [categoryToArchive, setCategoryToArchive] = useState(null);
 
   // Built-in categories that should always exist
   const builtInCategories = ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods'];
@@ -202,20 +204,25 @@ const Categories = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to archive this category? It will be hidden from POS/Terminal and Inventory filters.')) {
-      return;
-    }
+  const handleDelete = (category) => {
+    setCategoryToArchive(category);
+    setShowArchiveCategoryModal(true);
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!categoryToArchive) return;
 
     try {
       // Archive the category (set status to inactive) instead of deleting
-      const response = await fetch(`http://localhost:5000/api/categories/${id}/archive`, {
+      const response = await fetch(`http://localhost:5000/api/categories/${categoryToArchive._id}/archive`, {
         method: 'PATCH'
       });
 
       const data = await response.json();
 
       if (data.success) {
+        setShowArchiveCategoryModal(false);
+        setCategoryToArchive(null);
         fetchCategories();
       } else {
         alert(data.message || 'Failed to archive category');
@@ -273,8 +280,8 @@ const Categories = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={`w-[500px] h-11 pl-14 pr-4 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent transition-colors ${theme === 'dark'
-                  ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-400'
-                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-400'
+                : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                 }`}
             />
           </div>
@@ -283,31 +290,40 @@ const Categories = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setFilterStatus('All')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${filterStatus === 'All'
-                ? 'text-white shadow-md'
-                : theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all shadow-sm border ${filterStatus === 'All'
+                ? theme === 'dark'
+                  ? 'bg-[#2A2724] text-[#AD7F65] border-[#4A4037] border-b-[4px] border-b-[#AD7F65]'
+                  : 'bg-white text-[#AD7F65] border-gray-100 border-b-[4px] border-b-[#AD7F65]'
+                : theme === 'dark'
+                  ? 'bg-[#2A2724] text-gray-300 border-[#4A4037] border-b-[4px] border-b-[#4A4037] hover:bg-[#3A3734]'
+                  : 'bg-white text-gray-800 border-gray-200 border-b-[4px] border-b-gray-200 hover:bg-gray-50'
                 }`}
-              style={filterStatus === 'All' ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' } : {}}
             >
               All
             </button>
             <button
               onClick={() => setFilterStatus('Active')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${filterStatus === 'Active'
-                ? 'text-white shadow-md'
-                : theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all shadow-sm border ${filterStatus === 'Active'
+                ? theme === 'dark'
+                  ? 'bg-[#2A2724] text-[#AD7F65] border-[#4A4037] border-b-[4px] border-b-[#AD7F65]'
+                  : 'bg-white text-[#AD7F65] border-gray-100 border-b-[4px] border-b-[#AD7F65]'
+                : theme === 'dark'
+                  ? 'bg-[#2A2724] text-gray-300 border-[#4A4037] border-b-[4px] border-b-[#4A4037] hover:bg-[#3A3734]'
+                  : 'bg-white text-gray-800 border-gray-200 border-b-[4px] border-b-gray-200 hover:bg-gray-50'
                 }`}
-              style={filterStatus === 'Active' ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' } : {}}
             >
               Active
             </button>
             <button
               onClick={() => setFilterStatus('Archived')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${filterStatus === 'Archived'
-                ? 'text-white shadow-md'
-                : theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all shadow-sm border ${filterStatus === 'Archived'
+                ? theme === 'dark'
+                  ? 'bg-[#2A2724] text-[#AD7F65] border-[#4A4037] border-b-[4px] border-b-[#AD7F65]'
+                  : 'bg-white text-[#AD7F65] border-gray-100 border-b-[4px] border-b-[#AD7F65]'
+                : theme === 'dark'
+                  ? 'bg-[#2A2724] text-gray-300 border-[#4A4037] border-b-[4px] border-b-[#4A4037] hover:bg-[#3A3734]'
+                  : 'bg-white text-gray-800 border-gray-200 border-b-[4px] border-b-gray-200 hover:bg-gray-50'
                 }`}
-              style={filterStatus === 'Archived' ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' } : {}}
             >
               Archived
             </button>
@@ -339,78 +355,62 @@ const Categories = () => {
           <div className="text-gray-500">No categories found. Create your first category!</div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredCategories.map((category) => (
             <div
               key={category._id}
-              className={`rounded-xl shadow-lg border overflow-hidden transition-colors ${theme === 'dark' ? 'bg-[#2A2724] border-[#4A4037]' : 'bg-white border-gray-200'
-                }`}
+              className={`rounded-xl shadow-lg border overflow-hidden transition-colors ${theme === 'dark' ? 'bg-[#2A2724] border-[#4A4037]' : 'bg-white border-gray-200'} ${category.status === 'inactive' ? 'grayscale opacity-70' : ''}`}
             >
-              <div className="flex">
-                {/* Left Side - Category Name */}
-                <div className="flex-1 p-4">
-                  <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
-                    {category.name}
-                  </h3>
+              <div className="flex flex-col items-center justify-center p-4 text-center h-full">
+                {/* Category Name */}
+                <h3 className={`text-xl font-bold mb-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  {category.name}
+                </h3>
+
+                {/* Product Count */}
+                <div className="mb-4">
+                  <span className={`text-lg font-bold ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>
+                    {category.productCount || 0}
+                  </span>
+                  <span className={`text-xs ml-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Products in category
+                  </span>
                 </div>
 
-                {/* Vertical Separator */}
-                <div className="w-1 bg-[#AD7F65]"></div>
-
-                {/* Right Side - Details */}
-                <div className="flex-1 p-4">
-                  <div className="mb-2">
-                    <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>{category.productCount || 0}</p>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Products in category</p>
-                  </div>
-
-                  {/* Status Indicator */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <div
-                      className={`w-2.5 h-2.5 rounded-full ${category.status === 'active' ? 'bg-green-500' : 'bg-gray-400'
-                        }`}
-                    ></div>
-                    <span className={`text-xs font-medium ${category.status === 'active' ? 'text-green-600' : 'text-gray-500'
-                      }`}>
-                      {category.status === 'active' ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 mt-2">
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 mt-auto">
+                  <button
+                    onClick={() => handleViewProducts(category)}
+                    className={`px-3 py-1.5 rounded-lg transition-colors text-xs font-bold ${theme === 'dark'
+                      ? 'bg-[#3A3734] text-gray-300 hover:bg-[#4A4440]'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                  >
+                    View Products
+                  </button>
+                  {!builtInCategories.includes(category.name) && (
                     <button
-                      onClick={() => handleViewProducts(category)}
-                      className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${theme === 'dark'
-                          ? 'bg-[#3A3734] text-gray-300 hover:bg-[#4A4440]'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
+                      onClick={() => handleEdit(category)}
+                      className="w-8 h-8 flex items-center justify-center bg-[#007AFF] text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
                     >
-                      View Products
+                      <FaEdit className="w-3.5 h-3.5" />
                     </button>
-                    {!builtInCategories.includes(category.name) && (
-                      <button
-                        onClick={() => handleEdit(category)}
-                        className="w-9 h-9 flex items-center justify-center bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                      >
-                        <FaEdit className="w-4 h-4" />
-                      </button>
-                    )}
-                    {category.status === 'active' ? (
-                      <button
-                        onClick={() => handleDelete(category._id)}
-                        className="w-9 h-9 flex items-center justify-center bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                      >
-                        <FaTrash className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleToggleStatus(category._id)}
-                        className="w-9 h-9 flex items-center justify-center bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                      >
-                        <FaUndo className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+                  )}
+                  {category.status === 'active' ? (
+                    <button
+                      onClick={() => handleDelete(category)}
+                      className="w-8 h-8 flex items-center justify-center bg-[#EF4444] text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
+                    >
+                      <FaTrash className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleToggleStatus(category._id)}
+                      className="w-8 h-8 flex items-center justify-center bg-[#10B981] text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm"
+                    >
+                      <FaUndo className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -420,11 +420,32 @@ const Categories = () => {
 
       {/* Add Category Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`rounded-xl p-6 w-full max-w-md ${theme === 'dark' ? 'bg-[#1E1B18] text-white' : 'bg-white text-gray-900'}`}>
-            <h2 className="text-2xl font-bold mb-4">Add Category</h2>
-            <div className="mb-4">
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+        <div className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-2xl p-8 w-full max-w-lg ${theme === 'dark' ? 'bg-[#1E1B18] text-white' : 'bg-white text-gray-900'} relative shadow-2xl transition-all transform scale-100`}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl shadow-lg" style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}>
+                  <FaPlus />
+                </div>
+                <h2 className="text-2xl font-bold">Add New Category</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setCategoryName('');
+                  setError('');
+                }}
+                className={`p-2 rounded-full hover:bg-opacity-10 transition-colors ${theme === 'dark' ? 'hover:bg-white text-gray-400' : 'hover:bg-black text-gray-400'}`}
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="mb-8">
+              <label className={`block text-sm font-semibold mb-2 ml-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                 Category Name
               </label>
               <input
@@ -434,33 +455,36 @@ const Categories = () => {
                   setCategoryName(e.target.value);
                   setError('');
                 }}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
-                    ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-400'
-                    : 'bg-white border-gray-300 text-gray-900'
+                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#AD7F65] transition-all
+                  ${theme === 'dark'
+                    ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-500'
+                    : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 shadow-sm'
                   }`}
-                placeholder="Enter category name"
+                placeholder="eg. Casual Wear"
                 autoFocus
               />
-              {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+              {error && <p className="text-red-500 text-sm mt-2 ml-1 flex items-center gap-1"><FaTimes className="text-xs" /> {error}</p>}
             </div>
-            <div className="flex gap-3 justify-end">
+
+            {/* Footer Buttons */}
+            <div className="flex gap-4 justify-center">
               <button
                 onClick={() => {
                   setShowAddModal(false);
                   setCategoryName('');
                   setError('');
                 }}
-                className={`px-4 py-2 rounded-lg transition-colors ${theme === 'dark'
-                    ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                className={`px-8 py-3 rounded-xl font-bold transition-all transform active:scale-95 ${theme === 'dark'
+                  ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddCategory}
-                className="px-4 py-2 text-white rounded-lg hover:shadow-lg transition-all"
-                style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+                className="px-8 py-3 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all transform active:scale-95 hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}
               >
                 Add Category
               </button>
@@ -471,11 +495,33 @@ const Categories = () => {
 
       {/* Edit Category Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`rounded-xl p-6 w-full max-w-md ${theme === 'dark' ? 'bg-[#1E1B18] text-white' : 'bg-white text-gray-900'}`}>
-            <h2 className="text-2xl font-bold mb-4">Edit Category</h2>
-            <div className="mb-4">
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+        <div className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-2xl p-8 w-full max-w-lg ${theme === 'dark' ? 'bg-[#1E1B18] text-white' : 'bg-white text-gray-900'} relative shadow-2xl transition-all transform scale-100`}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl shadow-lg" style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}>
+                  <FaEdit />
+                </div>
+                <h2 className="text-2xl font-bold">Edit Category</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingCategory(null);
+                  setCategoryName('');
+                  setError('');
+                }}
+                className={`p-2 rounded-full hover:bg-opacity-10 transition-colors ${theme === 'dark' ? 'hover:bg-white text-gray-400' : 'hover:bg-black text-gray-400'}`}
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="mb-8">
+              <label className={`block text-sm font-semibold mb-2 ml-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                 Category Name
               </label>
               <input
@@ -485,16 +531,19 @@ const Categories = () => {
                   setCategoryName(e.target.value);
                   setError('');
                 }}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
-                    ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-400'
-                    : 'bg-white border-gray-300 text-gray-900'
+                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#AD7F65] transition-all
+                  ${theme === 'dark'
+                    ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-500'
+                    : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 shadow-sm'
                   }`}
-                placeholder="Enter category name"
+                placeholder="eg. Casual Wear"
                 autoFocus
               />
-              {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+              {error && <p className="text-red-500 text-sm mt-2 ml-1 flex items-center gap-1"><FaTimes className="text-xs" /> {error}</p>}
             </div>
-            <div className="flex gap-3 justify-end">
+
+            {/* Footer Buttons */}
+            <div className="flex gap-4 justify-center">
               <button
                 onClick={() => {
                   setShowEditModal(false);
@@ -502,17 +551,17 @@ const Categories = () => {
                   setCategoryName('');
                   setError('');
                 }}
-                className={`px-4 py-2 rounded-lg transition-colors ${theme === 'dark'
-                    ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                className={`px-8 py-3 rounded-xl font-bold transition-all transform active:scale-95 ${theme === 'dark'
+                  ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
               >
                 Cancel
               </button>
               <button
                 onClick={handleEditCategory}
-                className="px-4 py-2 text-white rounded-lg hover:shadow-lg transition-all"
-                style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+                className="px-8 py-3 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all transform active:scale-95 hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}
               >
                 Save Changes
               </button>
@@ -530,6 +579,63 @@ const Categories = () => {
         }}
         categoryName={selectedCategory?.name}
       />
+
+      {/* Archive Category Modal */}
+      {showArchiveCategoryModal && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-2xl p-8 w-full max-w-md ${theme === 'dark' ? 'bg-[#1E1B18] text-white' : 'bg-white text-gray-900'} relative shadow-2xl transition-all transform scale-100`}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl shadow-lg" style={{ background: 'linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)' }}>
+                  <FaTrash />
+                </div>
+                <h2 className="text-2xl font-bold">Archive Category</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowArchiveCategoryModal(false);
+                  setCategoryToArchive(null);
+                }}
+                className={`p-2 rounded-full hover:bg-opacity-10 transition-colors ${theme === 'dark' ? 'hover:bg-white text-gray-400' : 'hover:bg-black text-gray-400'}`}
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="mb-8">
+              <p className={`text-base leading-relaxed ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
+                Are you sure you want to archive the category <span className="font-bold">"{categoryToArchive?.name}"</span>? It will be hidden from POS/Terminal and Inventory filters.
+              </p>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => {
+                  setShowArchiveCategoryModal(false);
+                  setCategoryToArchive(null);
+                }}
+                className={`px-6 py-3 rounded-xl font-bold transition-all transform active:scale-95 ${theme === 'dark'
+                  ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmArchive}
+                className="px-6 py-3 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all transform active:scale-95 hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)' }}
+              >
+                Yes, Archive
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

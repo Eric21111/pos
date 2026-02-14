@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 
 const AddCategoryModal = ({ show, onClose, onAdd }) => {
@@ -77,7 +77,7 @@ const AddCategoryModal = ({ show, onClose, onAdd }) => {
                         <button
                             type="submit"
                             disabled={loading || !newCategory.trim()}
-                            className="px-6 py-2.5 rounded-xl bg-[#8B5E3C] text-white font-medium hover:bg-[#6F4E37] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#8B5E3C]/30"
+                            className="px-6 py-2.5 rounded-xl bg-green-600 text-white font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
                         >
                             {loading ? 'Adding...' : 'Add Category'}
                         </button>

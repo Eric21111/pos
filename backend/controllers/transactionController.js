@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const SalesTransaction = require('../models/SalesTransaction');
 const VoidLog = require('../models/VoidLog');
 const Product = require('../models/Product');
+const Discount = require('../models/Discount');
 
 // Helper function to safely convert to ObjectId
 const toObjectId = (id) => {
@@ -172,7 +173,9 @@ exports.createTransaction = async (req, res) => {
       referenceNo,
       receiptNo: providedReceiptNo,
       originalTransactionId,
-      checkedOutAt
+
+      checkedOutAt,
+      appliedDiscountIds // Array of discount IDs used in this transaction
     } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -241,6 +244,13 @@ exports.createTransaction = async (req, res) => {
       message: 'Transaction created successfully',
       data: transaction
     });
+
+    // Update discount usage counts asynchronously
+    if (appliedDiscountIds && Array.isArray(appliedDiscountIds) && appliedDiscountIds.length > 0) {
+      Promise.all(appliedDiscountIds.map(id =>
+        Discount.findByIdAndUpdate(id, { $inc: { usageCount: 1 } })
+      )).catch(err => console.error('Error updating discount usage counts:', err));
+    }
   } catch (error) {
     console.error('Error creating transaction:', error);
     console.error('Error details:', error.errors || error.message);

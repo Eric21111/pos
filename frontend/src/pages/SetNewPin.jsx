@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import bgImage from '../assets/bg.png';
 import defaultAvatar from '../assets/default.jpeg';
 import logo from '../assets/logo.png';
-import bgImage from '../assets/bg.png';
+import { useAuth } from '../context/AuthContext';
 import { validatePinSecurity } from '../utils/pinValidation';
 
 const PIN_LENGTH = 6;
@@ -105,7 +105,7 @@ const SetNewPin = () => {
     setter((prev) => {
       const updated = [...prev];
       updated[index] = value;
-      
+
       // Real-time validation for new PIN when complete
       if (type === 'new') {
         const pinString = updated.join('');
@@ -121,7 +121,7 @@ const SetNewPin = () => {
           setError('');
         }
       }
-      
+
       return updated;
     });
 
@@ -286,7 +286,7 @@ const SetNewPin = () => {
   return (
     <div className="relative w-screen h-screen overflow-hidden">
       <div className="flex w-full h-full overflow-hidden flex-col lg:flex-row">
-        <div className="flex-1 relative flex items-center justify-center p-8 min-h-[40vh] lg:min-h-full" style={{ backgroundColor: '#F5F5F5' }}>
+        <div className="flex-1 relative flex items-center justify-center p-8 min-h-[40vh] lg:min-h-full" style={{ backgroundColor: '#FFFFFF' }}>
           <div
             className="absolute inset-8 lg:inset-8 rounded-[20px] bg-cover bg-center"
             style={{
@@ -301,7 +301,7 @@ const SetNewPin = () => {
             />
           </div>
         </div>
-        <div className="flex-1 flex items-center justify-center p-8 min-h-[60vh] lg:min-h-full" style={{ backgroundColor: '#F5F5F5' }}>
+        <div className="flex-1 flex items-center justify-center p-8 min-h-[60vh] lg:min-h-full" style={{ backgroundColor: '#FFFFFF' }}>
           <div className="w-full max-w-[600px]">
             <div className="text-center mb-12">
               <h2 className="text-5xl font-bold text-[#8B7355] mb-4 tracking-[8px]">CYSPOS</h2>

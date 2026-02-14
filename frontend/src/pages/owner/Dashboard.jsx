@@ -300,13 +300,12 @@ const Dashboard = () => {
                     setTimeframe(t);
                     setDateRange([null, null]); // Reset custom range when switching back to presets
                   }}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                    timeframe === t
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${timeframe === t
                       ? "bg-[#AD7F65] text-white shadow-sm"
                       : theme === "dark"
                         ? "text-gray-400 hover:bg-[#3A3734]"
                         : "text-gray-500 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   {t}
                 </button>
@@ -321,13 +320,12 @@ const Dashboard = () => {
                     setShowDatePicker(true);
                   }
                 }}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                  timeframe === "Custom"
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${timeframe === "Custom"
                     ? "bg-[#AD7F65] text-white shadow-sm"
                     : theme === "dark"
                       ? "text-gray-400 hover:bg-[#3A3734] hidden"
                       : "text-gray-500 hover:bg-gray-100 hidden" // Hide 'Custom' tab unless active, or maybe show it?
-                }`}
+                  }`}
               >
                 Custom
               </button>
@@ -635,8 +633,8 @@ const Dashboard = () => {
                         yAxisId="right"
                         type="monotone"
                         dataKey="growth"
-                        fill="#dcfce7" // Light green bg
-                        stroke="#4ADE80" // Green stroke
+                        fill="#D7D7D7" // Gray bg
+                        stroke="#D7D7D7" // Gray stroke
                         name="Growth"
                         strokeWidth={3}
                         fillOpacity={0.6}
@@ -668,8 +666,8 @@ const Dashboard = () => {
                           yAxisId="right"
                           type="monotone"
                           dataKey="growth"
-                          fill="#dcfce7"
-                          stroke="#4ADE80"
+                          fill="#D7D7D7"
+                          stroke="#D7D7D7"
                           name="Growth"
                           strokeWidth={3}
                           fillOpacity={0.6}
@@ -974,11 +972,10 @@ const Dashboard = () => {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
-                          className={`px-2 py-1 rounded-full text-[10px] font-bold ${
-                            product.calculatedStock === 0
+                          className={`px-2 py-1 rounded-full text-[10px] font-bold ${product.calculatedStock === 0
                               ? "bg-red-100 text-red-600"
                               : "bg-orange-100 text-orange-600"
-                          }`}
+                            }`}
                         >
                           {product.calculatedStock === 0
                             ? "Out of Stock"

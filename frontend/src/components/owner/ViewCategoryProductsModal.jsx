@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useTheme } from '../../context/ThemeContext';
+import { useEffect, useState } from 'react';
 import { FaTimes } from 'react-icons/fa';
+import { useTheme } from '../../context/ThemeContext';
 
 const ViewCategoryProductsModal = ({ isOpen, onClose, categoryName }) => {
   const { theme } = useTheme();
@@ -39,10 +39,7 @@ const ViewCategoryProductsModal = ({ isOpen, onClose, categoryName }) => {
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4 backdrop-blur-sm">
       <div className={`rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col ${theme === 'dark' ? 'bg-[#1E1B18] text-white' : 'bg-white text-gray-900'}`}>
-        <div
-          className="h-1"
-          style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
-        />
+
 
         <div className={`px-6 py-4 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
           <div>
@@ -71,49 +68,48 @@ const ViewCategoryProductsModal = ({ isOpen, onClose, categoryName }) => {
               <table className="w-full border-collapse">
                 <thead>
                   <tr
-                    className="text-white text-sm font-medium"
-                    style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+                    className={`text-sm font-bold uppercase tracking-wider ${theme === 'dark' ? 'bg-[#3A3734] text-gray-200' : 'bg-[#EAE0D5] text-[#4A403A]'}`}
                   >
-                    <th className="px-4 py-3 text-center border border-white shadow-sm">Image</th>
-                    <th className="px-4 py-3 text-center border border-white shadow-sm">SKU</th>
-                    <th className="px-4 py-3 text-center border border-white shadow-sm">Item Name</th>
-                    <th className="px-4 py-3 text-center border border-white shadow-sm">Brand</th>
-                    <th className="px-4 py-3 text-center border border-white shadow-sm">Variant</th>
-                    <th className="px-4 py-3 text-center border border-white shadow-sm">Price</th>
-                    <th className="px-4 py-3 text-center border border-white shadow-sm">Stock</th>
+                    <th className="px-6 py-4 text-center font-bold">Image</th>
+                    <th className="px-6 py-4 text-center font-bold">SKU</th>
+                    <th className="px-6 py-4 text-left font-bold">Item Name</th>
+                    <th className="px-6 py-4 text-center font-bold">Brand</th>
+                    <th className="px-6 py-4 text-center font-bold">Variant</th>
+                    <th className="px-6 py-4 text-center font-bold">Price</th>
+                    <th className="px-6 py-4 text-center font-bold">Stock</th>
                   </tr>
                 </thead>
                 <tbody>
                   {products.map((product) => (
-                    <tr key={product._id} className={`hover:bg-opacity-50 transition-colors ${theme === 'dark' ? 'hover:bg-[#3A3734]' : 'hover:bg-gray-50'}`}>
-                      <td className="px-4 py-3 border border-gray-300 text-center">
+                    <tr key={product._id} className={`border-b transition-colors ${theme === 'dark' ? 'border-gray-800 hover:bg-[#2A2724]' : 'border-gray-100 hover:bg-gray-50'}`}>
+                      <td className="px-6 py-4 text-center">
                         <div className="flex justify-center">
                           {product.itemImage ? (
                             <img
                               src={product.itemImage}
                               alt={product.itemName}
-                              className="w-12 h-12 object-cover rounded"
+                              className="w-12 h-12 object-cover rounded-lg shadow-sm"
                             />
                           ) : (
-                            <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
+                            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xs font-medium">
                               No img
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className={`px-4 py-3 border text-center ${theme === 'dark' ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`}>{product.sku}</td>
-                      <td className={`px-4 py-3 border text-center ${theme === 'dark' ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`}>{product.itemName}</td>
-                      <td className={`px-4 py-3 border text-center ${theme === 'dark' ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`}>{product.brandName || 'Default'}</td>
-                      <td className={`px-4 py-3 border text-center ${theme === 'dark' ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`}>{product.variant || '-'}</td>
-                      <td className={`px-4 py-3 border text-center ${theme === 'dark' ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`}>PHP {(product.itemPrice || 0).toFixed(2)}</td>
-                      <td className={`px-4 py-3 border text-center ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'}`}>
+                      <td className={`px-6 py-4 text-center font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{product.sku}</td>
+                      <td className={`px-6 py-4 text-left font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{product.itemName}</td>
+                      <td className={`px-6 py-4 text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{product.brandName || '-'}</td>
+                      <td className={`px-6 py-4 text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{product.variant || '-'}</td>
+                      <td className={`px-6 py-4 text-center font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>PHP {(product.itemPrice || 0).toFixed(2)}</td>
+                      <td className="px-6 py-4 text-center">
                         <div className="flex justify-center">
                           <span
-                            className={`px-2 py-1 rounded text-sm font-medium ${product.currentStock === 0
-                                ? 'bg-red-100 text-red-700'
-                                : product.currentStock <= (product.reorderNumber || 10)
-                                  ? 'bg-yellow-100 text-yellow-700'
-                                  : 'bg-green-100 text-green-700'
+                            className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold shadow-sm ${product.currentStock === 0
+                              ? 'bg-[#FCA5A5] text-red-900'
+                              : product.currentStock <= (product.reorderNumber || 10)
+                                ? 'bg-[#FED7AA] text-orange-900'
+                                : 'bg-[#86EFAC] text-green-900'
                               }`}
                           >
                             {product.currentStock || 0}

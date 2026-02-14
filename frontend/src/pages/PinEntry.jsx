@@ -1,9 +1,9 @@
-import { useState, useEffect, memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import logo from '../assets/logo.png';
 import bgImage from '../assets/bg.png';
 import defaultAvatar from '../assets/default.jpeg';
+import logo from '../assets/logo.png';
+import { useAuth } from '../context/AuthContext';
 
 const PinEntry = () => {
   const navigate = useNavigate();
@@ -139,7 +139,7 @@ const PinEntry = () => {
   return (
     <div className="flex w-screen h-screen overflow-hidden flex-col lg:flex-row">
 
-      <div className="flex-1 relative flex items-center justify-center p-8 min-h-[40vh] lg:min-h-full" style={{ backgroundColor: '#F5F5F5' }}>
+      <div className="flex-1 relative flex items-center justify-center p-8 min-h-[40vh] lg:min-h-full" style={{ backgroundColor: '#FFFFFF' }}>
 
         <div
           className="absolute inset-8 lg:inset-8 rounded-[20px] bg-cover bg-center"
@@ -157,7 +157,7 @@ const PinEntry = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-8 min-h-[60vh] lg:min-h-full" style={{ backgroundColor: '#F5F5F5' }}>
+      <div className="flex-1 flex items-center justify-center p-8 min-h-[60vh] lg:min-h-full" style={{ backgroundColor: '#FFFFFF' }}>
         <div className="w-full max-w-[600px]">
 
           <div className="text-center mb-12">
@@ -187,7 +187,7 @@ const PinEntry = () => {
                 {[0, 1, 2, 3, 4, 5].map((index) => (
                   <div
                     key={index}
-                    className="w-8 h-8 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center shadow-sm"
+                    className="w-12 h-12 rounded-xl bg-white border-2 border-gray-300 flex items-center justify-center shadow-sm"
                   >
                     {index < pin.length && (
                       <div className="w-3 h-3 rounded-full bg-gray-800"></div>
@@ -260,7 +260,7 @@ const PinEntry = () => {
           {!showKeypad && (
             <div className="text-center mt-8">
               <button
-                className="bg-[#8B7355] text-white border-none rounded-[10px] px-12 py-3 text-lg font-semibold cursor-pointer transition-all duration-300 uppercase shadow-md hover:bg-[#6d5a43] hover:shadow-lg active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-[#8B7355] text-white border-none rounded-[10px] px-12 py-3 text-lg font-semibold cursor-pointer transition-all duration-300 uppercase shadow-md hover:bg-[#6d5a43] hover:shadow-lg active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed -translate-x-5"
                 onClick={handleLogin}
                 disabled={loading || pin.length !== 6}
                 style={{ fontFamily: 'sans-serif' }}

@@ -1,32 +1,30 @@
-import { useState, useEffect, useMemo, memo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { useAuth } from '../context/AuthContext';
-import { useDataCache } from '../context/DataCacheContext';
-import { useTheme } from '../context/ThemeContext';
-import Header from '../components/shared/header';
-import { FaPlus, FaMinus, FaEdit } from 'react-icons/fa';
-import { MdCategory } from 'react-icons/md';
+import Pagination from '../components/inventory/Pagination';
 import CategoryButtons from '../components/shared/CategoryButtons';
+import Header from '../components/shared/header';
+import CashPaymentModal from '../components/terminal/CashPaymentModal';
+import CheckoutConfirmationModal from '../components/terminal/CheckoutConfirmationModal';
+import DiscountModal from '../components/terminal/DiscountModal';
+import DuplicateItemModal from '../components/terminal/DuplicateItemModal';
 import OrderSummary from '../components/terminal/OrderSummary';
 import ProductCard from '../components/terminal/ProductCard';
 import ProductDetailsModal from '../components/terminal/ProductDetailsModal';
-import Pagination from '../components/inventory/Pagination';
-import CheckoutConfirmationModal from '../components/terminal/CheckoutConfirmationModal';
-import CashPaymentModal from '../components/terminal/CashPaymentModal';
 import QRCodePaymentModal from '../components/terminal/QRCodePaymentModal';
-import DiscountModal from '../components/terminal/DiscountModal';
 import RemoveItemPinModal from '../components/terminal/RemoveItemPinModal';
-import DuplicateItemModal from '../components/terminal/DuplicateItemModal';
+import { useAuth } from '../context/AuthContext';
+import { useDataCache } from '../context/DataCacheContext';
+import { useTheme } from '../context/ThemeContext';
 
 
+import accessoriesIcon from '../assets/inventory-icons/accesories.svg';
 import allIcon from '../assets/inventory-icons/ALL.svg';
-import topIcon from '../assets/inventory-icons/Top.svg';
 import bottomsIcon from '../assets/inventory-icons/Bottoms.svg';
 import dressesIcon from '../assets/inventory-icons/dresses.svg';
-import makeupIcon from '../assets/inventory-icons/make up.svg';
-import accessoriesIcon from '../assets/inventory-icons/accesories.svg';
-import shoesIcon from '../assets/inventory-icons/shoe.svg';
 import headWearIcon from '../assets/inventory-icons/head wear.svg';
+import makeupIcon from '../assets/inventory-icons/make up.svg';
+import shoesIcon from '../assets/inventory-icons/shoe.svg';
+import topIcon from '../assets/inventory-icons/Top.svg';
 
 const Terminal = () => {
   const { theme } = useTheme();
@@ -866,7 +864,7 @@ const Terminal = () => {
 
     // If discount applies to a specific category
     if (appliesToType === 'category' && discountItem.category) {
-      const allItemsMatchCategory = cartItems.every(item => {
+      const hasMatchingItem = cartItems.some(item => {
         // First check if item has category field
         let itemCategory = item.category;
 
@@ -884,25 +882,10 @@ const Terminal = () => {
         return itemCategory === discountItem.category;
       });
 
-      if (!allItemsMatchCategory) {
-        // Find which categories are in the cart
-        const cartCategories = cartItems.map(item => {
-          let itemCategory = item.category;
-          if (!itemCategory) {
-            const productId = item._id || item.productId || item.id;
-            const product = products.find(p => {
-              const pId = p._id || p.id;
-              return (pId && productId && (pId.toString() === productId.toString()));
-            });
-            itemCategory = product?.category;
-          }
-          return itemCategory;
-        }).filter(Boolean);
-        const uniqueCategories = [...new Set(cartCategories)];
-
+      if (!hasMatchingItem) {
         return {
           valid: false,
-          message: `This discount only applies to "${discountItem.category}" category. Your cart contains items from: ${uniqueCategories.join(', ')}.`
+          message: `This discount only applies to items in the "${discountItem.category}" category.`
         };
       }
       return { valid: true };
@@ -910,7 +893,7 @@ const Terminal = () => {
 
     // If discount applies to specific products
     if (appliesToType === 'products' && discountItem.productIds && discountItem.productIds.length > 0) {
-      const allItemsInDiscount = cartItems.every(item => {
+      const hasMatchingItem = cartItems.some(item => {
         const itemId = item._id || item.productId || item.id;
         return discountItem.productIds.some(pid => {
           const pidStr = pid.toString ? pid.toString() : pid;
@@ -919,10 +902,10 @@ const Terminal = () => {
         });
       });
 
-      if (!allItemsInDiscount) {
+      if (!hasMatchingItem) {
         return {
           valid: false,
-          message: 'This discount only applies to specific products. Your cart contains items not eligible for this discount.'
+          message: 'This discount only applies to specific products. Your cart does not contain any eligible items.'
         };
       }
       return { valid: true };
@@ -967,15 +950,57 @@ const Terminal = () => {
       const discountValueStr = selectedDiscount.discountValue || '';
 
       try {
-        // Recalculate discount based on selected discount and current subtotal
+        let totalEligibleAmount = 0;
+        const appliesToType = selectedDiscount.appliesToType || selectedDiscount.appliesTo;
+
+        // Calculate eligible amount based on discount type
+        if (appliesToType === 'all') {
+          totalEligibleAmount = subtotal;
+        } else if (appliesToType === 'category' && selectedDiscount.category) {
+          totalEligibleAmount = cart.reduce((sum, item) => {
+            // Find item category
+            let itemCategory = item.category;
+            if (!itemCategory) {
+              const productId = item._id || item.productId || item.id;
+              const product = products.find(p => {
+                const pId = p._id || p.id;
+                return (pId && productId && (pId.toString() === productId.toString()));
+              });
+              itemCategory = product?.category;
+            }
+
+            if (itemCategory === selectedDiscount.category) {
+              return sum + (item.itemPrice * item.quantity);
+            }
+            return sum;
+          }, 0);
+        } else if (appliesToType === 'products' && selectedDiscount.productIds && selectedDiscount.productIds.length > 0) {
+          totalEligibleAmount = cart.reduce((sum, item) => {
+            const itemId = item._id || item.productId || item.id;
+            const isEligible = selectedDiscount.productIds.some(pid => {
+              const pidStr = pid.toString ? pid.toString() : pid;
+              const itemIdStr = itemId.toString ? itemId.toString() : itemId;
+              return pidStr === itemIdStr;
+            });
+
+            if (isEligible) {
+              return sum + (item.itemPrice * item.quantity);
+            }
+            return sum;
+          }, 0);
+        }
+
+        // Recalculate discount based on selected discount and ELIGIBLE amount
         if (typeof discountValueStr === 'string' && discountValueStr.includes('%')) {
           const percentage = parseFloat(discountValueStr.replace('% OFF', '').replace(/\s/g, ''));
           if (!isNaN(percentage)) {
-            totalDiscount += (subtotal * percentage) / 100;
+            totalDiscount += (totalEligibleAmount * percentage) / 100;
           }
         } else if (typeof discountValueStr === 'string' && (discountValueStr.includes('P') || discountValueStr.includes('₱'))) {
           const amount = parseFloat(discountValueStr.replace(/[P₱\sOFF]/g, ''));
           if (!isNaN(amount)) {
+            // For fixed amount, generally applied once if conditions met
+            // Could limit to eligible amount if needed: Math.min(amount, totalEligibleAmount)
             totalDiscount += amount;
           }
         }
@@ -1057,7 +1082,8 @@ const Terminal = () => {
           totalAmount: total,
           performedById: currentUser?._id || currentUser?.id,
           performedByName: currentUser?.name,
-          status: 'Completed'
+          status: 'Completed',
+          appliedDiscountIds: selectedDiscounts.map(d => d._id)
         })
       });
 
@@ -1075,6 +1101,8 @@ const Terminal = () => {
       // Step 2: Transaction succeeded - NOW update stock
       // Clear cart after successful transaction
       setCart([]);
+      setSelectedDiscounts([]);
+      setDiscountAmount('');
 
       // Invalidate cache so next fetch gets fresh data
       invalidateCache('products');
@@ -1271,6 +1299,7 @@ const Terminal = () => {
           <div className={`w-[420px] border-l-0 p-4 relative ${theme === 'dark' ? 'bg-[#121212]' : 'bg-gray-50'}`}>
             <OrderSummary
               cart={cart}
+              products={products}
               removeFromCart={removeFromCart}
               removeFromCartDirect={removeFromCartDirect}
               updateQuantity={updateQuantity}

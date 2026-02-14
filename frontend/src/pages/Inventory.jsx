@@ -1485,7 +1485,7 @@ const Inventory = () => {
       <Header pageName="Product & Stocks" showBorder={false} />
 
 
-      <div className="mb-6">
+      <div className="mb-6 mt-8 flex flex-col md:flex-row justify-between items-start gap-4">
         <div className="flex gap-4 flex-wrap">
           <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-500"></div>
@@ -1539,7 +1539,9 @@ const Inventory = () => {
               </svg>
             </div>
           </div>
+        </div>
 
+        <div className="flex gap-4">
           <button
             onClick={handleExportButtonClick}
             className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isExportSelectionMode
@@ -1674,7 +1676,7 @@ const Inventory = () => {
               setShowAddModal(true);
             }}
             className="px-6 py-2 text-white rounded-lg hover:opacity-90 flex items-center gap-2 font-medium transition-all"
-            style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+            style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}
           >
             <FaPlus /> Add New Item
           </button>

@@ -1,13 +1,13 @@
-import React, { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FaMinus, FaPlus, FaTag, FaTimes } from 'react-icons/fa';
 import { HiDocumentRemove } from 'react-icons/hi';
 import { MdCategory } from 'react-icons/md';
 import cashIcon from '../../assets/cash.svg';
 import qrIcon from '../../assets/qr.png';
-import RemoveItemPinModal from './RemoveItemPinModal';
-import VoidTransactionModal from './VoidTransactionModal';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import RemoveItemPinModal from './RemoveItemPinModal';
+import VoidTransactionModal from './VoidTransactionModal';
 
 const OrderSummary = ({
   cart,
@@ -25,7 +25,8 @@ const OrderSummary = ({
   onCashPayment,
   onQRPayment,
   onOpenDiscountModal,
-  onSelectDiscount
+  onSelectDiscount,
+  products = []
 }) => {
   const { theme } = useTheme();
   const { currentUser } = useAuth();
@@ -41,6 +42,45 @@ const OrderSummary = ({
   const isProcessingVoidRef = useRef(false);
   // Track pending quantity changes per item (key: item._id + selectedSize)
   const [pendingQuantities, setPendingQuantities] = useState({});
+  const [availableDiscounts, setAvailableDiscounts] = useState([]);
+
+  // Fetch discounts on mount for auto-apply functionality
+  useEffect(() => {
+    const fetchDiscounts = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/discounts');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setAvailableDiscounts(data.data.filter(d => d.status === 'active'));
+        }
+      } catch (error) {
+        console.error('Error fetching discounts for auto-apply:', error);
+      }
+    };
+    fetchDiscounts();
+  }, []);
+
+  // Auto-apply discount when code matches
+  useEffect(() => {
+    if (!discountCode || !discountCode.trim() || applyingDiscount) return;
+
+    const codeToFind = discountCode.trim().toLowerCase();
+    const matchingDiscount = availableDiscounts.find(discount =>
+      (discount.discountCode || '').trim().toLowerCase() === codeToFind
+    );
+
+    if (matchingDiscount) {
+      // Check if already applied to avoid loops
+      const isAlreadyApplied = selectedDiscounts.some(d => d._id === matchingDiscount._id);
+
+      if (!isAlreadyApplied) {
+        if (onSelectDiscount) {
+          onSelectDiscount(matchingDiscount);
+          setDiscountCode('');
+        }
+      }
+    }
+  }, [discountCode, availableDiscounts, selectedDiscounts, applyingDiscount, onSelectDiscount]);
 
   const handleProceed = () => {
     if (selectedPaymentMethod === 'cash' && onCashPayment) {
@@ -114,7 +154,6 @@ const OrderSummary = ({
     });
   };
 
-  // Confirm pending change - show PIN modal if reducing quantity
   const handleConfirmPending = (item) => {
     const key = getItemKey(item);
     const pendingQty = pendingQuantities[key];
@@ -138,6 +177,59 @@ const OrderSummary = ({
       updateQuantity(item, pendingQty);
       handleCancelPending(item);
     }
+  };
+
+  // Helper to calculate total discount percentage for an item
+  const getItemTotalDiscountPercent = (item) => {
+    if (!selectedDiscounts || selectedDiscounts.length === 0) return 0;
+
+    let totalPercent = 0;
+
+    // Resolve item category (same logic as Terminal.jsx)
+    let itemCategory = item.category;
+    if (!itemCategory && products.length > 0) {
+      const productId = item._id || item.productId || item.id;
+      const product = products.find(p => {
+        const pId = p._id || p.id;
+        return (pId && productId && (pId.toString() === productId.toString()));
+      });
+      itemCategory = product?.category;
+    }
+
+    selectedDiscounts.forEach(discount => {
+      // Check if discount applies
+      const appliesToType = discount.appliesToType || discount.appliesTo;
+      let applies = false;
+
+      if (appliesToType === 'all') {
+        applies = true;
+      } else if (appliesToType === 'category' && discount.category) {
+        if (itemCategory === discount.category) {
+          applies = true;
+        }
+      } else if (appliesToType === 'products' && discount.productIds && discount.productIds.length > 0) {
+        const itemId = item._id || item.productId || item.id;
+        const isMatch = discount.productIds.some(pid => {
+          const pidStr = pid.toString ? pid.toString() : pid;
+          const itemIdStr = itemId.toString ? itemId.toString() : itemId;
+          return pidStr === itemIdStr;
+        });
+        if (isMatch) applies = true;
+      }
+
+      if (applies) {
+        // Extract percentage
+        const discountValueStr = discount.discountValue || '';
+        if (typeof discountValueStr === 'string' && discountValueStr.includes('%')) {
+          const percentage = parseFloat(discountValueStr.replace('% OFF', '').replace(/\s/g, ''));
+          if (!isNaN(percentage)) {
+            totalPercent += percentage;
+          }
+        }
+      }
+    });
+
+    return totalPercent;
   };
 
   const handleRemoveConfirm = async (reason, approverInfo = {}) => {
@@ -469,8 +561,8 @@ const OrderSummary = ({
           onClick={handleVoidButtonClick}
           disabled={cart.length === 0}
           className={`w-8 h-8 flex items-center justify-center transition-all ${cart.length === 0
-              ? 'text-gray-300 cursor-not-allowed'
-              : 'text-red-500 hover:text-red-700'
+            ? 'text-gray-300 cursor-not-allowed'
+            : 'text-red-500 hover:text-red-700'
             }`}
           title="Void Transaction"
         >
@@ -492,11 +584,22 @@ const OrderSummary = ({
 
               return (
                 <div key={item._id || item.productId || `cart-item-${index}`} className={`relative rounded-xl border shadow-[0_3px_8px_rgba(0,0,0,0.04)] p-3 ${hasPending
-                    ? (theme === 'dark' ? 'border-orange-700 bg-orange-900/20' : 'border-orange-300 bg-orange-50')
-                    : (theme === 'dark' ? 'bg-[#2A2724] border-gray-700' : 'bg-white border-gray-200')
+                  ? (theme === 'dark' ? 'border-orange-700 bg-orange-900/20' : 'border-orange-300 bg-orange-50')
+                  : (theme === 'dark' ? 'bg-[#2A2724] border-gray-700' : 'bg-white border-gray-200')
                   }`}>
                   <div className="flex items-center gap-3">
-                    <div className={`w-16 h-16 rounded-lg shrink-0 overflow-hidden ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-gray-100'}`}>
+                    <div className={`w-16 h-16 rounded-lg shrink-0 overflow-hidden relative ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-gray-100'}`}>
+                      {(() => {
+                        const discountPercent = getItemTotalDiscountPercent(item);
+                        if (discountPercent > 0) {
+                          return (
+                            <div className="absolute top-0 left-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-br-lg z-10">
+                              -{discountPercent}%
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       {item.itemImage && item.itemImage.trim() !== '' ? (
                         <img
                           src={item.itemImage}
@@ -538,8 +641,8 @@ const OrderSummary = ({
                           onClick={() => handleMinusClick(item)}
                           disabled={displayQty <= 1}
                           className={`w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-all ${displayQty <= 1
-                              ? 'bg-gray-300 text-white cursor-not-allowed'
-                              : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
+                            ? 'bg-gray-300 text-white cursor-not-allowed'
+                            : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
                             }`}
                         >
                           <FaMinus className="text-[10px]" />
@@ -550,17 +653,17 @@ const OrderSummary = ({
                         <button
                           onClick={() => handlePlusClickPending(item)}
                           className={`w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-all ${(() => {
-                              if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
-                                const sizeData = item.sizes[item.selectedSize];
-                                const maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
-                                  ? sizeData.quantity
-                                  : (typeof sizeData === 'number' ? sizeData : 0);
-                                return displayQty >= maxQty;
-                              }
-                              return false;
-                            })()
-                              ? 'bg-gray-300 text-white cursor-not-allowed'
-                              : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
+                            if (item.selectedSize && item.sizes && item.sizes[item.selectedSize] !== undefined) {
+                              const sizeData = item.sizes[item.selectedSize];
+                              const maxQty = typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined
+                                ? sizeData.quantity
+                                : (typeof sizeData === 'number' ? sizeData : 0);
+                              return displayQty >= maxQty;
+                            }
+                            return false;
+                          })()
+                            ? 'bg-gray-300 text-white cursor-not-allowed'
+                            : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
                             }`}
                           disabled={
                             (() => {
@@ -647,8 +750,8 @@ const OrderSummary = ({
                 }
               }}
               className={`flex-1 px-4 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
-                  ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-500'
-                  : 'bg-white border-[#d6c1b5] text-gray-900'
+                ? 'bg-[#2A2724] border-gray-600 text-white placeholder-gray-500'
+                : 'bg-white border-[#d6c1b5] text-gray-900'
                 }`}
             />
             <button
@@ -690,8 +793,8 @@ const OrderSummary = ({
             <button
               onClick={() => setSelectedPaymentMethod('cash')}
               className={`w-24 flex flex-col items-center justify-center py-2 rounded-lg border-2 transition-all ${selectedPaymentMethod === 'cash'
-                  ? 'border-[#AD7F65] bg-[#f5f0ed]'
-                  : (theme === 'dark' ? 'border-gray-600 bg-[#2A2724] hover:border-gray-500' : 'border-gray-300 bg-white hover:border-gray-400')
+                ? 'border-[#AD7F65] bg-[#f5f0ed]'
+                : (theme === 'dark' ? 'border-gray-600 bg-[#2A2724] hover:border-gray-500' : 'border-gray-300 bg-white hover:border-gray-400')
                 }`}
             >
               <img src={cashIcon} alt="Cash" className="w-7 h-7 mb-1" />
@@ -700,8 +803,8 @@ const OrderSummary = ({
             <button
               onClick={() => setSelectedPaymentMethod('qr')}
               className={`w-24 flex flex-col items-center justify-center py-0 rounded-lg border-2 transition-all ${selectedPaymentMethod === 'qr'
-                  ? 'border-[#AD7F65] bg-[#f5f0ed]'
-                  : (theme === 'dark' ? 'border-gray-600 bg-[#2A2724] hover:border-gray-500' : 'border-gray-300 bg-white hover:border-gray-400')
+                ? 'border-[#AD7F65] bg-[#f5f0ed]'
+                : (theme === 'dark' ? 'border-gray-600 bg-[#2A2724] hover:border-gray-500' : 'border-gray-300 bg-white hover:border-gray-400')
                 }`}
             >
               <img src={qrIcon} alt="QR Code" className="w-12 h-12 mb-4 " />

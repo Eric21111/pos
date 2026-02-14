@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useTheme } from '../../context/ThemeContext';
 import { FaTimes, FaUserFriends } from 'react-icons/fa';
 import cameraIcon from '../../assets/owner/camera.svg';
+import { useTheme } from '../../context/ThemeContext';
 
 const initialFormState = {
   brandName: '',
@@ -103,9 +103,7 @@ const AddBrandPartnerModal = ({ isOpen, onClose, onSuccess }) => {
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#E1D5CB' }}>
               <FaUserFriends className="text-[#76462B]" />
             </div>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#E1D5CB' }}>
-              <FaUserFriends className="text-[#76462B]" />
-            </div>
+
             <div>
               <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Add Brand Partner</h2>
               <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Create a new brand partner profile</p>
@@ -212,7 +210,7 @@ const AddBrandPartnerModal = ({ isOpen, onClose, onSuccess }) => {
             <button
               type="button"
               onClick={onClose}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${theme === 'dark'
+              className={`px-5 py-2 rounded-[15px] text-sm font-medium transition-colors ${theme === 'dark'
                 ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
@@ -222,7 +220,7 @@ const AddBrandPartnerModal = ({ isOpen, onClose, onSuccess }) => {
             <button
               type="submit"
               disabled={submitting}
-              className="px-6 py-2 rounded-full text-white text-sm font-semibold shadow-lg disabled:opacity-60"
+              className="px-6 py-2 rounded-[15px] text-white text-sm font-semibold shadow-lg disabled:opacity-60"
               style={{ background: 'linear-gradient(135deg, #1DB954 0%, #0A8A3E 100%)' }}
             >
               {submitting ? 'Adding...' : 'Add Brand'}

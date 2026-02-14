@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { FaChevronLeft, FaChevronRight, FaEye, FaSearch } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaSearch } from 'react-icons/fa';
 import PullOutIcon from '../assets/logs/pull_out.svg';
 import StockInIcon from '../assets/logs/stock-in.svg';
 import StockOutIcon from '../assets/logs/stock-out.svg';
@@ -182,27 +182,13 @@ const Logs = () => {
 
   const getTypeBadge = (type) => {
     const styles = {
-      'Stock-In': 'bg-green-100 text-green-700 border-green-200',
-      'Stock-Out': 'bg-red-100 text-red-700 border-red-200',
-      'Pull-Out': 'bg-orange-100 text-orange-700 border-orange-200'
-    };
-
-    const getIcon = () => {
-      switch (type) {
-        case 'Stock-In':
-          return <img src={StockInIcon} alt="Stock In" className="w-4 h-4" />;
-        case 'Stock-Out':
-          return <img src={StockOutIcon} alt="Stock Out" className="w-4 h-4" />;
-        case 'Pull-Out':
-          return <img src={PullOutIcon} alt="Pull Out" className="w-4 h-4" />;
-        default:
-          return null;
-      }
+      'Stock-In': 'bg-green-500 text-white',
+      'Stock-Out': 'bg-red-500 text-white',
+      'Pull-Out': 'bg-orange-500 text-white'
     };
 
     return (
-      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${styles[type] || 'bg-gray-100 text-gray-700'}`}>
-        {getIcon()}
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${styles[type] || 'bg-gray-500 text-white'}`}>
         {type}
       </span>
     );
@@ -515,7 +501,7 @@ const Logs = () => {
 
   const totalPages = Math.ceil(filteredMovements.length / rowsPerPage) || 1;
   const voidTotalPages = Math.ceil(voidLogs.length / rowsPerPage) || 1;
-  const movementTableColumnCount = isMovementExportMode ? 13 : 12;
+  const movementTableColumnCount = isMovementExportMode ? 8 : 7;
 
   useEffect(() => {
     setSelectedMovementIds((prev) =>
@@ -534,115 +520,111 @@ const Logs = () => {
 
   return (
     <div className={`p-8 min-h-screen ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-gray-50'}`}>
-      <Header pageName={activeTab === 'stock-movement' ? 'Stock Movement Logs' : 'Void Logs'} showBorder={false} />
+      <Header pageName={activeTab === 'stock-movement' ? 'Inventory Logs' : 'Void Logs'} showBorder={false} />
 
       {/* Tab Buttons */}
       <div className="flex gap-3 mb-6">
         <button
           onClick={() => setActiveTab('stock-movement')}
-          className={`px-6 py-3 font-medium transition-all ${activeTab === 'stock-movement'
-            ? 'text-white shadow-md rounded-xl'
-            : `${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 border-gray-700 hover:border-gray-600' : 'bg-white text-gray-800 border border-gray-200 hover:border-gray-300'} rounded-lg`
+          className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${activeTab === 'stock-movement'
+            ? `text-[#AD7F65] border-b-4 border-[#AD7F65] ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`
+            : `${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 border border-gray-700' : 'bg-white text-gray-800 border border-gray-200'}`
             }`}
-          style={
-            activeTab === 'stock-movement'
-              ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }
-              : {}
-          }
         >
-          Stock Movement
+          Inventory Logs
         </button>
         <button
           onClick={() => setActiveTab('void-logs')}
-          className={`px-6 py-3 font-medium transition-all ${activeTab === 'void-logs'
-            ? 'text-white shadow-md rounded-xl'
-            : `${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 border-gray-700 hover:border-gray-600' : 'bg-white text-gray-800 border border-gray-200 hover:border-gray-300'} rounded-lg`
+          className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${activeTab === 'void-logs'
+            ? `text-[#AD7F65] border-b-4 border-[#AD7F65] ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`
+            : `${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 border border-gray-700' : 'bg-white text-gray-800 border border-gray-200'}`
             }`}
-          style={
-            activeTab === 'void-logs'
-              ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }
-              : {}
-          }
         >
           Void Logs
         </button>
       </div>
 
-      {/* Stock Movement Content */}
+      {/* Inventory Logs Content */}
       {activeTab === 'stock-movement' && (
         <>
           {/* Summary Cards */}
           <div className="mb-6">
-            <div className="flex gap-4 flex-wrap">
-              <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-green-500"></div>
-                <div className="ml-2">
-                  <div className="text-3xl font-bold text-green-500">{stats.stockIns}</div>
-                  <div className="text-xs text-green-400 mt-0.5">Stock-ins Today</div>
+            <div className="flex justify-between items-center gap-4 flex-wrap">
+              {/* Left: Stat Cards */}
+              <div className="flex gap-4 flex-wrap">
+                <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
+                  <div className="absolute left-0 top-0 bottom-0 w-2 bg-green-500"></div>
+                  <div className="ml-2">
+                    <div className="text-3xl font-bold text-green-500">{stats.stockIns}</div>
+                    <div className="text-xs text-green-400 mt-0.5">Stock-ins Today</div>
+                  </div>
+                  <div className="w-20 h-20  rounded-full flex items-center justify-center">
+                    <img src={StockInIcon} alt="Stock In" className="w-16 h-16" />
+                  </div>
                 </div>
-                <div className="w-20 h-20  rounded-full flex items-center justify-center">
-                  <img src={StockInIcon} alt="Stock In" className="w-16 h-16" />
+
+                <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
+                  <div className="absolute left-0 top-0 bottom-0 w-2 bg-red-500"></div>
+                  <div className="ml-2">
+                    <div className="text-3xl font-bold text-red-500">{stats.stockOuts}</div>
+                    <div className="text-xs text-red-400 mt-0.5">Stock-outs Today</div>
+                  </div>
+                  <div className="w-20 h-20  rounded-full flex items-center justify-center">
+                    <img src={StockOutIcon} alt="Stock Out" className="w-16 h-16" />
+                  </div>
+                </div>
+
+                <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
+                  <div className="absolute left-0 top-0 bottom-0 w-2 bg-orange-500"></div>
+                  <div className="ml-2">
+                    <div className="text-3xl font-bold text-orange-500">{stats.pullOuts}</div>
+                    <div className="text-xs text-orange-400 mt-0.5">Pull-Outs Today</div>
+                  </div>
+                  <div className="w-20 h-20 rounded-full flex items-center justify-center">
+                    <img src={PullOutIcon} alt="Pull Out" className="w-16 h-16" />
+                  </div>
                 </div>
               </div>
 
-              <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-red-500"></div>
-                <div className="ml-2">
-                  <div className="text-3xl font-bold text-red-500">{stats.stockOuts}</div>
-                  <div className="text-xs text-red-400 mt-0.5">Stock-outs Today</div>
-                </div>
-                <div className="w-20 h-20  rounded-full flex items-center justify-center">
-                  <img src={StockOutIcon} alt="Stock Out" className="w-16 h-16" />
-                </div>
-              </div>
-
-              <div className={`rounded-2xl shadow-md flex items-center justify-between px-5 py-4 relative overflow-hidden ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`} style={{ minWidth: '200px' }}>
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-orange-500"></div>
-                <div className="ml-2">
-                  <div className="text-3xl font-bold text-orange-500">{stats.pullOuts}</div>
-                  <div className="text-xs text-orange-400 mt-0.5">Pull-Outs Today</div>
-                </div>
-                <div className="w-20 h-20 rounded-full flex items-center justify-center">
-                  <img src={PullOutIcon} alt="Pull Out" className="w-16 h-16" />
-                </div>
-              </div>
-
-              <button
-                onClick={handleMovementExportButtonClick}
-                className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]' : 'bg-white text-gray-700 hover:bg-gray-50'} ${isMovementExportMode ? 'border border-[#AD7F65] bg-[#AD7F65]/5' : ''}`}
-                style={{ minWidth: '100px' }}
-              >
-                <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <div className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`}>
-                  {isMovementExportMode ? 'Export Selected' : 'Export'}
-                </div>
-              </button>
-              {isMovementExportMode && (
+              {/* Right: Export/Import Buttons */}
+              <div className="flex gap-4 items-center">
                 <button
-                  onClick={handleCancelMovementSelection}
-                  className={`rounded-2xl shadow-md px-4 py-2 text-xs font-medium border transition-colors ${theme === 'dark' ? 'bg-[#2A2724] border-gray-700 text-gray-300 hover:bg-[#3A3734]' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  onClick={handleMovementExportButtonClick}
+                  className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-[#3A3734]' : 'bg-white text-gray-700 hover:bg-gray-50'} ${isMovementExportMode ? 'border border-[#AD7F65] bg-[#AD7F65]/5' : ''}`}
+                  style={{ minWidth: '100px' }}
                 >
-                  Cancel
+                  <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <div className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`}>
+                    {isMovementExportMode ? 'Export Selected' : 'Export'}
+                  </div>
                 </button>
-              )}
+                {isMovementExportMode && (
+                  <button
+                    onClick={handleCancelMovementSelection}
+                    className={`rounded-2xl shadow-md px-4 py-2 text-xs font-medium border transition-colors ${theme === 'dark' ? 'bg-[#2A2724] border-gray-700 text-gray-300 hover:bg-[#3A3734]' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    Cancel
+                  </button>
+                )}
 
-              <label
-                className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors cursor-pointer ${theme === 'dark' ? 'bg-[#2A2724] hover:bg-[#3A3734] text-gray-300' : 'bg-white hover:bg-gray-50'}`}
-                style={{ minWidth: '100px' }}
-              >
-                <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <div className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`}>Import</div>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleImport}
-                  className="hidden"
-                />
-              </label>
+                <label
+                  className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors cursor-pointer ${theme === 'dark' ? 'bg-[#2A2724] hover:bg-[#3A3734] text-gray-300' : 'bg-white hover:bg-gray-50'}`}
+                  style={{ minWidth: '100px' }}
+                >
+                  <svg className="w-8 h-8 text-gray-700 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <div className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'}`}>Import</div>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleImport}
+                    className="hidden"
+                  />
+                </label>
+              </div>
             </div>
           </div>
 
@@ -757,30 +739,6 @@ const Logs = () => {
                         </label>
                       </th>
                     )}
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Item Image</th>
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer ${theme === 'dark' ? 'text-gray-400 hover:bg-[#3A3734]' : 'text-gray-500 hover:bg-gray-100'}`}>
-                      <div className="flex items-center gap-1">
-                        SKU
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                        </svg>
-                      </div>
-                    </th>
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer ${theme === 'dark' ? 'text-gray-400 hover:bg-[#3A3734]' : 'text-gray-500 hover:bg-gray-100'}`}>
-                      <div className="flex items-center gap-1">
-                        Item Name
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                        </svg>
-                      </div>
-                    </th>
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Type</th>
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Quantity</th>
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Size Breakdown</th>
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Before</th>
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>After</th>
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Reason</th>
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Handled by</th>
                     <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer ${theme === 'dark' ? 'text-gray-400 hover:bg-[#3A3734]' : 'text-gray-500 hover:bg-gray-100'}`}>
                       <div className="flex items-center gap-1">
                         Date & Time
@@ -789,7 +747,12 @@ const Logs = () => {
                         </svg>
                       </div>
                     </th>
-                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Action</th>
+                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Type</th>
+                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Quantity</th>
+                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Before</th>
+                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>After</th>
+                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Reason</th>
+                    <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Handled by</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${theme === 'dark' ? 'bg-[#2A2724] divide-gray-700' : 'bg-white divide-gray-200'}`}>
@@ -822,56 +785,15 @@ const Logs = () => {
                             />
                           </td>
                         )}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <img
-                            src={movement.itemImage || 'https://via.placeholder.com/50'}
-                            alt={movement.itemName}
-                            className="w-12 h-12 object-cover rounded"
-                            onError={(e) => {
-                              e.target.src = 'https://via.placeholder.com/50';
-                            }}
-                          />
-                        </td>
-                        <td className={`px-4 py-3 whitespace-nowrap text-sm ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{movement.sku}</td>
-                        <td className={`px-4 py-3 whitespace-nowrap text-sm ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{movement.itemName}</td>
+                        <td className={`px-4 py-3 whitespace-nowrap text-sm ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{formatDateTime(movement.createdAt)}</td>
                         <td className="px-4 py-3 whitespace-nowrap">{getTypeBadge(movement.type)}</td>
                         <td className={`px-4 py-3 whitespace-nowrap text-sm font-medium ${getQuantityColor(movement.type, movement.quantity)}`}>
                           {movement.type === 'Stock-In' ? '+' : '-'}{movement.quantity}
-                        </td>
-                        <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>
-                          {movement.sizeQuantities && typeof movement.sizeQuantities === 'object' ? (
-                            <div className="flex flex-wrap gap-1">
-                              {Object.entries(movement.sizeQuantities).map(([size, qty]) => (
-                                <span
-                                  key={size}
-                                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${movement.type === 'Stock-In'
-                                    ? 'bg-green-100 text-green-700'
-                                    : movement.type === 'Pull-Out'
-                                      ? 'bg-orange-100 text-orange-700'
-                                      : 'bg-red-100 text-red-700'
-                                    }`}
-                                >
-                                  {size}: {movement.type === 'Stock-In' ? '+' : '-'}{qty}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-xs">-</span>
-                          )}
                         </td>
                         <td className={`px-4 py-3 whitespace-nowrap text-sm ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{movement.stockBefore}</td>
                         <td className={`px-4 py-3 whitespace-nowrap text-sm ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{movement.stockAfter}</td>
                         <td className={`px-4 py-3 whitespace-nowrap text-sm ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{movement.reason}</td>
                         <td className={`px-4 py-3 whitespace-nowrap text-sm ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{movement.handledBy}</td>
-                        <td className={`px-4 py-3 whitespace-nowrap text-sm ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{formatDateTime(movement.createdAt)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <button
-                            onClick={() => handleView(movement)}
-                            className="text-green-600 hover:text-green-800"
-                          >
-                            <FaEye className="w-5 h-5" />
-                          </button>
-                        </td>
                       </tr>
                     ))
                   )}
@@ -951,13 +873,12 @@ const Logs = () => {
                   <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Handled By</th>
                   <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Approved By</th>
                   <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Total</th>
-                  <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Quick Action</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${theme === 'dark' ? 'bg-[#2A2724] divide-gray-700' : 'bg-white divide-gray-200'}`}>
                 {loading && voidLogs.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
                       <div className="flex flex-col items-center justify-center">
                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#8B7355] mb-2"></div>
                         <span>Loading...</span>
@@ -966,7 +887,7 @@ const Logs = () => {
                   </tr>
                 ) : voidLogs.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
                       No void logs found
                     </td>
                   </tr>
@@ -989,7 +910,11 @@ const Logs = () => {
                     };
 
                     return (
-                      <tr key={log._id} className={`${theme === 'dark' ? 'hover:bg-[#3A3734] hover:bg-opacity-50' : 'hover:bg-gray-50'}`}>
+                      <tr
+                        key={log._id}
+                        className={`cursor-pointer ${theme === 'dark' ? 'hover:bg-[#3A3734] hover:bg-opacity-50' : 'hover:bg-gray-50'}`}
+                        onClick={() => handleView(log)}
+                      >
                         <td className={`px-4 py-3 whitespace-nowrap text-sm font-bold ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>
                           #{voidNumber}
                         </td>
@@ -1014,15 +939,6 @@ const Logs = () => {
                         </td>
                         <td className={`px-4 py-3 whitespace-nowrap text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>
                           ₱{parseFloat(log.totalAmount || 0).toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <button
-                            onClick={() => handleView(log)}
-                            className={`text-green-600 hover:text-green-800 p-2 rounded-lg transition-colors ${theme === 'dark' ? 'hover:bg-green-900/30' : 'hover:bg-green-50'}`}
-                            title="View Details"
-                          >
-                            <FaEye className="w-5 h-5" />
-                          </button>
                         </td>
                       </tr>
                     );

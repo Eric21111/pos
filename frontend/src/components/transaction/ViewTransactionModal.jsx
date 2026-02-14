@@ -1,4 +1,4 @@
-import { FaTimes, FaPrint } from 'react-icons/fa';
+import { FaPrint, FaTimes } from 'react-icons/fa';
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
@@ -63,7 +63,7 @@ const ViewTransactionModal = ({ isOpen, onClose, transaction, onReturnItems, onP
   }, 0) || 0;
 
   // Calculate adjusted total
-  const originalTotal = transaction.totalAmount || (subtotal - discountAmount);
+  const originalTotal = subtotal - discountAmount;
   const adjustedTotal = originalTotal - totalReturned;
 
   // Get amount paid and change
@@ -116,12 +116,12 @@ const ViewTransactionModal = ({ isOpen, onClose, transaction, onReturnItems, onP
                   Payment: {transaction.paymentMethod?.charAt(0).toUpperCase() + transaction.paymentMethod?.slice(1) || 'N/A'}
                 </span>
                 <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${transaction.status === 'Completed'
-                    ? 'bg-green-100 text-green-700'
-                    : transaction.status === 'Returned'
-                      ? 'bg-orange-100 text-orange-700'
-                      : transaction.status === 'Partially Returned'
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-red-100 text-red-600'
+                  ? 'bg-green-100 text-green-700'
+                  : transaction.status === 'Returned'
+                    ? 'bg-orange-100 text-orange-700'
+                    : transaction.status === 'Partially Returned'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-red-100 text-red-600'
                   }`}>
                   ● {transaction.status || 'Completed'}
                 </span>
@@ -164,10 +164,10 @@ const ViewTransactionModal = ({ isOpen, onClose, transaction, onReturnItems, onP
                     <div key={idx}>
                       <div
                         className={`grid grid-cols-12 gap-2 px-4 py-3 items-center ${isFullyReturned
-                            ? 'bg-orange-50 border-l-4 border-l-orange-400'
-                            : isPartiallyReturned
-                              ? 'bg-amber-50 border-l-4 border-l-amber-400'
-                              : 'bg-white border-b border-gray-100 last:border-b-0'
+                          ? 'bg-orange-50 border-l-4 border-l-orange-400'
+                          : isPartiallyReturned
+                            ? 'bg-amber-50 border-l-4 border-l-amber-400'
+                            : 'bg-white border-b border-gray-100 last:border-b-0'
                           }`}
                       >
                         {/* Item Name */}
@@ -284,7 +284,7 @@ const ViewTransactionModal = ({ isOpen, onClose, transaction, onReturnItems, onP
           {onPrintReceipt && (
             <button
               onClick={() => onPrintReceipt(transaction)}
-              className="px-6 py-3 rounded-lg bg-[#AD7F65] hover:bg-[#8B5F45] text-white font-semibold transition-all flex items-center gap-2"
+              className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all flex items-center gap-2"
             >
               <FaPrint className="w-4 h-4" />
               Print Receipt

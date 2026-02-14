@@ -1,12 +1,12 @@
-import { useState, useContext, useEffect, useRef, useMemo, memo } from 'react';
+import { memo, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { FaBox, FaEdit, FaEye, FaKey, FaPalette, FaUser } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import Header from '../components/shared/header';
-import { FaBell, FaEdit, FaUser, FaKey, FaPalette, FaBox, FaCalendarAlt, FaEye } from 'react-icons/fa';
-import { SidebarContext } from '../context/SidebarContext';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import SuccessModal from '../components/inventory/SuccessModal';
 import defaultAvatar from '../assets/default.jpeg';
+import SuccessModal from '../components/inventory/SuccessModal';
+import Header from '../components/shared/header';
+import { useAuth } from '../context/AuthContext';
+import { SidebarContext } from '../context/SidebarContext';
+import { useTheme } from '../context/ThemeContext';
 
 const Settings = () => {
   const { isExpanded } = useContext(SidebarContext);
@@ -319,33 +319,19 @@ const Settings = () => {
         <div className="flex gap-3 mb-6">
           <button
             onClick={() => setActiveTab('personal')}
-            className={`px-6 py-3 font-medium transition-all ${activeTab === 'personal'
-              ? 'text-white shadow-md rounded-xl'
-              : theme === 'dark'
-                ? 'bg-[#2A2724] text-gray-200 border border-gray-600 hover:border-gray-500 rounded-lg'
-                : 'bg-white text-gray-800 border border-gray-200 hover:border-gray-300 rounded-lg'
+            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${activeTab === 'personal'
+              ? `text-[#AD7F65] border-b-4 border-[#AD7F65] ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`
+              : `${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 border border-gray-700' : 'bg-white text-gray-800 border border-gray-200'}`
               }`}
-            style={
-              activeTab === 'personal'
-                ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }
-                : {}
-            }
           >
             Personal Information
           </button>
           <button
             onClick={() => setActiveTab('archives')}
-            className={`px-6 py-3 font-medium transition-all ${activeTab === 'archives'
-              ? 'text-white shadow-md rounded-xl'
-              : theme === 'dark'
-                ? 'bg-[#2A2724] text-gray-200 border border-gray-600 hover:border-gray-500 rounded-lg'
-                : 'bg-white text-gray-800 border border-gray-200 hover:border-gray-300 rounded-lg'
+            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${activeTab === 'archives'
+              ? `text-[#AD7F65] border-b-4 border-[#AD7F65] ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`
+              : `${theme === 'dark' ? 'bg-[#2A2724] text-gray-300 border border-gray-700' : 'bg-white text-gray-800 border border-gray-200'}`
               }`}
-            style={
-              activeTab === 'archives'
-                ? { background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }
-                : {}
-            }
           >
             Archives
           </button>
@@ -566,8 +552,8 @@ const Settings = () => {
                               value={firstName}
                               onChange={(e) => setFirstName(e.target.value)}
                               className={`w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
-                                  ? 'bg-[#1E1B18] border-gray-600 text-white'
-                                  : 'bg-white border-gray-300 text-gray-900'
+                                ? 'bg-[#1E1B18] border-gray-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-900'
                                 }`}
                               onBlur={() => setIsEditingFirstName(false)}
                               autoFocus
@@ -593,8 +579,8 @@ const Settings = () => {
                               value={lastName}
                               onChange={(e) => setLastName(e.target.value)}
                               className={`w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
-                                  ? 'bg-[#1E1B18] border-gray-600 text-white'
-                                  : 'bg-white border-gray-300 text-gray-900'
+                                ? 'bg-[#1E1B18] border-gray-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-900'
                                 }`}
                               onBlur={() => setIsEditingLastName(false)}
                               autoFocus
@@ -628,8 +614,8 @@ const Settings = () => {
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               className={`w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
-                                  ? 'bg-[#1E1B18] border-gray-600 text-white'
-                                  : 'bg-white border-gray-300 text-gray-900'
+                                ? 'bg-[#1E1B18] border-gray-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-900'
                                 }`}
                               onBlur={() => setIsEditingEmail(false)}
                               autoFocus
@@ -655,8 +641,8 @@ const Settings = () => {
                               value={contactNumber}
                               onChange={(e) => setContactNumber(e.target.value)}
                               className={`w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-2 focus:ring-[#AD7F65] ${theme === 'dark'
-                                  ? 'bg-[#1E1B18] border-gray-600 text-white'
-                                  : 'bg-white border-gray-300 text-gray-900'
+                                ? 'bg-[#1E1B18] border-gray-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-900'
                                 }`}
                               onBlur={() => setIsEditingContact(false)}
                               autoFocus
@@ -722,8 +708,8 @@ const Settings = () => {
                               onChange={(e) => handlePinInput(e.target.value, i, "old")}
                               disabled={pinLoading}
                               className={`w-10 h-10 text-center text-base font-semibold rounded-lg border shadow-sm focus:border-[#AD7F65] focus:shadow-md transition-all outline-none disabled:opacity-50 ${theme === 'dark'
-                                  ? 'bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]'
-                                  : 'bg-[#FAFAFA] border-gray-200 text-gray-900 focus:bg-white'
+                                ? 'bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]'
+                                : 'bg-[#FAFAFA] border-gray-200 text-gray-900 focus:bg-white'
                                 }`}
                             />
                           ))}
@@ -744,8 +730,8 @@ const Settings = () => {
                               onChange={(e) => handlePinInput(e.target.value, i, "new")}
                               disabled={pinLoading}
                               className={`w-10 h-10 text-center text-base font-semibold rounded-lg border shadow-sm focus:border-[#AD7F65] focus:shadow-md transition-all outline-none disabled:opacity-50 ${theme === 'dark'
-                                  ? 'bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]'
-                                  : 'bg-[#FAFAFA] border-gray-200 text-gray-900 focus:bg-white'
+                                ? 'bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]'
+                                : 'bg-[#FAFAFA] border-gray-200 text-gray-900 focus:bg-white'
                                 }`}
                             />
                           ))}
@@ -766,8 +752,8 @@ const Settings = () => {
                               onChange={(e) => handlePinInput(e.target.value, i, "confirm")}
                               disabled={pinLoading}
                               className={`w-10 h-10 text-center text-base font-semibold rounded-lg border shadow-sm focus:border-[#AD7F65] focus:shadow-md transition-all outline-none disabled:opacity-50 ${theme === 'dark'
-                                  ? 'bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]'
-                                  : 'bg-[#FAFAFA] border-gray-200 text-gray-900 focus:bg-white'
+                                ? 'bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]'
+                                : 'bg-[#FAFAFA] border-gray-200 text-gray-900 focus:bg-white'
                                 }`}
                             />
                           ))}
@@ -790,8 +776,8 @@ const Settings = () => {
                         onClick={handleCancelPin}
                         disabled={pinLoading}
                         className={`px-6 py-2 text-sm rounded-xl font-medium shadow transition-all disabled:opacity-50 ${theme === 'dark'
-                            ? 'bg-[#1E1B18] text-gray-300 hover:bg-[#352F2A]'
-                            : 'bg-[#ECECEC] text-gray-700 hover:bg-gray-300'
+                          ? 'bg-[#1E1B18] text-gray-300 hover:bg-[#352F2A]'
+                          : 'bg-[#ECECEC] text-gray-700 hover:bg-gray-300'
                           }`}
                       >
                         Cancel
@@ -824,8 +810,8 @@ const Settings = () => {
                     <button
                       onClick={() => setTheme('dark')}
                       className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${theme === 'dark'
-                          ? 'border-[#AD7F65] shadow-md'
-                          : 'border-[#D8B9A4] shadow-sm'
+                        ? 'border-[#AD7F65] shadow-md'
+                        : 'border-[#D8B9A4] shadow-sm'
                         }`}
                     >
                       <div className="w-full h-14 rounded-lg bg-[#1E1B18] shadow-inner"></div>
@@ -836,8 +822,8 @@ const Settings = () => {
                     <button
                       onClick={() => setTheme('light')}
                       className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${theme === 'light'
-                          ? 'border-[#AD7F65] shadow-md'
-                          : 'border-[#D8B9A4] shadow-sm'
+                        ? 'border-[#AD7F65] shadow-md'
+                        : 'border-[#D8B9A4] shadow-sm'
                         }`}
                     >
                       <div className="w-full h-14 rounded-lg bg-white shadow-inner"></div>

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { FaTimes } from 'react-icons/fa';
 import { useTheme } from '../../context/ThemeContext';
 
-const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
+const AddDiscountModal = ({ isOpen, onClose, onAdd, onEdit, discountToEdit }) => {
   const { theme } = useTheme();
   const [formData, setFormData] = useState({
     discountName: '',
@@ -15,7 +15,6 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
     validUntil: '',
     noExpiration: false,
     minPurchaseAmount: '',
-    maxPurchaseAmount: '',
     usageLimit: '',
     description: ''
   });
@@ -23,24 +22,40 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
   const categories = ['Tops', 'Bottoms', 'Dresses', 'Makeup', 'Accessories', 'Shoes', 'Head Wear', 'Foods'];
 
   useEffect(() => {
-    if (!isOpen) {
-      setFormData({
-        discountName: '',
-        discountCode: '',
-        discountType: 'percentage',
-        discountValue: '',
-        appliesTo: 'all',
-        category: '',
-        validFrom: '',
-        validUntil: '',
-        noExpiration: false,
-        minPurchaseAmount: '',
-        maxPurchaseAmount: '',
-        usageLimit: '',
-        description: ''
-      });
+    if (isOpen) {
+      if (discountToEdit) {
+        setFormData({
+          discountName: discountToEdit.title || '',
+          discountCode: discountToEdit.discountCode || '',
+          discountType: discountToEdit.discountType || 'percentage',
+          discountValue: discountToEdit.discountValue || '',
+          appliesTo: discountToEdit.appliesTo || 'all',
+          category: discountToEdit.category || '',
+          validFrom: discountToEdit.validFrom ? new Date(discountToEdit.validFrom).toISOString().split('T')[0] : '',
+          validUntil: discountToEdit.validTo ? new Date(discountToEdit.validTo).toISOString().split('T')[0] : '',
+          noExpiration: discountToEdit.noExpiration || false,
+          minPurchaseAmount: discountToEdit.minPurchaseAmount || '',
+          usageLimit: discountToEdit.usageLimit || '',
+          description: discountToEdit.description || ''
+        });
+      } else {
+        setFormData({
+          discountName: '',
+          discountCode: '',
+          discountType: 'percentage',
+          discountValue: '',
+          appliesTo: 'all',
+          category: '',
+          validFrom: '',
+          validUntil: '',
+          noExpiration: false,
+          minPurchaseAmount: '',
+          usageLimit: '',
+          description: ''
+        });
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, discountToEdit]);
 
   if (!isOpen) return null;
 
@@ -51,7 +66,11 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
       alert('Please select a category');
       return;
     }
-    onAdd(formData);
+    if (discountToEdit) {
+      onEdit(discountToEdit._id, formData);
+    } else {
+      onAdd(formData);
+    }
     onClose();
   };
 
@@ -74,7 +93,9 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
         />
 
         <div className={`px-6 py-4 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-          <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Create New Discount</h2>
+          <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
+            {discountToEdit ? 'Edit Discount' : 'Create New Discount'}
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -120,8 +141,8 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
                       onChange={handleChange}
                       placeholder="e.g DRESS10"
                       className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === 'dark'
-                          ? 'bg-[#1E1B18] border-gray-600 text-white placeholder-gray-500'
-                          : 'bg-white border-gray-300 text-gray-900'
+                        ? 'bg-[#1E1B18] border-gray-600 text-white placeholder-gray-500'
+                        : 'bg-white border-gray-300 text-gray-900'
                         }`}
                     />
                   </div>
@@ -315,25 +336,6 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
 
                   <div>
                     <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                      <span>Maximum Purchase Amount</span>
-                      <span className="ml-2 text-xs text-gray-400 font-normal">Optional</span>
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600">₱</span>
-                      <input
-                        type="number"
-                        name="maxPurchaseAmount"
-                        value={formData.maxPurchaseAmount}
-                        onChange={handleChange}
-                        step="0.01"
-                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">Maximum discount amount for percentage-based discounts</p>
-                  </div>
-
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                       <span>Usage Limit</span>
                       <span className="ml-2 text-xs text-gray-400 font-normal">Optional</span>
                     </label>
@@ -377,10 +379,10 @@ const AddDiscountModal = ({ isOpen, onClose, onAdd }) => {
               type="submit"
               className="px-8 py-3 text-white rounded-lg font-bold text-lg shadow-md hover:shadow-lg transition-all"
               style={{
-                background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)'
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
               }}
             >
-              Add New Discount
+              {discountToEdit ? 'Update Discount' : 'Add New Discount'}
             </button>
           </div>
         </form>

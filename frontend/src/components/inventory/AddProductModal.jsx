@@ -749,15 +749,15 @@ const AddProductModal = ({
                 </div>
               </div>
 
-              <div className="flex flex-col">
+              <div className="flex flex-col px-8 mt-6">
                 <div>
                   <div
                     onClick={() => document.getElementById('fileInput').click()}
-                    className={`w-full border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${theme === 'dark'
+                    className={`w-3/4 mx-auto border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${theme === 'dark'
                       ? 'bg-[#1E1B18] border-gray-600 hover:bg-[#2A2724] hover:border-[#AD7F65]'
                       : 'bg-gray-50 border-gray-300 hover:bg-gray-100 hover:border-[#AD7F65]'
                       }`}
-                    style={{ height: '320px' }}
+                    style={{ height: '350px' }}
                   >
                     <input
                       id="fileInput"
@@ -821,7 +821,7 @@ const AddProductModal = ({
                     type="submit"
                     disabled={loading}
                     className="px-12 py-3 text-white rounded-xl font-medium hover:opacity-90 disabled:opacity-50 transition-all shadow-lg"
-                    style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+                    style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}
                   >
                     {loading ? (editingProduct ? 'Updating...' : 'Adding...') : (editingProduct ? 'Update Product' : 'Add New Item')}
                   </button>

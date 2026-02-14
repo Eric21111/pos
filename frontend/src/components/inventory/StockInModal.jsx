@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 
 const StockInModal = ({
@@ -112,9 +112,7 @@ const StockInModal = ({
       <div className={`rounded-2xl w-full max-w-5xl relative pointer-events-auto overflow-hidden ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-white'}`}
         style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.1)' }}>
 
-        <div className="h-2 bg-gradient-to-r from-[#AD7F65] to-[#C99B7F]"></div>
-
-        <div className="flex justify-between items-center px-6 py-4 border-b">
+        <div className="flex justify-between items-center px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="relative w-6 h-6 flex items-center justify-center">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -281,7 +279,7 @@ const StockInModal = ({
                   type="submit"
                   disabled={loading}
                   className="px-6 py-3 text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-all"
-                  style={{ background: 'linear-gradient(135deg, #AD7F65 0%, #76462B 100%)' }}
+                  style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}
                 >
                   {loading ? 'Adding...' : 'Add Stocks'}
                 </button>

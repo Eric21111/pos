@@ -1,14 +1,14 @@
-import { useState, useCallback, useEffect, lazy, Suspense, memo } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { lazy, memo, Suspense, useCallback, useEffect, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
+import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import './App.css'
+import PageTitle from './components/shared/PageTitle'
+import ProtectedRoute from './components/shared/ProtectedRoute'
 import Sidebar from './components/shared/Sidebar'
-import { SidebarContext } from './context/SidebarContext'
 import { AuthProvider } from './context/AuthContext'
 import { DataCacheProvider } from './context/DataCacheContext'
+import { SidebarContext } from './context/SidebarContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
-import ProtectedRoute from './components/shared/ProtectedRoute'
-import PageTitle from './components/shared/PageTitle'
 
 // Lazy load all pages for better performance
 const StaffSelection = lazy(() => import('./pages/StaffSelection'))
@@ -29,7 +29,7 @@ const OwnerOnboarding = lazy(() => import('./pages/OwnerOnboarding'))
 
 // Loading fallback component
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
+  <div className="min-h-screen flex items-center justify-center bg-[#FFFFFF]">
     <div className="text-center">
       <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#8B7355] mb-4"></div>
       <p className="text-gray-600">Loading...</p>
@@ -42,7 +42,7 @@ const MainLayout = memo(({ children }) => {
   const { theme } = useTheme();
 
   return (
-    <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: theme === 'dark' ? '#1E1B18' : '#F5F5F5' }}>
+    <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: theme === 'dark' ? '#1E1B18' : '#FFFFFF' }}>
       <SidebarContext.Provider value={{ isExpanded }}>
         <Sidebar isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
         <main className={`transition-all duration-300 px-6 py-4 ${isExpanded ? 'ml-80' : 'ml-20'}`}>
@@ -54,6 +54,7 @@ const MainLayout = memo(({ children }) => {
 });
 
 const LandingGate = () => {
+  const { theme } = useTheme();
   const [status, setStatus] = useState({
     loading: true,
     error: '',
@@ -95,17 +96,17 @@ const LandingGate = () => {
 
   if (status.loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1F1F1F]">
-        <p className="text-white tracking-[0.3em] uppercase text-sm">Preparing CYSPOS...</p>
+      <div className={`min-h-screen flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F1F]' : 'bg-[#FFFFFF]'}`}>
+        <p className={`${theme === 'dark' ? 'text-white' : 'text-[#8B7355]'} tracking-[0.3em] uppercase text-sm`}>Preparing CYSPOS...</p>
       </div>
     );
   }
 
   if (status.error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#1F1F1F] px-4 text-center gap-6">
+      <div className={`min-h-screen flex flex-col items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F1F]' : 'bg-[#FFFFFF]'} px-4 text-center gap-6`}>
         <div className="max-w-md">
-          <p className="text-white text-lg font-semibold mb-2">Something went wrong</p>
+          <p className={`${theme === 'dark' ? 'text-white' : 'text-[#2D2D2D]'} text-lg font-semibold mb-2`}>Something went wrong</p>
           <p className="text-gray-400 text-sm">{status.error}</p>
         </div>
         <button

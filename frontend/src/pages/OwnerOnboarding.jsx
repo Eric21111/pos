@@ -1,9 +1,9 @@
-import { useRef, useState, memo } from 'react';
+import { memo, useRef, useState } from 'react';
+import { FaCheck, FaSpinner } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { FaSpinner, FaCheck } from 'react-icons/fa';
-import logo from '../assets/logo.png';
 import bgImage from '../assets/bg.png';
+import logo from '../assets/logo.png';
+import { useAuth } from '../context/AuthContext';
 import { validatePinSecurity } from '../utils/pinValidation';
 
 const PIN_LENGTH = 6;
@@ -502,8 +502,8 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
   };
 
   return (
-    <div className="flex w-screen h-screen overflow-hidden flex-col lg:flex-row bg-[#F5F5F5]">
-      <div className="flex-1 bg-[#F5F5F5] flex items-center justify-center px-6 py-10 lg:px-16">
+    <div className="flex w-screen h-screen overflow-hidden flex-col lg:flex-row bg-white">
+      <div className="flex-1 bg-white flex items-center justify-center px-6 py-10 lg:px-16">
         <div className="w-full max-w-[600px]">
           <div className="text-center mb-10">
             <h1 className="text-5xl lg:text-6xl font-bold mb-4">
@@ -701,7 +701,7 @@ const OwnerOnboarding = ({ onSetupComplete }) => {
         </div>
       </div>
 
-      <div className="flex-1 relative flex items-center justify-center p-8 bg-[#F5F5F5] min-h-[40vh] lg:min-h-full">
+      <div className="flex-1 relative flex items-center justify-center p-8 bg-white min-h-[40vh] lg:min-h-full">
         <div
           className="absolute inset-8 rounded-[20px] bg-cover bg-center"
           style={{

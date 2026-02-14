@@ -26,6 +26,11 @@ const brandPartnerSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    status: {
+      type: String,
+      enum: ['active', 'archived'],
+      default: 'active',
+    },
   },
   {
     timestamps: true,

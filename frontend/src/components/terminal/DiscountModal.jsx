@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { FaTimes, FaSearch, FaTag, FaCalendar, FaBox, FaUsers } from 'react-icons/fa';
+import { useEffect, useState } from 'react';
+import { FaBox, FaCalendar, FaSearch, FaTag, FaTimes, FaUsers } from 'react-icons/fa';
 import filterIcon from '../../assets/filter.svg';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -94,8 +94,8 @@ const DiscountModal = ({ isOpen, onClose, onSelectDiscount, cart = [], products 
 
     // If discount applies to a specific category
     if (appliesToType === 'category' && discount.category) {
-      // Check if all cart items are from the same category as the discount
-      const allItemsMatchCategory = cart.every(item => {
+      // Check if ANY cart item is from the same category as the discount
+      const hasMatchingItem = cart.some(item => {
         // First check if item has category field
         let itemCategory = item.category;
 
@@ -113,13 +113,13 @@ const DiscountModal = ({ isOpen, onClose, onSelectDiscount, cart = [], products 
         return itemCategory === discount.category;
       });
 
-      return allItemsMatchCategory;
+      return hasMatchingItem;
     }
 
     // If discount applies to specific products
     if (appliesToType === 'products' && discount.productIds && discount.productIds.length > 0) {
-      // Check if all cart items are in the discount's product list
-      const allItemsInDiscount = cart.every(item => {
+      // Check if ANY cart item is in the discount's product list
+      const hasMatchingItem = cart.some(item => {
         const itemId = item._id || item.productId || item.id;
         return discount.productIds.some(pid => {
           const pidStr = pid.toString ? pid.toString() : pid;
@@ -128,7 +128,7 @@ const DiscountModal = ({ isOpen, onClose, onSelectDiscount, cart = [], products 
         });
       });
 
-      return allItemsInDiscount;
+      return hasMatchingItem;
     }
 
     return false;
@@ -156,7 +156,7 @@ const DiscountModal = ({ isOpen, onClose, onSelectDiscount, cart = [], products 
       className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 font-poppins p-4"
     >
       <div className={`rounded-2xl w-full max-w-md h-[95vh] flex flex-col shadow-2xl ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-white'}`}>
-        <div className="h-5 rounded-t-2xl" style={{ background: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)' }}></div>
+
 
         <div className={`px-6 py-4 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
           <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Discounts</h2>
