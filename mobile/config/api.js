@@ -1,5 +1,5 @@
 
-const PRODUCTION_URL = 'https://your-backend-app.onrender.com';
+const PRODUCTION_URL = 'https://YOUR_HOSTED_BACKEND_URL.com'; // TODO: Replace with your actual hosted backend URL
 
 const LOCAL_IP = '192.168.56.1';
 const PORT = 5000;

@@ -1,35 +1,47 @@
 import Header from "@/components/shared/header";
 import { useData } from "@/context/DataContext";
+import { useFocusEffect } from "@react-navigation/native";
 import { Buffer } from "buffer";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  LayoutAnimation,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Dimensions,
+    useCallback,
+    useRef,
+    useState
+} from "react";
+import {
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    Image,
+    LayoutAnimation,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { BarChart, LineChart } from "react-native-chart-kit";
 import * as XLSX from "xlsx";
-import { transactionAPI, productAPI, stockMovementAPI } from "../../services/api";
-import { useFocusEffect } from "@react-navigation/native";
+import {
+    productAPI,
+    stockMovementAPI,
+    transactionAPI,
+} from "../../services/api";
 
 global.Buffer = Buffer;
 
-
-
 export default function Analytics() {
-  const { transactions: cachedTransactions, products: cachedProducts, fetchTransactions, fetchProducts, invalidateCache } = useData();
+  const {
+    transactions: cachedTransactions,
+    products: cachedProducts,
+    fetchTransactions,
+    fetchProducts,
+    invalidateCache,
+  } = useData();
 
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -49,8 +61,14 @@ export default function Analytics() {
   });
 
   const [chartData, setChartData] = useState({
-    daily: { labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], datasets: [{ data: [0] }] },
-    monthly: { labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"], datasets: [{ data: [0] }] },
+    daily: {
+      labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      datasets: [{ data: [0] }],
+    },
+    monthly: {
+      labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+      datasets: [{ data: [0] }],
+    },
     yearly: { labels: ["2023", "2024", "2025"], datasets: [{ data: [0] }] },
   });
 
@@ -58,7 +76,15 @@ export default function Analytics() {
   const [lowStockItems, setLowStockItems] = useState([]);
   const [stockInData, setStockInData] = useState([0]);
   const [stockOutData, setStockOutData] = useState([0]);
-  const [stockChartLabels, setStockChartLabels] = useState(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+  const [stockChartLabels, setStockChartLabels] = useState([
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat",
+    "Sun",
+  ]);
 
   // Fetch all analytics data
   const fetchAnalyticsData = async () => {
@@ -84,14 +110,19 @@ export default function Analytics() {
   // Fetch top selling products
   const fetchTopProducts = async () => {
     try {
-      const response = await transactionAPI.getTopSelling({ limit: 5, period: chartType });
+      const response = await transactionAPI.getTopSelling({
+        limit: 5,
+        period: chartType,
+      });
       if (response?.success && response.data) {
         // Map backend data to component format
-        const mappedProducts = response.data.map(product => ({
+        const mappedProducts = response.data.map((product) => ({
           item: product.itemName || "Unknown",
           quantity: product.totalQuantitySold || 0,
           total: product.totalQuantitySold || 0, // Using quantity as total for now based on UI
-          image: product.itemImage ? { uri: product.itemImage } : require("./iconz/profile3.png"),
+          image: product.itemImage
+            ? { uri: product.itemImage }
+            : require("./iconz/profile3.png"),
         }));
         setTopProducts(mappedProducts);
       }
@@ -101,7 +132,10 @@ export default function Analytics() {
   };
 
   // Fetch dashboard stats
-  const fetchDashboardStats = async (timeframe = 'daily', showLoader = true) => {
+  const fetchDashboardStats = async (
+    timeframe = "daily",
+    showLoader = true,
+  ) => {
     try {
       if (showLoader) setLoading(true);
       console.log(`Fetching dashboard stats for ${timeframe}...`);
@@ -109,10 +143,17 @@ export default function Analytics() {
       console.log("Dashboard stats response:", JSON.stringify(response));
 
       if (response?.success && response.data) {
-        const { totalSalesToday, totalTransactions, growthRate, lowStockItems, totalSalesPrevious } = response.data;
+        const {
+          totalSalesToday,
+          totalTransactions,
+          growthRate,
+          lowStockItems,
+          totalSalesPrevious,
+        } = response.data;
         // totalSalesToday in response is actually totalSales for the period requested
 
-        const avgValue = totalTransactions > 0 ? totalSalesToday / totalTransactions : 0;
+        const avgValue =
+          totalTransactions > 0 ? totalSalesToday / totalTransactions : 0;
 
         setDashboardStats({
           totalSalesToday: totalSalesToday || 0,
@@ -141,8 +182,10 @@ export default function Analytics() {
       const response = await transactionAPI.getSalesOverTime(chartType);
 
       if (response && response.success && response.data) {
-        const labels = response.data.map(item => item.period);
-        const data = response.data.map(item => item.revenue || item.totalSales || 0);
+        const labels = response.data.map((item) => item.period);
+        const data = response.data.map(
+          (item) => item.revenue || item.totalSales || 0,
+        );
 
         if (labels.length === 0) {
           setSalesData({
@@ -166,13 +209,18 @@ export default function Analytics() {
     try {
       console.log("Fetching low stock items...");
       const response = await productAPI.getAll();
-      console.log("Products response:", response?.success, "Count:", response?.data?.length);
+      console.log(
+        "Products response:",
+        response?.success,
+        "Count:",
+        response?.data?.length,
+      );
 
       if (response?.success && response.data?.length > 0) {
         // Filter products with low or zero stock
         // Product model uses: itemName, currentStock, reorderNumber
         const items = response.data
-          .filter(p => {
+          .filter((p) => {
             const stock = p.currentStock ?? p.stock ?? p.quantity ?? 0;
             const reorderLevel = p.reorderNumber ?? p.lowStockThreshold ?? 10;
             return stock <= reorderLevel;
@@ -199,7 +247,7 @@ export default function Analytics() {
   };
 
   // Fetch stock movements for charts
-  const fetchStockMovements = async (timeframe = 'daily') => {
+  const fetchStockMovements = async (timeframe = "daily") => {
     try {
       const response = await stockMovementAPI.getStockStatsOverTime(timeframe);
       if (response?.success && response.data) {
@@ -209,8 +257,8 @@ export default function Analytics() {
         // But for now, let's just update the data
         // The backend returns 7 days of data. The current chart expects 6?
         // Let's adjust the chart to show 7 days or slice the data.
-        // The current chart hardcodes labels ["Mon", "Tue", ...]. 
-        // We should probably update the labels in the chart component too, 
+        // The current chart hardcodes labels ["Mon", "Tue", ...].
+        // We should probably update the labels in the chart component too,
         // but for now let's just map the data.
 
         // The backend returns 7 days, ending today.
@@ -241,7 +289,7 @@ export default function Analytics() {
         setInitialLoad(false);
       };
       loadStats();
-    }, [fetchTransactions, fetchProducts])
+    }, [fetchTransactions, fetchProducts]),
   );
 
   // Fetch chart data AND stats when chartType changes (no global spinner)
@@ -252,13 +300,13 @@ export default function Analytics() {
       fetchDashboardStats(chartType, false);
       fetchStockMovements(chartType);
       fetchTopProducts(); // Re-fetch top products based on new chartType
-    }, [chartType])
+    }, [chartType]),
   );
 
   // Pull to refresh - force fetch new data
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    invalidateCache('all');
+    invalidateCache("all");
     analyticsCalculated.current = false;
     await Promise.all([fetchTransactions(true), fetchProducts(true)]);
     // Re-fetch everything with current chartType
@@ -267,8 +315,8 @@ export default function Analytics() {
       fetchSalesOverTime(),
       fetchLowStockItems(),
       fetchStockMovements(chartType),
-      fetchTopProducts()
-    ])
+      fetchTopProducts(),
+    ]);
     setRefreshing(false);
   }, [invalidateCache, fetchTransactions, fetchProducts, chartType]);
 
@@ -305,15 +353,23 @@ export default function Analytics() {
         Sales: val,
       }));
 
-      const lowStock = lowStockItems.map(item => ({
+      const lowStock = lowStockItems.map((item) => ({
         Product: item.name,
         Stock: item.stocks,
         Status: item.status,
       }));
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sales), "Sales Data");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lowStock), "Low Stock");
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(sales),
+        "Sales Data",
+      );
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(lowStock),
+        "Low Stock",
+      );
 
       const wbout = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
       const fileUri = FileSystem.cacheDirectory + "Analytics_Report.xlsx";
@@ -323,7 +379,8 @@ export default function Analytics() {
       });
 
       await Sharing.shareAsync(fileUri, {
-        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         dialogTitle: "Export Analytics Report",
         UTI: "com.microsoft.excel.xlsx",
       });
@@ -353,17 +410,23 @@ export default function Analytics() {
             <h3 style="margin-top:25px;">Sales Over Time (${chartType})</h3>
             <table border="1" style="width:100%;border-collapse:collapse;">
               <tr><th>Period</th><th>Sales</th></tr>
-              ${salesData.labels.map((label, i) =>
-        `<tr><td>${label}</td><td>${formatCurrency(salesData.datasets[0].data[i])}</td></tr>`
-      ).join("")}
+              ${salesData.labels
+                .map(
+                  (label, i) =>
+                    `<tr><td>${label}</td><td>${formatCurrency(salesData.datasets[0].data[i])}</td></tr>`,
+                )
+                .join("")}
             </table>
 
             <h3 style="margin-top:25px;">Low Stock Items</h3>
             <table border="1" style="width:100%;border-collapse:collapse;">
               <tr><th>Product</th><th>Stock</th><th>Status</th></tr>
-              ${lowStockItems.map(item =>
-        `<tr><td>${item.name}</td><td>${item.stocks}</td><td>${item.status}</td></tr>`
-      ).join("")}
+              ${lowStockItems
+                .map(
+                  (item) =>
+                    `<tr><td>${item.name}</td><td>${item.stocks}</td><td>${item.status}</td></tr>`,
+                )
+                .join("")}
             </table>
 
             <p style="text-align:center;margin-top:30px;">Generated on ${new Date().toLocaleString()}</p>
@@ -397,49 +460,102 @@ export default function Analytics() {
         <ScrollView
           style={styles.main}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#AD7F65"]} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#AD7F65"]}
+            />
           }
         >
           {/* SEARCH BAR + BUTTONS */}
           <View style={styles.searchContainer}>
             <Text style={styles.anafont}>Analytics</Text>
             <TouchableOpacity style={styles.printButton} onPress={handlePrint}>
-              <Image source={require("./iconz/print.png")} style={{ width: 21, height: 21 }} />
+              <Image
+                source={require("./iconz/print.png")}
+                style={{ width: 21, height: 21 }}
+              />
             </TouchableOpacity>
           </View>
 
           {/* DASHBOARD STATS */}
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{formatCurrency(dashboardStats.totalSalesToday)}</Text>
-              <Text style={styles.statLabel}>Total Sales ({chartType.charAt(0).toUpperCase() + chartType.slice(1)})</Text>
-              <Text style={styles.statLabel1}>Total sales made this {chartType === 'daily' ? 'day' : chartType === 'monthly' ? 'month' : 'year'}</Text>
+              <Text style={styles.statValue}>
+                {formatCurrency(dashboardStats.totalSalesToday)}
+              </Text>
+              <Text style={styles.statLabel}>
+                Total Sales (
+                {chartType.charAt(0).toUpperCase() + chartType.slice(1)})
+              </Text>
+              <Text style={styles.statLabel1}>
+                Total sales made this{" "}
+                {chartType === "daily"
+                  ? "day"
+                  : chartType === "monthly"
+                    ? "month"
+                    : "year"}
+              </Text>
               <Text style={styles.statLabel2}>
-                {getComparisonText(dashboardStats.totalSalesToday, dashboardStats.previousPeriodSales)}
+                {getComparisonText(
+                  dashboardStats.totalSalesToday,
+                  dashboardStats.previousPeriodSales,
+                )}
               </Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{dashboardStats.totalTransactions}</Text>
-              <Text style={styles.statLabel}>Total Transactions ({chartType.charAt(0).toUpperCase() + chartType.slice(1)})</Text>
-              <Text style={styles.statLabel1}>Transactions made this {chartType === 'daily' ? 'day' : chartType === 'monthly' ? 'month' : 'year'}</Text>
+              <Text style={styles.statValue}>
+                {dashboardStats.totalTransactions}
+              </Text>
+              <Text style={styles.statLabel}>
+                Total Transactions (
+                {chartType.charAt(0).toUpperCase() + chartType.slice(1)})
+              </Text>
+              <Text style={styles.statLabel1}>
+                Transactions made this{" "}
+                {chartType === "daily"
+                  ? "day"
+                  : chartType === "monthly"
+                    ? "month"
+                    : "year"}
+              </Text>
               <Text style={styles.statLabel2}>
-                {getComparisonText(dashboardStats.totalTransactions, dashboardStats.previousPeriodTransactions)}
+                {getComparisonText(
+                  dashboardStats.totalTransactions,
+                  dashboardStats.previousPeriodTransactions,
+                )}
               </Text>
             </View>
           </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{formatCurrency(dashboardStats.averageTransactionValue)}</Text>
-              <Text style={styles.statLabel}>Avg. Transaction ({chartType.charAt(0).toUpperCase() + chartType.slice(1)})</Text>
-              <Text style={styles.statLabel1}>Average amount spent per transaction.</Text>
+              <Text style={styles.statValue}>
+                {formatCurrency(dashboardStats.averageTransactionValue)}
+              </Text>
+              <Text style={styles.statLabel}>
+                Avg. Transaction (
+                {chartType.charAt(0).toUpperCase() + chartType.slice(1)})
+              </Text>
+              <Text style={styles.statLabel1}>
+                Average amount spent per transaction.
+              </Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={[styles.statValue, dashboardStats.salesGrowthRate >= 0 ? styles.statValuePositive : styles.statValueNegative]}>
+              <Text
+                style={[
+                  styles.statValue,
+                  dashboardStats.salesGrowthRate >= 0
+                    ? styles.statValuePositive
+                    : styles.statValueNegative,
+                ]}
+              >
                 {formatPercentage(dashboardStats.salesGrowthRate)}
               </Text>
               <Text style={styles.statLabel}>Sales Growth Rate</Text>
-              <Text style={styles.statLabel1}>Growth rate vs previous period</Text>
+              <Text style={styles.statLabel1}>
+                Growth rate vs previous period
+              </Text>
             </View>
           </View>
 
@@ -451,10 +567,18 @@ export default function Analytics() {
                 {["daily", "monthly", "yearly"].map((type) => (
                   <TouchableOpacity
                     key={type}
-                    style={[styles.chartButton, chartType === type && styles.activeButton]}
+                    style={[
+                      styles.chartButton,
+                      chartType === type && styles.activeButton,
+                    ]}
                     onPress={() => setChartType(type)}
                   >
-                    <Text style={[styles.buttonText, chartType === type && styles.activeButtonText]}>
+                    <Text
+                      style={[
+                        styles.buttonText,
+                        chartType === type && styles.activeButtonText,
+                      ]}
+                    >
                       {type.charAt(0).toUpperCase() + type.slice(1)}
                     </Text>
                   </TouchableOpacity>
@@ -463,10 +587,18 @@ export default function Analytics() {
             </View>
             <LineChart
               data={{
-                labels: salesData.labels.length > 0 ? salesData.labels : ["No Data"],
-                datasets: [{ data: salesData.datasets[0].data.length > 0 ? salesData.datasets[0].data : [0] }]
+                labels:
+                  salesData.labels.length > 0 ? salesData.labels : ["No Data"],
+                datasets: [
+                  {
+                    data:
+                      salesData.datasets[0].data.length > 0
+                        ? salesData.datasets[0].data
+                        : [0],
+                  },
+                ],
               }}
-              width={350}
+              width={Dimensions.get("window").width - 64}
               height={220}
               chartConfig={{
                 backgroundColor: "#fff",
@@ -476,10 +608,10 @@ export default function Analytics() {
                 color: (opacity = 1) => `rgba(173, 127, 101, ${opacity})`,
                 labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
                 style: { borderRadius: 16 },
-                propsForDots: { r: "4", strokeWidth: "2", stroke: "#fff" }
+                propsForDots: { r: "4", strokeWidth: "2", stroke: "#fff" },
               }}
               bezier
-              style={styles.chart}
+              style={[styles.chart, { marginLeft: -16 }]}
               withVerticalLines={false}
               withInnerLines={false}
               withShadow={false}
@@ -488,7 +620,9 @@ export default function Analytics() {
           </View>
 
           <View style={[styles.chartContainer, { marginBottom: 24 }]}>
-            <Text style={[styles.chartTitle, { marginBottom: 16 }]}>Stock In</Text>
+            <Text style={[styles.chartTitle, { marginBottom: 16 }]}>
+              Stock In
+            </Text>
             <BarChart
               data={{
                 labels: stockChartLabels,
@@ -505,12 +639,15 @@ export default function Analytics() {
                 color: (opacity = 1) => `rgba(16, 185, 129, 1)`, // Green #10B981 (Solid)
                 labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
                 barPercentage: 0.6,
-                fillShadowGradient: '#10B981', // Solid fill
-                fillShadowGradientFrom: '#10B981', // Solid fill start
-                fillShadowGradientTo: '#10B981', // Solid fill end
+                fillShadowGradient: "#10B981", // Solid fill
+                fillShadowGradientFrom: "#10B981", // Solid fill start
+                fillShadowGradientTo: "#10B981", // Solid fill end
                 fillShadowGradientOpacity: 1,
                 style: { borderRadius: 16 },
-                propsForBackgroundLines: { strokeWidth: 0.5, stroke: "#e0e0e0" },
+                propsForBackgroundLines: {
+                  strokeWidth: 0.5,
+                  stroke: "#e0e0e0",
+                },
                 propsForLabels: { fontSize: 10 },
               }}
               style={{ marginTop: 8, marginBottom: 8, paddingRight: 0 }}
@@ -521,7 +658,9 @@ export default function Analytics() {
           </View>
 
           <View style={[styles.chartContainer, { marginBottom: 24 }]}>
-            <Text style={[styles.chartTitle, { marginBottom: 16 }]}>Pull Outs</Text>
+            <Text style={[styles.chartTitle, { marginBottom: 16 }]}>
+              Pull Outs
+            </Text>
             <BarChart
               data={{
                 labels: stockChartLabels,
@@ -538,12 +677,15 @@ export default function Analytics() {
                 color: (opacity = 1) => `rgba(239, 68, 68, 1)`, // Red #EF4444 (Solid)
                 labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
                 barPercentage: 0.6,
-                fillShadowGradient: '#EF4444',
-                fillShadowGradientFrom: '#EF4444',
-                fillShadowGradientTo: '#EF4444',
+                fillShadowGradient: "#EF4444",
+                fillShadowGradientFrom: "#EF4444",
+                fillShadowGradientTo: "#EF4444",
                 fillShadowGradientOpacity: 1,
                 style: { borderRadius: 16 },
-                propsForBackgroundLines: { strokeWidth: 0.5, stroke: "#e0e0e0" },
+                propsForBackgroundLines: {
+                  strokeWidth: 0.5,
+                  stroke: "#e0e0e0",
+                },
                 propsForLabels: { fontSize: 10 },
               }}
               style={{ marginTop: 8, marginBottom: 8, paddingRight: 0 }}
@@ -557,8 +699,16 @@ export default function Analytics() {
           <View style={[styles.chartContainer, { height: 190 }]}>
             <Text style={styles.chartTitle}>Products Performance</Text>
             {topProducts.length === 0 ? (
-              <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-                <Text style={{ color: "#888", fontSize: 14 }}>No products sold yet.</Text>
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#888", fontSize: 14 }}>
+                  No products sold yet.
+                </Text>
               </View>
             ) : (
               <FlatList
@@ -582,36 +732,88 @@ export default function Analytics() {
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
-                <Text style={styles.sectionTitle}>Low & Out-of-Stock Items</Text>
-                <Text style={styles.sectionSubtitle}>Inventory items that need attention</Text>
+                <Text style={styles.sectionTitle}>
+                  Low & Out-of-Stock Items
+                </Text>
+                <Text style={styles.sectionSubtitle}>
+                  Inventory items that need attention
+                </Text>
               </View>
-              <TouchableOpacity onPress={toggleExpand} style={styles.viewMoreButton} activeOpacity={0.7}>
-                <Text style={styles.viewMoreText}>{expanded ? "Show Less" : "View All"}</Text>
+              <TouchableOpacity
+                onPress={toggleExpand}
+                style={styles.viewMoreButton}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.viewMoreText}>
+                  {expanded ? "Show Less" : "View All"}
+                </Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.tableContainer}>
               <View style={styles.tableHeader}>
-                <Text style={[styles.headerText, { flex: 3, textAlign: "left" }]}>Product</Text>
-                <Text style={[styles.headerText, { flex: 1, textAlign: "center" }]}>Stocks</Text>
-                <Text style={[styles.headerText, { flex: 1.5, textAlign: "right" }]}>Status</Text>
+                <Text
+                  style={[styles.headerText, { flex: 3, textAlign: "left" }]}
+                >
+                  Product
+                </Text>
+                <Text
+                  style={[styles.headerText, { flex: 1, textAlign: "center" }]}
+                >
+                  Stocks
+                </Text>
+                <Text
+                  style={[styles.headerText, { flex: 1.5, textAlign: "right" }]}
+                >
+                  Status
+                </Text>
               </View>
 
               <View style={styles.tableBody}>
                 {visibleData.length === 0 ? (
                   <View style={styles.emptyStateContainer}>
-                    <Text style={styles.emptyStateText}>✓ All items are well stocked</Text>
-                    <Text style={styles.emptyStateSubtext}>No items need attention at this time</Text>
+                    <Text style={styles.emptyStateText}>
+                      ✓ All items are well stocked
+                    </Text>
+                    <Text style={styles.emptyStateSubtext}>
+                      No items need attention at this time
+                    </Text>
                   </View>
                 ) : (
                   visibleData.map((item, index) => (
-                    <View key={item.id.toString()} style={[styles.tableRow, index % 2 === 0 && styles.evenRow]}>
-                      <Text style={[styles.rowText, { flex: 3, textAlign: "left", fontWeight: "500" }]} numberOfLines={1}>
+                    <View
+                      key={item.id.toString()}
+                      style={[
+                        styles.tableRow,
+                        index % 2 === 0 && styles.evenRow,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.rowText,
+                          { flex: 3, textAlign: "left", fontWeight: "500" },
+                        ]}
+                        numberOfLines={1}
+                      >
                         {item.name}
                       </Text>
-                      <Text style={[styles.rowText, { flex: 1, textAlign: "center" }]}>{item.stocks}</Text>
+                      <Text
+                        style={[
+                          styles.rowText,
+                          { flex: 1, textAlign: "center" },
+                        ]}
+                      >
+                        {item.stocks}
+                      </Text>
                       <View style={[styles.statusCell, { flex: 1.5 }]}>
-                        <Text style={[styles.statusText, item.status === "Out of Stock" ? styles.statusTextCritical : styles.statusTextLow]}>
+                        <Text
+                          style={[
+                            styles.statusText,
+                            item.status === "Out of Stock"
+                              ? styles.statusTextCritical
+                              : styles.statusTextLow,
+                          ]}
+                        >
                           {item.status}
                         </Text>
                       </View>
@@ -626,7 +828,6 @@ export default function Analytics() {
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   loadingContainer: {

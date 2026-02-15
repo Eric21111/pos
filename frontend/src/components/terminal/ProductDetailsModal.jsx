@@ -1,4 +1,4 @@
-import { FaTimes, FaMinus, FaPlus } from 'react-icons/fa';
+import { FaMinus, FaPlus, FaTimes } from 'react-icons/fa';
 import { MdCategory, MdShoppingBag } from 'react-icons/md';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -153,7 +153,7 @@ const ProductDetailsModal = ({
                 </div>
                 <div>
                   <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Size</p>
-                  <div className="flex gap-1 mt-1">
+                  <div className="grid grid-cols-3 gap-1 mt-1">
                     {availableSizes.length > 0 ? (
                       availableSizes.map((size) => {
                         const sizeStock = getSizeQuantity(product.sizes[size]);
@@ -164,10 +164,10 @@ const ProductDetailsModal = ({
                             onClick={() => !isOutOfStock && onSelectSize(size)}
                             disabled={isOutOfStock}
                             className={`px-3 py-1 rounded text-xs font-medium transition-all ${selectedSize === size
-                                ? 'bg-[#AD7F65] text-white'
-                                : isOutOfStock
-                                  ? theme === 'dark' ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                                  : theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              ? 'bg-[#AD7F65] text-white'
+                              : isOutOfStock
+                                ? theme === 'dark' ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                : theme === 'dark' ? 'bg-[#2A2724] text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                               }`}
                           >
                             {size}
@@ -200,8 +200,8 @@ const ProductDetailsModal = ({
                       onClick={onDecrement}
                       disabled={isDecrementDisabled()}
                       className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${isDecrementDisabled()
-                          ? theme === 'dark' ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                          : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
+                        ? theme === 'dark' ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
                         }`}
                     >
                       <FaMinus className="text-xs" />
@@ -213,8 +213,8 @@ const ProductDetailsModal = ({
                       onClick={onIncrement}
                       disabled={isIncrementDisabled()}
                       className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${isIncrementDisabled()
-                          ? theme === 'dark' ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                          : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
+                        ? theme === 'dark' ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-[#AD7F65] text-white hover:bg-[#8B5F45]'
                         }`}
                     >
                       <FaPlus className="text-xs" />
@@ -253,8 +253,8 @@ const ProductDetailsModal = ({
                 onClick={handleAdd}
                 disabled={isAddButtonDisabled()}
                 className={`w-full py-3 rounded-lg font-semibold text-white transition-all ${isAddButtonDisabled()
-                    ? 'bg-gray-300 cursor-not-allowed'
-                    : 'bg-green-500 hover:bg-green-600'
+                  ? 'bg-gray-300 cursor-not-allowed'
+                  : 'bg-green-500 hover:bg-green-600'
                   }`}
               >
                 Add to Cart

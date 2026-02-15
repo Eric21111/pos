@@ -1,15 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
-import { FaTimes } from 'react-icons/fa';
-import pinIcon from '../../assets/owner/pin.svg';
-import cameraIcon from '../../assets/owner/camera.svg';
-import circleIcon from '../../assets/owner/circle.svg';
+import { useEffect, useRef, useState } from 'react';
+import { FaCamera, FaTimes, FaUserEdit } from 'react-icons/fa';
 import defaultAvatar from '../../assets/default.jpeg';
 
-const EMPTY_PIN = ['', '', '', '', '', ''];
-
 const EditEmployeeProfile = ({ isOpen, onClose, employee, onEmployeeUpdated }) => {
-  const [newPin, setNewPin] = useState(EMPTY_PIN);
-  const [confirmPin, setConfirmPin] = useState(EMPTY_PIN);
   const [formData, setFormData] = useState({
     name: '',
     contactNo: '',
@@ -26,11 +19,8 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
   });
   const [profilePreview, setProfilePreview] = useState('');
   const [loading, setLoading] = useState(false);
-  const [pinLoading, setPinLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const newPinRefs = useRef([]);
-  const confirmPinRefs = useRef([]);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -52,94 +42,10 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
         generateReports: employee.permissions?.generateReports ?? false
       });
       setProfilePreview(employee.profileImage || employee.image || defaultAvatar);
-      setNewPin(EMPTY_PIN);
-      setConfirmPin(EMPTY_PIN);
-      setMessage('');
-      setError('');
-    }
-    if (!isOpen) {
-      setNewPin(EMPTY_PIN);
-      setConfirmPin(EMPTY_PIN);
       setMessage('');
       setError('');
     }
   }, [isOpen, employee]);
-
-  const handlePinChange = (index, value, pinType) => {
-    if (value && !/^\d$/.test(value)) return;
-
-    if (pinType === 'new') {
-      const updatedPin = [...newPin];
-      updatedPin[index] = value;
-      setNewPin(updatedPin);
-
-      if (value && index < 5) {
-        newPinRefs.current[index + 1]?.focus();
-      }
-    } else {
-      const updatedPin = [...confirmPin];
-      updatedPin[index] = value;
-      setConfirmPin(updatedPin);
-
-      if (value && index < 5) {
-        confirmPinRefs.current[index + 1]?.focus();
-      }
-    }
-  };
-
-  const handlePinKeyDown = (e, index, pinType) => {
-    if (e.key === 'Backspace') {
-      if (e.target.value) {
-        e.preventDefault();
-        if (pinType === 'new') {
-          const updatedPin = [...newPin];
-          updatedPin[index] = '';
-          setNewPin(updatedPin);
-        } else {
-          const updatedPin = [...confirmPin];
-          updatedPin[index] = '';
-          setConfirmPin(updatedPin);
-        }
-      } else if (index > 0) {
-        e.preventDefault();
-        if (pinType === 'new') {
-          newPinRefs.current[index - 1]?.focus();
-        } else {
-          confirmPinRefs.current[index - 1]?.focus();
-        }
-      }
-    }
-  };
-
-  const handlePinPaste = (e, pinType) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').slice(0, 6);
-    const digits = pastedData.split('').filter(char => /^\d$/.test(char));
-
-    if (pinType === 'new') {
-      const updatedPin = [...newPin];
-      digits.forEach((digit, i) => {
-        if (i < 6) {
-          updatedPin[i] = digit;
-        }
-      });
-      setNewPin(updatedPin);
-      const nextEmptyIndex = updatedPin.findIndex(val => val === '');
-      const focusIndex = nextEmptyIndex === -1 ? 5 : nextEmptyIndex;
-      newPinRefs.current[focusIndex]?.focus();
-    } else {
-      const updatedPin = [...confirmPin];
-      digits.forEach((digit, i) => {
-        if (i < 6) {
-          updatedPin[i] = digit;
-        }
-      });
-      setConfirmPin(updatedPin);
-      const nextEmptyIndex = updatedPin.findIndex(val => val === '');
-      const focusIndex = nextEmptyIndex === -1 ? 5 : nextEmptyIndex;
-      confirmPinRefs.current[focusIndex]?.focus();
-    }
-  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -160,36 +66,6 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
     const reader = new FileReader();
     reader.onloadend = () => setProfilePreview(reader.result);
     reader.readAsDataURL(file);
-  };
-
-  const handlePinUpdate = async () => {
-    const pinValue = newPin.join('');
-    if (pinValue.length !== 6 || pinValue !== confirmPin.join('')) {
-      setError('PINs must match and be 6 digits.');
-      return;
-    }
-
-    setPinLoading(true);
-    setError('');
-    setMessage('');
-    try {
-      const res = await fetch(`http://localhost:5000/api/employees/${employee._id}/pin`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPin: pinValue, requiresPinReset: true })
-      });
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to update PIN');
-      }
-      setMessage('PIN updated successfully.');
-      setNewPin(EMPTY_PIN);
-      setConfirmPin(EMPTY_PIN);
-    } catch (err) {
-      setError(err.message || 'Failed to update PIN.');
-    } finally {
-      setPinLoading(false);
-    }
   };
 
   const handleSave = async () => {
@@ -231,94 +107,82 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
   if (!isOpen || !employee) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-10002 p-4 backdrop-blur-sm bg-transparent">
-      <div className="bg-white rounded-3xl w-full max-w-6xl shadow-2xl overflow-hidden relative">
-        <div className="relative">
-          <div
-            className="h-[8px] w-full"
-            style={{
-              background:
-                'radial-gradient(circle at center, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
-            }}
-          />
-          <div
-            className="flex justify-between items-center px-8 py-4"
-            style={{
-              background:
-                'linear-gradient(to right, #C2A68C, #AD7F65, #76462B)',
-            }}
-          >
-            <h2 className="text-white font-semibold text-lg">
-              Update Employee Profile
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-200 transition"
-            >
-              <FaTimes className="w-6 h-6" />
-            </button>
+    <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4 backdrop-blur-sm bg-black/20">
+      <div className="bg-white w-full max-w-2xl relative shadow-2xl overflow-hidden animate-fadeIn" style={{ borderRadius: '24px' }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#AD7F65] flex items-center justify-center text-white">
+              <FaUserEdit className="w-5 h-5" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-800">Edit Employee Profile</h2>
           </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+          >
+            <FaTimes className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 p-8">
-          <div>
-            <div className="flex items-start gap-6">
-              <button
-                type="button"
-                onClick={handlePhotoClick}
-                className="w-32 h-32 rounded-full overflow-hidden shrink-0 bg-gray-100 relative focus:outline-none"
-              >
-                {profilePreview ? (
-                  <img
-                    src={profilePreview}
-                    alt={employee.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <>
-                    <img src={circleIcon} alt="circle" className="w-full h-full object-cover" />
-                    <img src={cameraIcon} alt="camera" className="absolute w-10 h-10 inset-0 m-auto" />
-                  </>
-                )}
-                <span className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs text-white bg-black/40 px-2 py-0.5 rounded-full">
-                  Change Photo
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  onChange={handleImageChange}
-                  className="hidden"
+        <div className="p-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
+
+          {/* Profile Section */}
+          <div className="flex items-start gap-8 mb-10">
+            <div className="shrink-0 relative group cursor-pointer" onClick={handlePhotoClick}>
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg relative">
+                <img
+                  src={profilePreview}
+                  alt={formData.name}
+                  className="w-full h-full object-cover transition-opacity group-hover:opacity-75"
                 />
-              </button>
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                  <FaCamera className="text-white w-8 h-8" />
+                </div>
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            </div>
 
-              <div className="flex flex-col gap-3 flex-1">
-                <input
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="text-2xl font-bold text-gray-800 focus:outline-none border-b border-transparent focus:border-b-[#AD7F65]"
-                />
+            <div className="flex-1 pt-2">
+              <h3 className="text-xl font-bold text-gray-900 mb-1">{formData.name || 'Employee Name'}</h3>
+              <p className="text-sm text-[#AD7F65] font-medium mb-4">{formData.role}</p>
 
-                <select
-                  name="role"
-                  value={formData.role}
-                  onChange={handleInputChange}
-                  className="text-[#F5A623] font-medium text-base bg-transparent border border-[#F5A623] rounded-lg px-3 py-1 focus:outline-none"
-                >
-                  {['Cashier', 'Sales Clerk', 'Manager', 'Supervisor', 'Owner'].map((role) => (
-                    <option value={role} key={role}>
-                      {role}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block">Permissions:</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {permissions.posTerminal && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
+                        POS Terminal
+                      </span>
+                    )}
+                    {permissions.viewTransactions && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
+                        View Transaction
+                      </span>
+                    )}
+                    {!permissions.posTerminal && !permissions.viewTransactions && (
+                      <span className="text-xs text-gray-400 italic">No active permissions</span>
+                    )}
+                  </div>
+                </div>
 
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm text-gray-600">Status</span>
+                <div>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block">Status:</label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="border rounded-lg px-3 py-2 focus:outline-none focus:border-[#AD7F65]"
+                    className={`inline-block px-3 py-1 rounded-lg text-xs font-bold border-none focus:ring-2 focus:ring-offset-1 focus:ring-[#AD7F65] cursor-pointer ${status === 'Active'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-red-100 text-red-700'
+                      }`}
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
@@ -326,206 +190,132 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="mt-16 flex justify-center">
-              <div
-                className="w-[360px] rounded-2xl shadow-md p-2 pl-10"
-                style={{
-                  borderTop: '5px solid #AD7F65',
-                  backgroundColor: '#fff',
-                }}
-              >
-                <h4 className="font-semibold text-[#76462B] mb-3 flex items-center gap-2">
-                  <img src={pinIcon} alt="PIN icon" className="w-5 h-5" />
-                  Change PIN
-                </h4>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-600">New Pin</p>
-                    <div className="flex gap-2">
-                      {newPin.map((value, i) => (
-                        <input
-                          key={i}
-                          ref={(el) => (newPinRefs.current[i] = el)}
-                          type="password"
-                          maxLength="1"
-                          value={value}
-                          onChange={(e) => handlePinChange(i, e.target.value, 'new')}
-                          onKeyDown={(e) => handlePinKeyDown(e, i, 'new')}
-                          onPaste={(e) => handlePinPaste(e, 'new')}
-                          className="w-10 h-10 bg-white border border-gray-300 rounded-lg text-center text-lg shadow-sm focus:outline-none focus:border-[#AD7F65] focus:shadow-md transition-all"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-600">Confirm PIN</p>
-                    <div className="flex gap-2">
-                      {confirmPin.map((value, i) => (
-                        <input
-                          key={i}
-                          ref={(el) => (confirmPinRefs.current[i] = el)}
-                          type="password"
-                          maxLength="1"
-                          value={value}
-                          onChange={(e) => handlePinChange(i, e.target.value, 'confirm')}
-                          onKeyDown={(e) => handlePinKeyDown(e, i, 'confirm')}
-                          onPaste={(e) => handlePinPaste(e, 'confirm')}
-                          className="w-10 h-10 bg-white border border-gray-300 rounded-lg text-center text-lg shadow-sm focus:outline-none focus:border-[#AD7F65] focus:shadow-md transition-all"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 mt-3 justify-end">
-                  <button
-                    onClick={handlePinUpdate}
-                    disabled={pinLoading}
-                    className="px-5 py-2 rounded-md text-white text-sm font-medium bg-[#AD7F65] hover:opacity-90 disabled:opacity-50"
-                  >
-                    {pinLoading ? 'Updating...' : 'Update PIN'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setNewPin(EMPTY_PIN);
-                      setConfirmPin(EMPTY_PIN);
-                    }}
-                    className="px-5 py-2 rounded-md bg-gray-100 text-sm font-medium hover:bg-gray-200"
-                  >
-                    Clear
-                  </button>
-                </div>
+          {/* Personal Details Form */}
+          <h4 className="text-base font-bold text-gray-800 mb-6">Personal Details</h4>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-6 mb-10">
+            <div>
+              <label className="text-sm font-medium text-gray-500 mb-1 block">Name</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className="w-full text-base font-semibold text-gray-800 border-b border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 placeholder-gray-300"
+                placeholder="Enter name"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500 mb-1 block">Contact number</label>
+              <input
+                type="text"
+                name="contactNo"
+                value={formData.contactNo}
+                onChange={handleInputChange}
+                className="w-full text-lg font-bold text-gray-800 border-b border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 placeholder-gray-300"
+                placeholder="09123456789"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500 mb-1 block">Email</label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                className="w-full text-lg font-bold text-gray-800 border-b border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 placeholder-gray-300"
+                placeholder="email@example.com"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500 mb-1 block">Date Joined</label>
+              <input
+                type="date"
+                name="dateJoined"
+                value={formData.dateJoined}
+                onChange={handleInputChange}
+                className="w-full text-lg font-bold text-gray-800 border-b border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium text-gray-500 mb-1 block">Position</label>
+              <div className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <span>Employee - </span>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleInputChange}
+                  className="bg-transparent border-b border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 font-bold text-gray-800 cursor-pointer"
+                >
+                  {['Cashier', 'Sales Clerk', 'Manager', 'Supervisor'].map((role) => (
+                    <option value={role} key={role}>
+                      {role}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div
-              className="p-6 rounded-2xl shadow-md"
-              style={{ borderTop: '5px solid #AD7F65' }}
-            >
-              <h4 className="font-semibold text-[#76462B] mb-4">
-                Profile Information
-              </h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+          {/* Permissions Section */}
+          <h4 className="text-base font-bold text-gray-800 mb-6">Permissions</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            {[
+              { label: 'POS Terminal', desc: 'Access to Point of Sale Terminal', key: 'posTerminal' },
+              { label: 'Inventory', desc: 'Add, Edit, Delete Products', key: 'inventory' },
+              { label: 'View Transactions', desc: 'View Sales History', key: 'viewTransactions' },
+              { label: 'Generate Reports', desc: 'Create and Download Business Reports', key: 'generateReports' },
+            ].map(({ label, desc, key }) => (
+              <div key={key} className="border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:border-[#AD7F65] transition-colors bg-white">
                 <div>
-                  <p className="text-gray-500 mb-1">Name</p>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AD7F65]"
-                  />
+                  <p className="font-bold text-gray-800 text-sm">{label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
                 </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Contact number</p>
+                <label className="relative inline-flex items-center cursor-pointer">
                   <input
-                    type="text"
-                    name="contactNo"
-                    value={formData.contactNo}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AD7F65]"
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={permissions[key]}
+                    onChange={() => handlePermissionToggle(key)}
                   />
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Email</p>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AD7F65]"
-                  />
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Date Joined</p>
-                  <input
-                    type="date"
-                    name="dateJoined"
-                    value={formData.dateJoined}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AD7F65]"
-                  />
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Position</p>
-                  <input
-                    type="text"
-                    value={`Employee - ${formData.role}`}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
-                  />
-                </div>
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-[#AD7F65] peer-focus:ring-2 peer-focus:ring-[#AD7F65]/20 transition-all"></div>
+                  <div className="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5 shadow-sm"></div>
+                </label>
               </div>
-            </div>
+            ))}
+          </div>
 
+          {/* Error Message */}
+          {(error || message) && (
             <div
-              className="p-6 rounded-2xl shadow-md"
-              style={{ borderTop: '5px solid #AD7F65' }}
-            >
-              <h4 className="font-semibold text-[#76462B] mb-4">
-                User Access Control
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'POS Terminal', key: 'posTerminal' },
-                  { label: 'Inventory', key: 'inventory' },
-                  { label: 'View Transactions', key: 'viewTransactions' },
-                  { label: 'Generate Reports', key: 'generateReports' },
-                ].map(({ label, key }) => (
-                  <div
-                    key={key}
-                    className="flex justify-between items-center border rounded-lg px-3 py-2 text-sm"
-                  >
-                    <span>{label}</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        checked={permissions[key]}
-                        onChange={() => handlePermissionToggle(key)}
-                      />
-                      <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-[#AD7F65] transition-all"></div>
-                      <div className="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition peer-checked:translate-x-5"></div>
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {(error || message) && (
-              <div
-                className={`px-4 py-3 rounded-xl text-sm ${
-                  error ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+              className={`px-4 py-3 rounded-xl text-sm mb-6 ${error ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                 }`}
-              >
-                {error || message}
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className="px-6 py-2 rounded-lg text-white font-medium hover:opacity-90 transition-all disabled:opacity-50"
-                style={{
-                  background:
-                    'linear-gradient(to right, #C2A68C, #AD7F65, #76462B)',
-                }}
-              >
-                {loading ? 'Updating...' : 'Update'}
-              </button>
-              <button
-                onClick={onClose}
-                className="px-6 py-2 rounded-lg bg-gray-200 font-medium hover:bg-gray-300 transition-all"
-              >
-                Cancel
-              </button>
+            >
+              {error || message}
             </div>
+          )}
+
+          {/* Footer Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              onClick={onClose}
+              className="px-6 py-2.5 rounded-lg bg-gray-200 font-bold text-gray-700 hover:bg-gray-300 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="px-8 py-2.5 rounded-lg text-white font-bold transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+              style={{
+                background: '#007AFF'
+              }}
+            >
+              {loading ? 'Updating...' : 'Update'}
+            </button>
           </div>
+
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
-import { FaTimes, FaSpinner, FaCheck } from 'react-icons/fa';
-import circleIcon from '../../assets/owner/circle.svg';
+import { useEffect, useRef, useState } from 'react';
+import { FaCamera, FaCheck, FaSpinner, FaTimes, FaUserPlus } from 'react-icons/fa';
 import cameraIcon from '../../assets/owner/camera.svg';
+import circleIcon from '../../assets/owner/circle.svg';
 
 const getDisplayDate = () =>
   new Date().toLocaleDateString('en-US', {
@@ -43,7 +43,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    contactNo: '+63',
+    contactNo: '',
     email: '',
     role: 'Cashier',
     dateCreated: getDisplayDate(),
@@ -78,7 +78,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
       setFormData({
         firstName: '',
         lastName: '',
-        contactNo: '+63',
+        contactNo: '',
         email: '',
         role: 'Cashier',
         dateCreated: getDisplayDate(),
@@ -95,8 +95,10 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
       setIsCodeSent(false);
       setIsEmailVerified(false);
       setVerificationTimer(0);
+      setError('');
     }
   }, [isOpen]);
+
   const handleImageSelect = () => {
     fileInputRef.current?.click();
   };
@@ -111,7 +113,6 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
     };
     reader.readAsDataURL(file);
   };
-
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -261,7 +262,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
         setFormData({
           firstName: '',
           lastName: '',
-          contactNo: '+63',
+          contactNo: '',
           email: '',
           role: 'Cashier',
           dateCreated: getDisplayDate(),
@@ -301,274 +302,251 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4 backdrop-blur-sm bg-transparent">
-      <div className="bg-white rounded-3xl w-full max-w-6xl shadow-2xl overflow-hidden relative">
-        <div className="relative">
-          <div
-            className="flex justify-between items-center px-8 py-4"
-            style={{
-              background:
-                'linear-gradient(to right, #C2A68C, #AD7F65, #76462B)',
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <h2 className="text-white font-semibold text-lg">
-                Add New Employee
-              </h2>
+    <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4 backdrop-blur-sm bg-black/20">
+      <div className="bg-white w-full max-w-xl relative shadow-2xl overflow-hidden animate-fadeIn" style={{ borderRadius: '24px' }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#AD7F65] flex items-center justify-center text-white">
+              <FaUserPlus className="w-5 h-5" />
             </div>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-200 transition"
-            >
-              <FaTimes className="w-6 h-6" />
-            </button>
+            <h2 className="text-lg font-bold text-gray-800">Add Employee Profile</h2>
           </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+          >
+            <FaTimes className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 p-8">
-          <div>
-            <div className="flex items-start gap-6">
-              <button
-                type="button"
-                onClick={handleImageSelect}
-                className="w-60 h-60 ml-30 mt-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center relative focus:outline-none"
-              >
-                {profilePreview ? (
+        <div className="p-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
+
+          {/* Centered Avatar Upload */}
+          <div className="flex justify-center mb-8">
+            <button
+              type="button"
+              onClick={handleImageSelect}
+              className="w-40 h-40 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center relative focus:outline-none group hover:opacity-90 transition-opacity"
+            >
+              {profilePreview ? (
+                <>
                   <img src={profilePreview} alt="Preview" className="w-full h-full object-cover" />
-                ) : (
-                  <>
-                    <img src={circleIcon} alt="Circle background" className="w-full h-full object-cover" />
-                    <img src={cameraIcon} alt="Camera" className="absolute w-20 h-20 opacity-80" />
-                    <span className="absolute bottom-6 text-white text-sm font-medium">Upload Photo</span>
-                  </>
-                )}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                    <FaCamera className="text-white w-8 h-8" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <img src={circleIcon} alt="Circle background" className="w-full h-full object-cover" />
+                  <img src={cameraIcon} alt="Camera" className="absolute w-16 h-16 opacity-80" />
+                </>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            </button>
+          </div>
+
+          {/* Personal Details */}
+          <h4 className="text-base font-bold text-gray-800 mb-4">Personal Details</h4>
+          <div className="space-y-4 mb-8">
+            {/* First Name and Last Name */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-gray-500 mb-1 block">First Name</label>
                 <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  onChange={handleImageChange}
-                  className="hidden"
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleInputChange}
+                  placeholder="First Name"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AD7F65] text-sm"
                 />
-              </button>
-            </div>
-
-            <div
-              className="mt-6 p-6 rounded-2xl shadow-md"
-              style={{ borderTop: '5px solid #AD7F65' }}
-            >
-              <h4 className="font-semibold text-[#76462B] mb-4">
-                User Access Control
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  'POS Terminal',
-                  'Inventory',
-                  'View Transactions',
-                  'Generate Reports',
-                ].map((item, idx) => {
-                  const accessKey = item === 'POS Terminal' ? 'posTerminal' :
-                    item === 'Inventory' ? 'inventory' :
-                      item === 'View Transactions' ? 'viewTransactions' :
-                        'generateReports';
-                  return (
-                    <div
-                      key={idx}
-                      className="flex justify-between items-center border rounded-lg px-3 py-2 text-sm"
-                    >
-                      <span>{item}</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={accessControl[accessKey]}
-                          onChange={() => handleAccessControlToggle(accessKey)}
-                        />
-                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-[#AD7F65] transition-all"></div>
-                        <div className="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition peer-checked:translate-x-5"></div>
-                      </label>
-                    </div>
-                  );
-                })}
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 mb-1 block">Last Name</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleInputChange}
+                  placeholder="Last Name"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AD7F65] text-sm"
+                />
               </div>
             </div>
-          </div>
 
-          <div className="space-y-6">
-            <div
-              className="p-6 rounded-2xl shadow-md"
-              style={{ borderTop: '5px solid #AD7F65' }}
-            >
-              <h4 className="font-semibold text-[#76462B] mb-4">
-                Profile Information
-              </h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500 mb-1">First Name (Username)</p>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    placeholder="e.g. John"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
-                  />
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Last Name</p>
-                  <input
-                    type="text"
-                    name="lastName"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    placeholder="e.g. Doe"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
-                  />
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Contact No.</p>
-                  <input
-                    type="text"
-                    name="contactNo"
-                    value={formData.contactNo}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
-                  />
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Date Joined</p>
-                  <input
-                    type="date"
-                    name="dateJoined"
-                    value={formData.dateJoined}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65] bg-white"
-                  />
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Role/Position</p>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65] bg-white"
+            {/* Email with Send Code */}
+            <div>
+              <label className="text-sm text-gray-500 mb-1 block">Email</label>
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={(e) => {
+                    handleInputChange(e);
+                    if (isEmailVerified) setIsEmailVerified(false);
+                    if (isCodeSent) setIsCodeSent(false);
+                  }}
+                  placeholder="user@example.com"
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-[#AD7F65] text-sm ${isEmailVerified ? 'border-green-500 bg-green-50' : 'border-gray-200'
+                    }`}
+                  readOnly={isEmailVerified}
+                />
+                {!isEmailVerified && !isCodeSent && (
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={emailLoading || !formData.email || verificationTimer > 0 || showCodeSentCheck}
+                    className="px-6 py-2 bg-[#C2A68C] text-white rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-2 transition-all whitespace-nowrap font-medium"
                   >
-                    <option value="Cashier">Cashier</option>
-                    <option value="Manager">Manager</option>
-                    <option value="Sub-Cashier">Sub-Cashier</option>
-                    <option value="Stock Manager">Stock Manager</option>
-                  </select>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Date Created</p>
+                    {emailLoading ? (
+                      <>
+                        <FaSpinner className="animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : showCodeSentCheck ? (
+                      <>
+                        <FaCheck className="animate-pulse" />
+                        <span>Sent!</span>
+                      </>
+                    ) : verificationTimer > 0 ? (
+                      `Resend (${verificationTimer}s)`
+                    ) : (
+                      'Send Code'
+                    )}
+                  </button>
+                )}
+                {isEmailVerified && (
+                  <div className="px-6 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
+                    <FaCheck /> Verified
+                  </div>
+                )}
+              </div>
+              {isCodeSent && !isEmailVerified && (
+                <div className="grid grid-cols-2 gap-4 mt-2">
                   <input
                     type="text"
-                    name="dateCreated"
-                    value={formData.dateCreated}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65] bg-gray-50"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                    placeholder="Enter 6-digit code"
+                    maxLength={6}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AD7F65] text-sm"
                   />
+                  <button
+                    type="button"
+                    onClick={handleVerifyCode}
+                    disabled={emailLoading || !verificationCode}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg text-sm whitespace-nowrap disabled:opacity-50 font-medium"
+                  >
+                    Verify
+                  </button>
                 </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Email</p>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={(e) => {
-                      handleInputChange(e);
-                      if (isEmailVerified) setIsEmailVerified(false);
-                    }}
-                    placeholder="user@example.com"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-[#AD7F65] ${isEmailVerified ? 'border-green-500 bg-green-50' : 'border-gray-300'
-                      }`}
-                    readOnly={isEmailVerified}
-                  />
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1 invisible">Verification</p>
-                  {!isEmailVerified && !isCodeSent && (
-                    <button
-                      type="button"
-                      onClick={handleSendCode}
-                      disabled={emailLoading || !formData.email || verificationTimer > 0 || showCodeSentCheck}
-                      className="w-full px-3 py-2 bg-[#AD7F65] text-white rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
-                    >
-                      {emailLoading ? (
-                        <>
-                          <FaSpinner className="animate-spin" />
-                          <span>Sending...</span>
-                        </>
-                      ) : showCodeSentCheck ? (
-                        <>
-                          <FaCheck className="animate-pulse" />
-                          <span>Code Sent!</span>
-                        </>
-                      ) : verificationTimer > 0 ? (
-                        `Resend in ${verificationTimer}s`
-                      ) : (
-                        'Send Code'
-                      )}
-                    </button>
-                  )}
+              )}
+            </div>
 
-                  {isCodeSent && !isEmailVerified && (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value)}
-                        placeholder="6-digit code"
-                        maxLength={6}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#AD7F65]"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleVerifyCode}
-                        disabled={emailLoading || !verificationCode}
-                        className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm whitespace-nowrap disabled:opacity-50"
-                      >
-                        Verify
-                      </button>
-                    </div>
-                  )}
-                  {isEmailVerified && (
-                    <div className="w-full px-3 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm text-center font-medium">
-                      ✓ Verified
-                    </div>
-                  )}
-                </div>
+            {/* Contact Number and Date Joined */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-gray-500 mb-1 block">Contact number</label>
+                <input
+                  type="text"
+                  name="contactNo"
+                  value={formData.contactNo}
+                  onChange={handleInputChange}
+                  placeholder="09123456789"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AD7F65] text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 mb-1 block">Date Joined</label>
+                <input
+                  type="date"
+                  name="dateJoined"
+                  value={formData.dateJoined}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AD7F65] text-sm bg-white"
+                />
               </div>
             </div>
 
-
-
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4">
-                {error}
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={handleAddEmployee}
-                disabled={loading || emailLoading || !isEmailVerified}
-                className="px-6 py-2 rounded-lg text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background:
-                    'linear-gradient(to right, #C2A68C, #AD7F65, #76462B)',
-                }}
+            {/* Position */}
+            <div>
+              <label className="text-sm text-gray-500 mb-1 block">Position</label>
+              <select
+                name="role"
+                value={formData.role}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AD7F65] text-sm bg-white"
               >
-                {loading ? 'Adding...' : 'Add Employee'}
-              </button>
-              <button
-                onClick={onClose}
-                disabled={loading}
-                className="px-6 py-2 rounded-lg bg-gray-200 font-medium hover:bg-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
+                <option value="Cashier">Cashier</option>
+                <option value="Manager">Manager</option>
+                <option value="Sub-Cashier">Sub-Cashier</option>
+                <option value="Stock Manager">Stock Manager</option>
+              </select>
             </div>
           </div>
+
+          {/* Permissions */}
+          <h4 className="text-base font-bold text-gray-800 mb-4">Permissions</h4>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {[
+              { label: 'POS Terminal', desc: 'Access to Point of Sale Terminal', key: 'posTerminal' },
+              { label: 'Inventory', desc: 'Add, Edit, Delete Products', key: 'inventory' },
+              { label: 'View Transactions', desc: 'View Sales History', key: 'viewTransactions' },
+              { label: 'Generate Reports', desc: 'Create and Download Business Reports', key: 'generateReports' },
+            ].map(({ label, desc, key }) => (
+              <div key={key} className="border border-gray-200 rounded-xl p-3 flex items-center justify-between hover:border-[#AD7F65] transition-colors bg-white">
+                <div>
+                  <p className="font-bold text-gray-800 text-xs">{label}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{desc}</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer ml-2">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={accessControl[key]}
+                    onChange={() => handleAccessControlToggle(key)}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-[#AD7F65] peer-focus:ring-2 peer-focus:ring-[#AD7F65]/20 transition-all"></div>
+                  <div className="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5 shadow-sm"></div>
+                </label>
+              </div>
+            ))}
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-100 text-red-700 px-4 py-3 rounded-xl text-sm mb-6">
+              {error}
+            </div>
+          )}
+
+          {/* Footer Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="px-6 py-2.5 rounded-lg bg-gray-200 font-bold text-gray-700 hover:bg-gray-300 transition-all disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddEmployee}
+              disabled={loading || emailLoading || !isEmailVerified}
+              className="px-8 py-2.5 rounded-lg text-white font-bold transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed bg-[#10B981]"
+            >
+              {loading ? 'Adding...' : 'Add'}
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
@@ -576,4 +554,3 @@ const AddEmployeeModal = ({ isOpen, onClose, onEmployeeAdded, onEmployeeCreated 
 };
 
 export default AddEmployeeModal;
-

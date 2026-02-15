@@ -1,31 +1,32 @@
-const express = require('express');
+const express = require("express");
+const dataSyncService = require("../services/dataSyncService");
 
 const router = express.Router();
 
-// Simple sync endpoint – extend this to call any real sync logic you need
-router.post('/all', async (req, res) => {
+// Manual sync endpoint - triggers bidirectional sync between local and cloud
+router.post("/all", async (req, res) => {
   try {
-    // TODO: add real sync logic here (e.g. pulling/pushing data)
-    // For now we assume everything is already up to date.
-    const hasChanges = false;
+    console.log("[Sync Route] Manual sync triggered...");
+    const startTime = Date.now();
+
+    await dataSyncService.sync();
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`[Sync Route] Manual sync completed in ${duration}s`);
 
     return res.json({
       success: true,
-      message: hasChanges
-        ? 'Sync completed successfully'
-        : 'Data is already up to date',
-      hasChanges,
+      message: `Data synchronized successfully (${duration}s)`,
       syncedAt: new Date().toISOString(),
+      duration: `${duration}s`,
     });
   } catch (error) {
-    console.error('Sync /all failed:', error);
+    console.error("Sync /all failed:", error);
     return res.status(500).json({
       success: false,
-      message: error.message || 'Sync failed',
+      message: error.message || "Sync failed",
     });
   }
 });
 
 module.exports = router;
-
-

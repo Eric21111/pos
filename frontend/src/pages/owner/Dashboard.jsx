@@ -7,7 +7,7 @@ import {
   FaChartLine,
   FaExclamationTriangle,
   FaHandshake,
-  FaShoppingBag
+  FaShoppingBag,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import {
@@ -153,7 +153,6 @@ const Dashboard = () => {
       const response = await fetch(url);
       const data = await response.json();
       if (data.success) {
-        // Ensure revenue key exists (server might return totalSales if not restarted)
         const mappedData = data.data.map((item) => ({
           ...item,
           revenue: item.revenue ?? item.totalSales ?? 0,
@@ -282,7 +281,7 @@ const Dashboard = () => {
         showBorder={false}
         userName={userName}
         userRole="Owner"
-        className="px-6 pt-8 pb-4" // Increased top padding and added bottom padding to header
+        className="px-6 pt-8 pb-4 [&_h1]:text-4xl" // Increased top padding and added bottom padding to header
       />
 
       <div className="px-6 pb-4 w-full space-y-6">
@@ -300,32 +299,30 @@ const Dashboard = () => {
                     setTimeframe(t);
                     setDateRange([null, null]); // Reset custom range when switching back to presets
                   }}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${timeframe === t
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                    timeframe === t
                       ? "bg-[#AD7F65] text-white shadow-sm"
                       : theme === "dark"
                         ? "text-gray-400 hover:bg-[#3A3734]"
                         : "text-gray-500 hover:bg-gray-100"
-                    }`}
+                  }`}
                 >
                   {t}
                 </button>
               ))}
               <button
                 onClick={() => {
-                  // Don't set timeframe to Custom immediately unless we want to,
-                  // but helps visual indication.
-                  // Let's just trigger the date picker if they click this?
-                  // Or just show it as active if Custom is active along with the logic below.
                   if (timeframe !== "Custom") {
                     setShowDatePicker(true);
                   }
                 }}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${timeframe === "Custom"
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                  timeframe === "Custom"
                     ? "bg-[#AD7F65] text-white shadow-sm"
                     : theme === "dark"
                       ? "text-gray-400 hover:bg-[#3A3734] hidden"
                       : "text-gray-500 hover:bg-gray-100 hidden" // Hide 'Custom' tab unless active, or maybe show it?
-                  }`}
+                }`}
               >
                 Custom
               </button>
@@ -937,7 +934,7 @@ const Dashboard = () => {
                   {lowStockProducts.map((product) => (
                     <tr
                       key={product._id}
-                      className={`border-b transition-colors ${theme === "dark" ? "bg-[#2A2724] border-gray-700 hover:bg-[#3A3734]" : "bg-white hover:bg-gray-50"}`}
+                      className={`transition-colors ${theme === "dark" ? "bg-[#2A2724] hover:bg-[#3A3734]" : "bg-white hover:bg-gray-50"}`}
                     >
                       <td
                         className={`px-4 py-3 font-medium flex items-center gap-3 ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}
@@ -972,10 +969,11 @@ const Dashboard = () => {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
-                          className={`px-2 py-1 rounded-full text-[10px] font-bold ${product.calculatedStock === 0
+                          className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                            product.calculatedStock === 0
                               ? "bg-red-100 text-red-600"
                               : "bg-orange-100 text-orange-600"
-                            }`}
+                          }`}
                         >
                           {product.calculatedStock === 0
                             ? "Out of Stock"

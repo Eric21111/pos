@@ -1,20 +1,24 @@
-const mongoose = require('mongoose');
-const dns = require('dns').promises;
+const mongoose = require("mongoose");
+const dns = require("dns").promises;
 
 class DatabaseManager {
   constructor() {
     this.connection = null;
-    this.cloudURI = process.env.MONGODB_URI || 'mongodb+srv://libradillaeric116_db_user:jtzUYlu73JjrvkMz@expense-tracker.m9uzs1f.mongodb.net/pos-system?retryWrites=true&w=majority&appName=expense-tracker';
-    this.localURI = 'mongodb://localhost:27017/pos-system';
+    this.cloudURI =
+      process.env.MONGODB_URI ||
+      "mongodb+srv://consolvestudio_db_user:7S9QKG6eFPHt7yyk@cys.biyeclf.mongodb.net/?appName=Cys";
+    this.localURI = "mongodb://localhost:27017/pos-system";
     this.currentURI = null;
     this.isOnline = false;
     this.connectionCheckInterval = null;
     this.isReconnecting = false;
+    // Cloud-only mode: meaningful for hosted backend (no local fallback)
+    this.cloudOnlyMode = process.env.CLOUD_ONLY === "true";
   }
 
   async checkInternetConnection() {
     try {
-      await dns.resolve('google.com');
+      await dns.resolve("google.com");
       return true;
     } catch (error) {
       return false;
@@ -24,40 +28,41 @@ class DatabaseManager {
   async initialize() {
     try {
       await this.connect();
-      
+
       this.startConnectionMonitoring();
     } catch (error) {
-      console.error('Failed to initialize database:', error.message);
+      console.error("Failed to initialize database:", error.message);
       throw error;
     }
   }
 
   startConnectionMonitoring() {
-   
+    if (this.cloudOnlyMode) return; // No need to monitor in cloud-only mode
+
     this.connectionCheckInterval = setInterval(async () => {
       if (this.isReconnecting) return;
 
       const wasOnline = this.isOnline;
       const isNowOnline = await this.checkInternetConnection();
 
- 
       if (wasOnline !== isNowOnline) {
         this.isOnline = isNowOnline;
-        console.log(`\n[Connection Status Changed] Online: ${wasOnline} -> ${isNowOnline}`);
+        console.log(
+          `\n[Connection Status Changed] Online: ${wasOnline} -> ${isNowOnline}`,
+        );
 
         const shouldUseCloud = isNowOnline && this.cloudURI;
         const currentlyUsingCloud = this.currentURI === this.cloudURI;
 
-    
         if (shouldUseCloud && !currentlyUsingCloud) {
-          console.log('[Switching] Moving from LOCAL to CLOUD database...');
+          console.log("[Switching] Moving from LOCAL to CLOUD database...");
           await this.reconnect();
         } else if (!shouldUseCloud && currentlyUsingCloud) {
-          console.log('[Switching] Moving from CLOUD to LOCAL database...');
+          console.log("[Switching] Moving from CLOUD to LOCAL database...");
           await this.reconnect();
         }
       }
-    }, 30000); 
+    }, 30000);
   }
 
   stopConnectionMonitoring() {
@@ -69,23 +74,21 @@ class DatabaseManager {
 
   async reconnect() {
     if (this.isReconnecting) {
-      console.log('[Reconnect] Already reconnecting, skipping...');
+      console.log("[Reconnect] Already reconnecting, skipping...");
       return;
     }
 
     try {
       this.isReconnecting = true;
 
-      
       if (mongoose.connection.readyState !== 0) {
         await mongoose.connection.close();
-        console.log('[Reconnect] Previous connection closed');
+        console.log("[Reconnect] Previous connection closed");
       }
 
-      
       await this.connect();
     } catch (error) {
-      console.error('[Reconnect] Failed:', error.message);
+      console.error("[Reconnect] Failed:", error.message);
     } finally {
       this.isReconnecting = false;
     }
@@ -93,65 +96,83 @@ class DatabaseManager {
 
   async connect() {
     try {
-     
       if (process.env.MONGODB_URI) {
         this.cloudURI = process.env.MONGODB_URI;
       }
 
-    
       if (mongoose.connection.readyState === 1 && !this.isReconnecting) {
         return mongoose.connection;
       }
 
-
-      this.isOnline = await this.checkInternetConnection();
-
-      console.log('DEBUG: isOnline =', this.isOnline);
-      console.log('DEBUG: cloudURI =', this.cloudURI ? 'Configured' : 'Not Configured');
-
-
-      if (this.isOnline && this.cloudURI) {
+      // CLOUD ONLY MODE (Hosted Backend)
+      if (this.cloudOnlyMode) {
         this.currentURI = this.cloudURI;
-        console.log('[Connection] Internet ONLINE - Forcing CLOUD database');
-      } else {
-        this.currentURI = this.localURI;
-        if (!this.cloudURI) {
-          console.log('[Connection] No cloud URI configured - Using LOCAL database');
+        this.isOnline = true; // Assume online in cloud environment
+        console.log("[Connection] Cloud-Only Mode - Connecting to Cloud DB...");
+      }
+      // HYBRID MODE (Local Backend)
+      else {
+        this.isOnline = await this.checkInternetConnection();
+
+        console.log("DEBUG: isOnline =", this.isOnline);
+        console.log(
+          "DEBUG: cloudURI =",
+          this.cloudURI ? "Configured" : "Not Configured",
+        );
+
+        if (this.isOnline && this.cloudURI) {
+          this.currentURI = this.cloudURI;
+          console.log("[Connection] Internet ONLINE - Forcing CLOUD database");
         } else {
-          console.log('[Connection] Internet OFFLINE - Using LOCAL database');
+          this.currentURI = this.localURI;
+          if (!this.cloudURI) {
+            console.log(
+              "[Connection] No cloud URI configured - Using LOCAL database",
+            );
+          } else {
+            console.log("[Connection] Internet OFFLINE - Using LOCAL database");
+          }
         }
       }
 
       await mongoose.connect(this.currentURI);
 
       console.log(`✓ MongoDB Connected: ${mongoose.connection.host}`);
-      console.log(`✓ Database mode: ${this.isOnline && this.cloudURI ? 'CLOUD' : 'LOCAL'}`);
+      console.log(
+        `✓ Database mode: ${this.isOnline && this.cloudURI ? "CLOUD" : "LOCAL"}`,
+      );
 
       this.connection = mongoose.connection;
 
-      mongoose.connection.on('disconnected', () => {
-        console.log('[Warning] Database disconnected');
+      mongoose.connection.on("disconnected", () => {
+        console.log("[Warning] Database disconnected");
       });
 
-      mongoose.connection.on('error', (err) => {
-        console.error('[Error] Database connection error:', err.message);
+      mongoose.connection.on("error", (err) => {
+        console.error("[Error] Database connection error:", err.message);
       });
 
       return mongoose.connection;
     } catch (error) {
-      console.error('[Error] Failed to connect to MongoDB:', error.message);
+      console.error("[Error] Failed to connect to MongoDB:", error.message);
 
-    
       if (this.isOnline && this.currentURI === this.cloudURI) {
-        console.log('[Fallback] Cloud database failed - Attempting local database...');
+        console.log(
+          "[Fallback] Cloud database failed - Attempting local database...",
+        );
         try {
           this.currentURI = this.localURI;
           await mongoose.connect(this.currentURI);
-          console.log(`✓ MongoDB Connected (Local Fallback): ${mongoose.connection.host}`);
+          console.log(
+            `✓ MongoDB Connected (Local Fallback): ${mongoose.connection.host}`,
+          );
           this.connection = mongoose.connection;
           return mongoose.connection;
         } catch (fallbackError) {
-          console.error('[Error] Local database fallback failed:', fallbackError.message);
+          console.error(
+            "[Error] Local database fallback failed:",
+            fallbackError.message,
+          );
           throw fallbackError;
         }
       }
@@ -169,18 +190,17 @@ class DatabaseManager {
   }
 
   getCurrentMode() {
-    return this.currentURI === this.cloudURI ? 'CLOUD' : 'LOCAL';
+    return this.currentURI === this.cloudURI ? "CLOUD" : "LOCAL";
   }
 
   async disconnect() {
     this.stopConnectionMonitoring();
     if (mongoose.connection.readyState !== 0) {
       await mongoose.connection.close();
-      console.log('Database connection closed');
+      console.log("Database connection closed");
     }
   }
 }
-
 
 const dbManager = new DatabaseManager();
 

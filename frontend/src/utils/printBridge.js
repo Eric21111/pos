@@ -2,7 +2,9 @@ const DEFAULT_DEV_ENDPOINT = import.meta.env.DEV
   ? 'http://localhost:5000/api/print/receipt'
   : '/api/print/receipt';
 const PRINT_ENDPOINT =
-  import.meta.env.VITE_PRINT_API || DEFAULT_DEV_ENDPOINT;
+  import.meta.env.VITE_PRINT_BRIDGE_URL ||
+  import.meta.env.VITE_PRINT_API ||
+  DEFAULT_DEV_ENDPOINT;
 const MAX_WIDTH = Number(import.meta.env.VITE_RECEIPT_LINE_WIDTH || 32);
 
 const formatCurrency = value => `PHP ${Number(value || 0).toFixed(2)}`;
@@ -32,18 +34,18 @@ export const buildReceiptLines = receipt => {
   const location = receipt.location || 'Pasonanca, Zamboanga City';
   const issueTime = receipt.time || '12:00PM';
   const referenceNo = receipt.referenceNo || receipt.reference || '-';
-  
+
   // Header
   lines.push(storeName);
   lines.push(padLine(issueTime, contactNumber));
   lines.push(location);
   lines.push('-'.repeat(MAX_WIDTH));
-  
+
   // Receipt No
   lines.push('Receipt No:');
   lines.push(`#${receipt.receiptNo || '000000'}`);
   lines.push('-'.repeat(MAX_WIDTH));
-  
+
   // Item table headers (Item: 20, Qty: 3, Price: 9 = 32 chars)
   const itemCol = 'Item'.padEnd(20);
   const qtyCol = 'Qty'.padStart(3);
@@ -56,7 +58,7 @@ export const buildReceiptLines = receipt => {
     const itemName = (item.name || item.itemName || 'Item').toString();
     const qty = item.qty || item.quantity || 1;
     const price = item.price || item.itemPrice || 0;
-    
+
     const itemNameLine = itemName.substring(0, 20).padEnd(20);
     const qtyStr = qty.toString().padStart(3);
     const priceStr = formatCurrency(price).padStart(9);
@@ -64,7 +66,7 @@ export const buildReceiptLines = receipt => {
   });
 
   lines.push('-'.repeat(MAX_WIDTH));
-  
+
   // Payment summary
   lines.push(padLine('Transaction/Reference', referenceNo));
   lines.push(padLine('Payment Method', receipt.paymentMethod || 'CASH'));
@@ -73,15 +75,15 @@ export const buildReceiptLines = receipt => {
   lines.push(padLine('Discount', formatCurrency(receipt.discount || 0)));
   lines.push('-'.repeat(MAX_WIDTH));
   lines.push(padLine('Total', formatCurrency(receipt.total || 0)));
-  
+
   if (receipt.cash !== undefined) {
     lines.push(padLine('Cash', formatCurrency(receipt.cash)));
   }
-  
+
   if (receipt.change !== undefined) {
     lines.push(padLine('Change', formatCurrency(receipt.change)));
   }
-  
+
   lines.push('-'.repeat(MAX_WIDTH));
   lines.push('This is not an official receipt');
   return lines;
@@ -105,12 +107,12 @@ export async function sendReceiptToPrinter(receipt) {
     clearTimeout(timeoutId);
 
     const payload = await response.json().catch(() => ({}));
-    
+
     // Check for HTTP errors
     if (!response.ok) {
       throw new Error(payload.message || `Print request failed: ${response.status} ${response.statusText}`);
     }
-    
+
     // Check for application-level errors (including file printing warnings)
     if (payload.success === false) {
       // If it's file printing, treat it as an error (not actual printing)
@@ -128,12 +130,12 @@ export async function sendReceiptToPrinter(receipt) {
     return payload;
   } catch (error) {
     clearTimeout(timeoutId);
-    
+
     // Handle abort (timeout)
     if (error.name === 'AbortError') {
       throw new Error('Print request timed out. The printer may be slow or unresponsive. Please try again.');
     }
-    
+
     // Re-throw other errors
     throw error;
   }
