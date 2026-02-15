@@ -901,7 +901,7 @@ exports.getSalesOverTime = async (req, res) => {
       switch (periodType) {
         case 'daily': limit = 7; break;
         case 'weekly': limit = 12; break; // 12 weeks
-        case 'monthly': limit = 12; break; // 12 months
+        case 'monthly': limit = 6; break; // 6 months
         case 'yearly': limit = 5; break; // 5 years
         default: limit = 7;
       }

@@ -1,5 +1,5 @@
 
-const PRODUCTION_URL = 'https://YOUR_HOSTED_BACKEND_URL.com'; // TODO: Replace with your actual hosted backend URL
+const PRODUCTION_URL = 'https://pos-system-w61d.onrender.com'; // TODO: Replace with your actual hosted backend URL
 
 const LOCAL_IP = '192.168.56.1';
 const PORT = 5000;

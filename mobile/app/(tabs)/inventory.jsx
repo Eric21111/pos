@@ -1,29 +1,39 @@
 import AddItem from "@/app/AddItem";
+import StockInModal from "@/components/inventory/StockInModal";
+import StockOutModal from "@/components/inventory/StockOutModal";
+
 import Header from "@/components/shared/header";
 import { useData } from "@/context/DataContext";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  Dimensions,
+  AppState,
   FlatList,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
-  RefreshControl,
-  AppState
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
 
 // Table View Component
 const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading }) => {
+  const [menuVisible, setMenuVisible] = useState(null);
+
+  // Stock Modal States
+  const [showStockIn, setShowStockIn] = useState(false);
+  const [showStockOut, setShowStockOut] = useState(false);
+  const [stockItem, setStockItem] = useState(null);
+  const [stockLoading, setStockLoading] = useState(false);
+
   useEffect(() => {
     // Lock to landscape
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
@@ -32,8 +42,6 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading }) 
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
     };
   }, []);
-
-  const [menuVisible, setMenuVisible] = useState(null);
 
   const menuItems = [
     {
@@ -136,6 +144,18 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading }) 
       return;
     }
 
+    if (action === 'stockIn') {
+      setStockItem(item);
+      setShowStockIn(true);
+      return;
+    }
+
+    if (action === 'stockOut') {
+      setStockItem(item);
+      setShowStockOut(true);
+      return;
+    }
+
     if (action === 'archive') {
       Alert.alert(
         'Archive Item',
@@ -159,7 +179,7 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading }) 
                 });
                 Alert.alert('Success', 'Item archived successfully');
                 // Refresh the table data
-                fetchTableData();
+                onRefresh();
               } catch (error) {
                 Alert.alert('Error', 'Failed to archive item: ' + error.message);
               }
@@ -168,9 +188,227 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading }) 
         ],
         { cancelable: true }
       );
-    } else {
-      console.log(`${action} item ${itemId}`);
-      // Handle other actions (stock in/out) - can be implemented later
+    }
+  };
+
+  const handleStockInConfirm = async (stockData) => {
+    if (!stockItem) return;
+
+    try {
+      setStockLoading(true);
+
+      const { productAPI } = require('../../services/api');
+
+      // We need to fetch the full product details first to get the sizes structure
+      // The item from the list might be normalized/simplified
+      const response = await productAPI.getById(stockItem._id || stockItem.id);
+
+      if (!response.success) {
+        throw new Error('Failed to fetch product details');
+      }
+
+      const fullProduct = response.data;
+      const updatedSizes = { ...(fullProduct.sizes || {}) };
+
+      // Helper to get quantity from size data
+      const getSizeQty = (sizeData) => {
+        if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+          return sizeData.quantity;
+        }
+        return typeof sizeData === 'number' ? sizeData : 0;
+      };
+
+      // Helper to get price from size data
+      const getSizePrice = (sizeData) => {
+        if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
+          return sizeData.price;
+        }
+        return null;
+      };
+
+      stockData.selectedSizes.forEach(size => {
+        const currentSizeData = updatedSizes[size];
+        const currentQty = getSizeQty(currentSizeData);
+        const currentPrice = getSizePrice(currentSizeData);
+        const addQty = stockData.sizes[size] || 0;
+        const newQty = currentQty + addQty;
+
+        // Preserve price structure if it exists
+        if (currentPrice !== null || (typeof currentSizeData === 'object' && currentSizeData !== null)) {
+          updatedSizes[size] = {
+            quantity: newQty,
+            price: currentPrice !== null ? currentPrice : (fullProduct.itemPrice || 0)
+          };
+        } else {
+          updatedSizes[size] = newQty;
+        }
+      });
+
+      const totalStock = Object.values(updatedSizes).reduce((sum, sizeData) => sum + getSizeQty(sizeData), 0);
+      const stockBefore = fullProduct.currentStock || 0;
+
+      // Prepare user info - Mock for mobile if not available in global state
+      const handledBy = 'Mobile User';
+      const handledById = 'mobile_user_id';
+
+      // Calculate size quantities that were added
+      const sizeQuantitiesAdded = {};
+      stockData.selectedSizes.forEach(size => {
+        const addQty = stockData.sizes[size] || 0;
+        if (addQty > 0) {
+          sizeQuantitiesAdded[size] = addQty;
+        }
+      });
+
+      await productAPI.update(fullProduct._id, {
+        currentStock: totalStock,
+        sizes: updatedSizes,
+        stockMovementType: 'Stock-In',
+        stockMovementReason: stockData.reason || 'Restock',
+        handledBy: handledBy,
+        handledById: handledById,
+        stockMovementSizeQuantities: Object.keys(sizeQuantitiesAdded).length > 0 ? sizeQuantitiesAdded : null
+      });
+
+      Alert.alert('Success', 'Stock added successfully');
+      setShowStockIn(false);
+      setStockItem(null);
+      onRefresh();
+
+    } catch (error) {
+      console.error('Error adding stock:', error);
+      Alert.alert('Error', 'Failed to update stock: ' + error.message);
+    } finally {
+      setStockLoading(false);
+    }
+  };
+
+  const handleStockOutConfirm = async (stockData) => {
+    if (!stockItem) return;
+
+    try {
+      setStockLoading(true);
+
+      const { productAPI, archiveAPI } = require('../../services/api');
+
+      // Fetch full product details
+      const response = await productAPI.getById(stockItem._id || stockItem.id);
+
+      if (!response.success) {
+        throw new Error('Failed to fetch product details');
+      }
+
+      const fullProduct = response.data;
+      const updatedSizes = { ...(fullProduct.sizes || {}) };
+
+      // Helper to get quantity from size data
+      const getSizeQty = (sizeData) => {
+        if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+          return sizeData.quantity;
+        }
+        return typeof sizeData === 'number' ? sizeData : 0;
+      };
+
+      // Helper to get price from size data
+      const getSizePrice = (sizeData) => {
+        if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
+          return sizeData.price;
+        }
+        return null;
+      };
+
+      stockData.selectedSizes.forEach(size => {
+        const currentSizeData = updatedSizes[size];
+        const currentQty = getSizeQty(currentSizeData);
+        const currentPrice = getSizePrice(currentSizeData);
+        const removeQty = stockData.sizes[size] || 0;
+        const newQty = Math.max(0, currentQty - removeQty);
+
+        // Preserve price structure if it exists
+        if (currentPrice !== null || (typeof currentSizeData === 'object' && currentSizeData !== null)) {
+          updatedSizes[size] = {
+            quantity: newQty,
+            price: currentPrice !== null ? currentPrice : (fullProduct.itemPrice || 0)
+          };
+        } else {
+          updatedSizes[size] = newQty;
+        }
+      });
+
+      const totalStock = Object.values(updatedSizes).reduce((sum, sizeData) => sum + getSizeQty(sizeData), 0);
+
+      // Determine type based on reason
+      const movementType =
+        stockData.reason === 'Damaged' ||
+          stockData.reason === 'Lost' ||
+          stockData.reason === 'Expired' ||
+          stockData.reason === 'Defective'
+          ? 'Pull-Out'
+          : 'Stock-Out';
+
+      // Values for tracking
+      const handledBy = 'Mobile User';
+      const handledById = 'mobile_user_id';
+
+      const sizeQuantitiesRemoved = {};
+      stockData.selectedSizes.forEach(size => {
+        const removeQty = stockData.sizes[size] || 0;
+        if (removeQty > 0) {
+          sizeQuantitiesRemoved[size] = removeQty;
+        }
+      });
+
+      await productAPI.update(fullProduct._id, {
+        currentStock: totalStock,
+        sizes: updatedSizes,
+        stockMovementType: movementType,
+        stockMovementReason: stockData.reason || 'Sold',
+        handledBy: handledBy,
+        handledById: handledById,
+        stockMovementSizeQuantities: Object.keys(sizeQuantitiesRemoved).length > 0 ? sizeQuantitiesRemoved : null
+      });
+
+      // Archive items if reason is Damaged, Defective, or Expired
+      const archiveReasons = ['Damaged', 'Defective', 'Expired'];
+      if (archiveReasons.includes(stockData.reason)) {
+        const totalQuantityRemoved = Object.values(sizeQuantitiesRemoved).reduce((sum, qty) => sum + qty, 0);
+        const sizesString = stockData.selectedSizes.join(', ');
+
+        try {
+          await archiveAPI.archive({
+            productId: fullProduct._id,
+            itemName: fullProduct.itemName,
+            sku: fullProduct.sku,
+            variant: fullProduct.variant || '',
+            selectedSize: sizesString,
+            category: fullProduct.category,
+            brandName: fullProduct.brandName || '',
+            itemPrice: fullProduct.itemPrice || 0,
+            costPrice: fullProduct.costPrice || 0,
+            quantity: totalQuantityRemoved,
+            itemImage: fullProduct.itemImage || '',
+            reason: stockData.reason === 'Defective' ? 'Defective' : stockData.reason,
+            archivedBy: handledBy,
+            archivedById: handledById,
+            source: 'stock-out',
+            notes: `Stock out - ${stockData.reason}. Sizes: ${sizesString}`
+          });
+        } catch (archiveError) {
+          console.error('Error archiving item:', archiveError);
+          // Don't fail the whole operation if archiving fails
+        }
+      }
+
+      Alert.alert('Success', 'Stock removed successfully');
+      setShowStockOut(false);
+      setStockItem(null);
+      onRefresh();
+
+    } catch (error) {
+      console.error('Error removing stock:', error);
+      Alert.alert('Error', 'Failed to update stock: ' + error.message);
+    } finally {
+      setStockLoading(false);
     }
   };
 
@@ -216,6 +454,28 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading }) 
           }
         />
       )}
+
+      <StockInModal
+        visible={showStockIn}
+        onClose={() => {
+          setShowStockIn(false);
+          setStockItem(null);
+        }}
+        product={stockItem}
+        onConfirm={handleStockInConfirm}
+        loading={stockLoading}
+      />
+
+      <StockOutModal
+        visible={showStockOut}
+        onClose={() => {
+          setShowStockOut(false);
+          setStockItem(null);
+        }}
+        product={stockItem}
+        onConfirm={handleStockOutConfirm}
+        loading={stockLoading}
+      />
     </SafeAreaView>
   );
 };

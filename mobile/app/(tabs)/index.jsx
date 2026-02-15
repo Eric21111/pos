@@ -3,17 +3,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Image,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import { transactionAPI } from "../../services/api";
@@ -194,7 +194,12 @@ export default function Dashboard() {
   // Platform-specific shadow styles
   const getShadowStyle = () => {
     if (Platform.OS === "web") {
-      return { boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.15)" };
+      return {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      };
     }
     return {
       shadowColor: "#000",
@@ -381,6 +386,14 @@ export default function Dashboard() {
             withInnerLines={false}
             withShadow={false}
             fromZero
+            formatXLabel={(label) => {
+              // Shorten labels to day number to prevent overlap like in Analytics
+              if (chartType === "daily") {
+                const parts = label.split(" ");
+                return parts.length > 1 ? parts[parts.length - 1] : label;
+              }
+              return label;
+            }}
           />
         </ScrollView>
       </View>
@@ -467,7 +480,10 @@ const styles = StyleSheet.create({
         elevation: 3,
       },
       web: {
-        boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.15)",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
       },
     }),
   },

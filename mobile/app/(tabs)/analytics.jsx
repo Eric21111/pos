@@ -2,34 +2,35 @@ import Header from "@/components/shared/header";
 import { useData } from "@/context/DataContext";
 import { useFocusEffect } from "@react-navigation/native";
 import { Buffer } from "buffer";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import {
-    useCallback,
-    useRef,
-    useState
+  useCallback,
+  useMemo,
+  useRef,
+  useState
 } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    FlatList,
-    Image,
-    LayoutAnimation,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  LayoutAnimation,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { BarChart, LineChart } from "react-native-chart-kit";
 import * as XLSX from "xlsx";
 import {
-    productAPI,
-    stockMovementAPI,
-    transactionAPI,
+  productAPI,
+  stockMovementAPI,
+  transactionAPI,
 } from "../../services/api";
 
 global.Buffer = Buffer;
@@ -85,6 +86,55 @@ export default function Analytics() {
     "Sat",
     "Sun",
   ]);
+
+  // Memoize chart configurations to prevent unnecessary re-renders
+  const commonChartConfig = useMemo(() => ({
+    backgroundColor: "#fff",
+    backgroundGradientFrom: "#fff",
+    backgroundGradientTo: "#fff",
+    decimalPlaces: 0,
+    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+    style: { borderRadius: 16 },
+    propsForDots: { r: "4", strokeWidth: "2", stroke: "#fff" },
+  }), []);
+
+  const salesChartConfig = useMemo(() => ({
+    ...commonChartConfig,
+    color: (opacity = 1) => `rgba(173, 127, 101, ${opacity})`,
+  }), [commonChartConfig]);
+
+  const stockInChartConfig = useMemo(() => ({
+    ...commonChartConfig,
+    color: (opacity = 1) => `rgba(16, 185, 129, 1)`, // Green #10B981 (Solid)
+    barPercentage: 0.6,
+    fillShadowGradient: "#10B981",
+    fillShadowGradientFrom: "#10B981",
+    fillShadowGradientTo: "#10B981",
+    fillShadowGradientOpacity: 1,
+    propsForBackgroundLines: {
+      strokeWidth: 0.5,
+      stroke: "#e0e0e0",
+    },
+    propsForLabels: { fontSize: 10 },
+  }), [commonChartConfig]);
+
+  const stockOutChartConfig = useMemo(() => ({
+    ...commonChartConfig,
+    color: (opacity = 1) => `rgba(239, 68, 68, 1)`, // Red #EF4444 (Solid)
+    barPercentage: 0.6,
+    fillShadowGradient: "#EF4444",
+    fillShadowGradientFrom: "#EF4444",
+    fillShadowGradientTo: "#EF4444",
+    fillShadowGradientOpacity: 1,
+    propsForBackgroundLines: {
+      strokeWidth: 0.5,
+      stroke: "#e0e0e0",
+    },
+    propsForLabels: { fontSize: 10 },
+  }), [commonChartConfig]);
+
+  const screenWidth = useMemo(() => Dimensions.get("window").width - 64, []);
+
 
   // Fetch all analytics data
   const fetchAnalyticsData = async () => {
@@ -175,6 +225,17 @@ export default function Analytics() {
     labels: ["Loading..."],
     datasets: [{ data: [0] }],
   });
+
+  const preparedSalesData = useMemo(() => ({
+    labels: salesData.labels.length > 0 ? salesData.labels : ["No Data"],
+    datasets: [
+      {
+        data: salesData.datasets[0].data.length > 0
+          ? salesData.datasets[0].data
+          : [0],
+      },
+    ],
+  }), [salesData]);
 
   // Fetch sales over time for charts
   const fetchSalesOverTime = async () => {
@@ -326,7 +387,8 @@ export default function Analytics() {
     setExpanded(!expanded);
   };
 
-  const visibleData = expanded ? lowStockItems : lowStockItems.slice(0, 3);
+  const visibleData = useMemo(() => expanded ? lowStockItems : lowStockItems.slice(0, 3), [expanded, lowStockItems]);
+
 
   // Format currency
   const formatCurrency = (value) => {
@@ -411,22 +473,22 @@ export default function Analytics() {
             <table border="1" style="width:100%;border-collapse:collapse;">
               <tr><th>Period</th><th>Sales</th></tr>
               ${salesData.labels
-                .map(
-                  (label, i) =>
-                    `<tr><td>${label}</td><td>${formatCurrency(salesData.datasets[0].data[i])}</td></tr>`,
-                )
-                .join("")}
+          .map(
+            (label, i) =>
+              `<tr><td>${label}</td><td>${formatCurrency(salesData.datasets[0].data[i])}</td></tr>`,
+          )
+          .join("")}
             </table>
 
             <h3 style="margin-top:25px;">Low Stock Items</h3>
             <table border="1" style="width:100%;border-collapse:collapse;">
               <tr><th>Product</th><th>Stock</th><th>Status</th></tr>
               ${lowStockItems
-                .map(
-                  (item) =>
-                    `<tr><td>${item.name}</td><td>${item.stocks}</td><td>${item.status}</td></tr>`,
-                )
-                .join("")}
+          .map(
+            (item) =>
+              `<tr><td>${item.name}</td><td>${item.stocks}</td><td>${item.status}</td></tr>`,
+          )
+          .join("")}
             </table>
 
             <p style="text-align:center;margin-top:30px;">Generated on ${new Date().toLocaleString()}</p>
@@ -598,20 +660,29 @@ export default function Analytics() {
                   },
                 ],
               }}
-              width={Dimensions.get("window").width - 64}
+              width={screenWidth}
               height={220}
-              chartConfig={{
-                backgroundColor: "#fff",
-                backgroundGradientFrom: "#fff",
-                backgroundGradientTo: "#fff",
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(173, 127, 101, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                style: { borderRadius: 16 },
-                propsForDots: { r: "4", strokeWidth: "2", stroke: "#fff" },
-              }}
+              chartConfig={salesChartConfig}
               bezier
               style={[styles.chart, { marginLeft: -16 }]}
+              renderDotContent={({ x, y, index }) => (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: y - 24,
+                    left: x - 10,
+                  }}
+                  key={index}
+                />
+              )}
+              formatXLabel={(label) => {
+                // Shorten labels for daily view to prevent overlap (e.g., "Feb 9" -> "9")
+                if (chartType === "daily") {
+                  const parts = label.split(" ");
+                  return parts.length > 1 ? parts[parts.length - 1] : label;
+                }
+                return label;
+              }}
               withVerticalLines={false}
               withInnerLines={false}
               withShadow={false}
@@ -628,28 +699,10 @@ export default function Analytics() {
                 labels: stockChartLabels,
                 datasets: [{ data: stockInData }],
               }}
-              width={Dimensions.get("window").width - 64} // Responsive width
+              width={screenWidth} // Responsive width
               height={220}
               yAxisLabel=""
-              chartConfig={{
-                backgroundColor: "#fff",
-                backgroundGradientFrom: "#fff",
-                backgroundGradientTo: "#fff",
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(16, 185, 129, 1)`, // Green #10B981 (Solid)
-                labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                barPercentage: 0.6,
-                fillShadowGradient: "#10B981", // Solid fill
-                fillShadowGradientFrom: "#10B981", // Solid fill start
-                fillShadowGradientTo: "#10B981", // Solid fill end
-                fillShadowGradientOpacity: 1,
-                style: { borderRadius: 16 },
-                propsForBackgroundLines: {
-                  strokeWidth: 0.5,
-                  stroke: "#e0e0e0",
-                },
-                propsForLabels: { fontSize: 10 },
-              }}
+              chartConfig={stockInChartConfig}
               style={{ marginTop: 8, marginBottom: 8, paddingRight: 0 }}
               fromZero
               showBarTops={false}
@@ -666,28 +719,10 @@ export default function Analytics() {
                 labels: stockChartLabels,
                 datasets: [{ data: stockOutData }],
               }}
-              width={Dimensions.get("window").width - 64} // Responsive width
+              width={screenWidth} // Responsive width
               height={220}
               yAxisLabel=""
-              chartConfig={{
-                backgroundColor: "#fff",
-                backgroundGradientFrom: "#fff",
-                backgroundGradientTo: "#fff",
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(239, 68, 68, 1)`, // Red #EF4444 (Solid)
-                labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                barPercentage: 0.6,
-                fillShadowGradient: "#EF4444",
-                fillShadowGradientFrom: "#EF4444",
-                fillShadowGradientTo: "#EF4444",
-                fillShadowGradientOpacity: 1,
-                style: { borderRadius: 16 },
-                propsForBackgroundLines: {
-                  strokeWidth: 0.5,
-                  stroke: "#e0e0e0",
-                },
-                propsForLabels: { fontSize: 10 },
-              }}
+              chartConfig={stockOutChartConfig}
               style={{ marginTop: 8, marginBottom: 8, paddingRight: 0 }}
               fromZero
               showBarTops={false}

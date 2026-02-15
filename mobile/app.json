@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "",
+    "name": "Create Your Style",
     "slug": "cysmob",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,14 +14,14 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cys.pos.mobile"
     },
     "android": {
+      "package": "com.cys.pos.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./app/(tabs)/iconz/iconn.jpeg"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -49,6 +49,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "33ea0bb5-e5ad-4ca8-ac2b-1ba1a113ef23"
+      }
     }
   }
 }
