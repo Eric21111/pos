@@ -3,7 +3,23 @@ const StockMovement = require('../models/StockMovement');
 
 exports.getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find({}).sort({ dateAdded: -1 }).lean();
+    const page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit);
+    let skip = 0;
+
+    let query = Product.find({}, '-sizes -stockHistory').sort({ dateAdded: -1 });
+
+    // Only apply pagination if limit is specified (Mobile uses limit=20, Web sends none)
+    if (limit) {
+      skip = (page - 1) * limit;
+      query = query.skip(skip).limit(limit);
+    }
+
+    // OPTIMIZATION: Exclude heavy fields (images, heavy nested objects) for the list view
+    // Only fetch these when viewing specific details
+    const products = await query.lean();
+
+    const totalCount = await Product.countDocuments();
 
     const formattedProducts = products.map(product => ({
       ...product,
@@ -15,7 +31,7 @@ exports.getAllProducts = async (req, res) => {
       reorderNumber: product.reorderNumber || 0,
       supplierName: product.supplierName || '',
       supplierContact: product.supplierContact || '',
-      sizes: product.sizes || null,
+      // sizes: product.sizes || null, // Excluded in projection
       displayInTerminal: product.displayInTerminal !== undefined ? product.displayInTerminal : true,
       terminalStatus: product.displayInTerminal !== false ? 'shown' : 'not shown'
     }));
@@ -23,6 +39,9 @@ exports.getAllProducts = async (req, res) => {
     res.json({
       success: true,
       count: formattedProducts.length,
+      total: totalCount,
+      totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+      currentPage: page,
       data: formattedProducts
     });
   } catch (error) {
@@ -588,14 +607,33 @@ exports.searchProducts = async (req, res) => {
       });
     }
 
-    const products = await Product.find({
-      $or: [
-        { itemName: { $regex: query, $options: 'i' } },
-        { sku: { $regex: query, $options: 'i' } },
-        { category: { $regex: query, $options: 'i' } },
-        { brandName: { $regex: query, $options: 'i' } }
-      ]
-    }).sort({ dateAdded: -1 }).lean();
+    // Optimize: Use Text Search if available (requires index), fallback to regex for partial matches if needed
+    // Assuming text index is set up as per model: { itemName: 'text', sku: 'text', brandName: 'text' }
+
+    // First try text search for relevance
+    let products = await Product.find(
+      { $text: { $search: query } },
+      { score: { $meta: "textScore" } }
+    )
+      .select('-sizes') // Include itemImage, exclude heavy sizes
+      .sort({ score: { $meta: "textScore" } })
+      .lean();
+
+    // Fallback: If text search returns nothing (e.g., partial words like "burg" for "burger"), try Regex
+    if (products.length === 0) {
+      products = await Product.find({
+        $or: [
+          { itemName: { $regex: query, $options: 'i' } },
+          { sku: { $regex: query, $options: 'i' } },
+          { category: { $regex: query, $options: 'i' } },
+          { brandName: { $regex: query, $options: 'i' } }
+        ]
+      })
+        .select('-sizes') // Include itemImage, exclude heavy sizes
+        .sort({ dateAdded: -1 })
+        .limit(50) // Limit regex results for performance
+        .lean();
+    }
 
     res.json({
       success: true,
@@ -607,6 +645,68 @@ exports.searchProducts = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error searching products',
+      error: error.message
+    });
+  }
+};
+
+exports.getInventoryStats = async (req, res) => {
+  try {
+    const stats = await Product.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalItems: { $sum: 1 },
+          inStock: {
+            $sum: { $cond: [{ $gt: ["$currentStock", 0] }, 1, 0] }
+          },
+          lowStock: {
+            $sum: {
+              $cond: [
+                { $and: [{ $gt: ["$currentStock", 0] }, { $lt: ["$currentStock", 5] }] },
+                1,
+                0
+              ]
+            }
+          },
+          outOfStock: {
+            $sum: { $cond: [{ $eq: ["$currentStock", 0] }, 1, 0] }
+          },
+          inventoryValue: { $sum: { $multiply: ["$currentStock", "$itemPrice"] } },
+          totalCostValue: { $sum: { $multiply: ["$currentStock", "$costPrice"] } }
+        }
+      }
+    ]);
+
+    const result = stats[0] || {
+      totalItems: 0,
+      inStock: 0,
+      lowStock: 0,
+      outOfStock: 0,
+      inventoryValue: 0,
+      totalCostValue: 0
+    };
+
+    // Calculate margins
+    const grossProfit = result.inventoryValue - result.totalCostValue;
+    const grossMargin = result.inventoryValue > 0
+      ? (grossProfit / result.inventoryValue) * 100
+      : 0;
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        grossProfit,
+        grossMargin
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting inventory stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting inventory stats',
       error: error.message
     });
   }

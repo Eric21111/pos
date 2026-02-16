@@ -118,31 +118,31 @@ export default function Dashboard() {
     }
   }, [syncModalVisible]);
 
-  // Fetch dashboard stats (loading spinner) on focus only
+
+  // Fetch dashboard stats and chart data on focus (with loading spinner on initial load)
   useFocusEffect(
     useCallback(() => {
-      const loadStats = async () => {
+      const loadDashboardData = async () => {
         try {
+          // Load user info
           const storedUser = await AsyncStorage.getItem("currentEmployee");
           if (storedUser) {
             setCurrentUser(JSON.parse(storedUser));
           }
-          await fetchDashboardStats(chartType); // Use current chartType
+
+          // Load dashboard stats and chart data in parallel for better performance
+          await Promise.all([
+            fetchDashboardStats(chartType),
+            fetchSalesData()
+          ]);
         } catch (error) {
-          console.warn("Failed to load stats:", error?.message);
+          console.warn("Failed to load dashboard data:", error?.message);
         }
       };
-      loadStats();
-    }, []),
+      loadDashboardData();
+    }, [chartType]), // Re-fetch when chartType changes
   );
 
-  // Fetch chart data AND stats on focus AND when chartType changes (no global spinner)
-  useFocusEffect(
-    useCallback(() => {
-      fetchSalesData();
-      fetchDashboardStats(chartType, false); // Update stats without spinner
-    }, [chartType]),
-  );
 
   const welcomeName =
     currentUser?.firstName ||

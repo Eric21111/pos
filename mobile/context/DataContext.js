@@ -27,12 +27,20 @@ export function DataProvider({ children }) {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const categoriesLastFetch = useRef(null);
 
-  // Dashboard stats state
   const [dashboardStats, setDashboardStats] = useState({
     totalSalesToday: 0,
     totalTransactions: 0,
     averageTransactionValue: 0,
     lowStockItems: 0,
+  });
+  const [inventoryStats, setInventoryStats] = useState({
+    totalItems: 0,
+    inStock: 0,
+    lowStock: 0,
+    outOfStock: 0,
+    inventoryValue: 0,
+    totalCostValue: 0,
+    grossMargin: 0,
   });
   const dashboardLastFetch = useRef(null);
 
@@ -42,47 +50,77 @@ export function DataProvider({ children }) {
     return Date.now() - lastFetch < CACHE_DURATION;
   };
 
-  // Fetch products with caching
-  const fetchProducts = useCallback(async (forceRefresh = false) => {
-    if (!forceRefresh && isCacheValid(productsLastFetch.current) && products.length > 0) {
-      return products;
-    }
+  // Fetch products with caching and pagination
+  // params: { page: 1, limit: 20, query: '' }
+  const fetchProducts = useCallback(async (forceRefresh = false, params = {}) => {
+    // If no params and valid cache, return existing (but this might be partial data now)
+    // We should be careful. Usually List views will manage their own pagination state
+    // and call this to append data.
+
+    // For specific page fetches, we usually bypass the "all" cache check
+    const isPagination = params.page && params.page > 1;
 
     try {
       setProductsLoading(true);
-      const response = await productAPI.getAll();
+      const response = await productAPI.getAll(params);
+
       if (response.success && response.data) {
-        setProducts(response.data);
-        productsLastFetch.current = Date.now();
-        return response.data;
+        if (isPagination) {
+          setProducts(prev => {
+            // Avoid duplicates based on _id
+            const newItems = response.data.filter(newItem =>
+              !prev.some(existing => existing._id === newItem._id)
+            );
+            return [...prev, ...newItems];
+          });
+        } else {
+          // Reset data if page 1 or refresh
+          setProducts(response.data);
+          productsLastFetch.current = Date.now();
+        }
+        return response; // Return full response for pagination metadata (totalPages etc)
       }
-      return products;
+      return { data: products }; // Fallback
     } catch (error) {
       console.error('Error fetching products:', error);
-      return products;
+      return { data: products };
     } finally {
       setProductsLoading(false);
     }
   }, [products]);
 
-  // Fetch transactions with caching
+  // Fetch transactions with caching and pagination
   const fetchTransactions = useCallback(async (forceRefresh = false, params = {}) => {
-    if (!forceRefresh && isCacheValid(transactionsLastFetch.current) && transactions.length > 0) {
-      return transactions;
+    const isPagination = params.page && params.page > 1;
+
+    if (!forceRefresh && !isPagination && isCacheValid(transactionsLastFetch.current) && transactions.length > 0) {
+      return { data: transactions };
     }
 
     try {
       setTransactionsLoading(true);
-      const response = await transactionAPI.getAll({ limit: '1000', ...params });
+      // Remove hardcoded limit, default to backend (20) or provided params
+      const response = await transactionAPI.getAll(params);
+
       if (response.success && response.data) {
-        setTransactions(response.data);
-        transactionsLastFetch.current = Date.now();
-        return response.data;
+        if (isPagination) {
+          setTransactions(prev => {
+            // Avoid duplicates
+            const newItems = response.data.filter(newItem =>
+              !prev.some(existing => existing._id === newItem._id)
+            );
+            return [...prev, ...newItems];
+          });
+        } else {
+          setTransactions(response.data);
+          transactionsLastFetch.current = Date.now();
+        }
+        return response;
       }
-      return transactions;
+      return { data: transactions };
     } catch (error) {
       console.error('Error fetching transactions:', error);
-      return transactions;
+      return { data: transactions };
     } finally {
       setTransactionsLoading(false);
     }
@@ -134,48 +172,36 @@ export function DataProvider({ children }) {
     }
   }, [categories]);
 
-  // Calculate dashboard stats from cached data
+  // Calculate dashboard stats (Fetch from API for performance)
   const calculateDashboardStats = useCallback(async (forceRefresh = false) => {
     if (!forceRefresh && isCacheValid(dashboardLastFetch.current)) {
       return dashboardStats;
     }
 
     try {
-      const [txns, prods] = await Promise.all([
-        fetchTransactions(forceRefresh),
-        fetchProducts(forceRefresh)
+      // Fetch stats from backend APIs instead of downloading all data
+      const [txnStatsResponse, inventoryStatsResponse] = await Promise.all([
+        transactionAPI.getDashboardStats(), // You might need to ensure this endpoint exists and returns correct structure
+        productAPI.getInventoryStats()
       ]);
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const todayTransactions = txns.filter(t => {
-        const transactionDate = new Date(t.createdAt || t.date);
-        transactionDate.setHours(0, 0, 0, 0);
-        return transactionDate.getTime() === today.getTime() &&
-          t.status !== 'Voided' &&
-          t.paymentMethod !== 'return';
-      });
-
-      const totalSalesToday = todayTransactions.reduce((sum, t) => {
-        return sum + (t.totalAmount || t.total || 0);
-      }, 0);
-
-      const averageTransactionValue = todayTransactions.length > 0
-        ? totalSalesToday / todayTransactions.length
-        : 0;
-
-      const lowStockItems = prods.filter(p => {
-        const stock = p.stock || p.quantity || p.currentStock || 0;
-        return stock > 0 && stock < 5;
-      }).length;
-
-      const newStats = {
-        totalSalesToday,
-        totalTransactions: todayTransactions.length,
-        averageTransactionValue,
-        lowStockItems,
+      let newStats = {
+        totalSalesToday: 0,
+        totalTransactions: 0,
+        averageTransactionValue: 0,
+        lowStockItems: 0,
       };
+
+      if (txnStatsResponse.success && txnStatsResponse.data) {
+        newStats.totalSalesToday = txnStatsResponse.data.totalSales || 0;
+        newStats.totalTransactions = txnStatsResponse.data.transactionCount || 0;
+        newStats.averageTransactionValue = txnStatsResponse.data.averageValue || 0;
+      }
+
+      if (inventoryStatsResponse.success && inventoryStatsResponse.data) {
+        newStats.lowStockItems = inventoryStatsResponse.data.lowStock || 0;
+        setInventoryStats(inventoryStatsResponse.data); // Save full stats for Inventory screen
+      }
 
       setDashboardStats(newStats);
       dashboardLastFetch.current = Date.now();
@@ -184,7 +210,7 @@ export function DataProvider({ children }) {
       console.error('Error calculating dashboard stats:', error);
       return dashboardStats;
     }
-  }, [fetchTransactions, fetchProducts, dashboardStats]);
+  }, [dashboardStats]);
 
   // Invalidate specific cache
   const invalidateCache = useCallback((type) => {
@@ -251,6 +277,7 @@ export function DataProvider({ children }) {
 
     // Dashboard
     dashboardStats,
+    inventoryStats,
     calculateDashboardStats,
 
     // Cache management
@@ -261,7 +288,7 @@ export function DataProvider({ children }) {
     transactions, transactionsLoading, fetchTransactions,
     brands, brandsLoading, fetchBrands,
     categories, categoriesLoading, fetchCategories,
-    dashboardStats, calculateDashboardStats,
+    dashboardStats, inventoryStats, calculateDashboardStats,
     invalidateCache, refreshAll
   ]);
 

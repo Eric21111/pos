@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
-  FlatList,
   Platform,
   RefreshControl,
   ScrollView,
@@ -25,7 +24,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Table View Component
-const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading }) => {
+const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, onEndReached, loadingMore }) => {
   const [menuVisible, setMenuVisible] = useState(null);
 
   // Stock Modal States
@@ -439,11 +438,19 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading }) 
           <Text style={styles.loadingText}>Loading products...</Text>
         </View>
       ) : (
-        <FlatList
+        <FlashList
           data={items}
           renderItem={renderItem}
+          estimatedItemSize={60}
           keyExtractor={item => (item._id || item.id || Math.random()).toString()}
-          style={styles.tableList}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={loadingMore ? (
+            <View style={{ padding: 10 }}>
+              <ActivityIndicator size="small" color="#8B4513" />
+            </View>
+          ) : null}
           refreshControl={
             <RefreshControl
               refreshing={loading}
@@ -486,12 +493,24 @@ const MIN_FETCH_INTERVAL = 5000; // 5 seconds - minimum time between fetches
 
 export default function Inventory() {
   const router = useRouter();
-  const { products: cachedProducts, productsLoading, fetchProducts: fetchCachedProducts, invalidateCache } = useData();
+  const {
+    products: cachedProducts,
+    productsLoading,
+    fetchProducts: fetchCachedProducts,
+    invalidateCache,
+    inventoryStats, // Use stats from context
+    calculateDashboardStats // To refresh stats
+  } = useData();
 
   const [showTableView, setShowTableView] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Optimization refs
   const lastFetchTime = useRef(0);
@@ -557,28 +576,7 @@ export default function Inventory() {
     return itemDate.toLocaleDateString();
   }, []);
 
-  // Memoized inventory stats
-  const inventoryStats = useMemo(() => {
-    const totalItems = products.length;
-    const inStock = products.filter(p => (p.stock || 0) > 0).length;
-    const lowStock = products.filter(p => {
-      const stock = p.stock || 0;
-      return stock > 0 && stock < 5;
-    }).length;
-    const outOfStock = products.filter(p => (p.stock || 0) === 0).length;
-    const inventoryValue = products.reduce((sum, p) => {
-      return sum + ((p.price || 0) * (p.stock || 0));
-    }, 0);
-
-    const totalCostValue = products.reduce((sum, p) => {
-      return sum + ((p.costPrice || 0) * (p.stock || 0));
-    }, 0);
-
-    const grossProfit = inventoryValue - totalCostValue;
-    const grossMargin = inventoryValue > 0 ? (grossProfit / inventoryValue) * 100 : 0;
-
-    return { totalItems, inStock, lowStock, outOfStock, inventoryValue, totalCostValue, grossMargin };
-  }, [products]);
+  // inventoryStats is now coming from Context, no need to calculate here!
 
   // Memoized recently added items
   const recentlyAddedItems = useMemo(() => {
@@ -598,43 +596,61 @@ export default function Inventory() {
       }));
   }, [products, formatDateAdded]);
 
+
+
   const loadingProducts = productsLoading && initialLoad;
 
-  // Optimized fetch function with debouncing and stale check
-  const fetchProductsOptimized = useCallback(async (forceRefresh = false) => {
-    const now = Date.now();
-    const timeSinceLastFetch = now - lastFetchTime.current;
+  // Optimized fetch function with debouncing, stale check, and pagination support
+  const fetchProductsOptimized = useCallback(async (forceRefresh = false, loadMore = false) => {
 
     // Prevent concurrent fetches
     if (isFetching.current) {
       return;
     }
 
-    // Skip if fetched recently (unless forced)
-    if (!forceRefresh && timeSinceLastFetch < MIN_FETCH_INTERVAL) {
-      return;
-    }
-
-    // Skip if data is fresh and not forced
-    if (!forceRefresh && timeSinceLastFetch < STALE_TIME && cachedProducts.length > 0) {
-      return;
-    }
+    // Determine requested page
+    const requestedPage = loadMore ? page + 1 : 1;
 
     try {
       isFetching.current = true;
+      if (loadMore) setLoadingMore(true);
 
       if (forceRefresh) {
         invalidateCache('products');
+        // Also refresh stats when forcing refresh
+        calculateDashboardStats(true);
+      } else if (!loadMore) {
+        // If simply reloading first page, check if we should refresh stats too
+        // (Just to keep them in sync on screen load)
+        calculateDashboardStats(false);
       }
 
-      await fetchCachedProducts(forceRefresh);
+      const response = await fetchCachedProducts(forceRefresh, { page: requestedPage, limit: 20 });
+
+      if (response && response.data) {
+        if (loadMore) {
+          setPage(prev => prev + 1);
+        } else {
+          setPage(1);
+        }
+
+        // Check if there are more pages
+        if (response.totalPages) {
+          setHasMore(requestedPage < response.totalPages);
+        } else {
+          // Fallback if backend doesn't return pagination metadata
+          setHasMore(response.data.length === 20);
+        }
+      }
+
       lastFetchTime.current = Date.now();
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
       isFetching.current = false;
+      setLoadingMore(false);
     }
-  }, [invalidateCache, fetchCachedProducts, cachedProducts.length]);
+  }, [invalidateCache, fetchCachedProducts, calculateDashboardStats, page]);
 
   // Load products on focus with optimization
   useFocusEffect(
@@ -680,6 +696,12 @@ export default function Inventory() {
     }
   }, [fetchProducts]);
 
+  const handleLoadMore = useCallback(() => {
+    if (!isFetching.current && hasMore) {
+      fetchProductsOptimized(false, true);
+    }
+  }, [fetchProductsOptimized, hasMore]);
+
   if (showAddItem) {
     return (
       <View style={{ flex: 1 }}>
@@ -700,6 +722,8 @@ export default function Inventory() {
         onBack={() => setShowTableView(false)}
         onEditItem={handleEditItem}
         onRefresh={fetchProducts}
+        onEndReached={handleLoadMore}
+        loadingMore={loadingMore}
       />
     );
   }

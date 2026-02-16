@@ -28,9 +28,8 @@ import {
 import { BarChart, LineChart } from "react-native-chart-kit";
 import * as XLSX from "xlsx";
 import {
-  productAPI,
   stockMovementAPI,
-  transactionAPI,
+  transactionAPI
 } from "../../services/api";
 
 global.Buffer = Buffer;
@@ -269,38 +268,19 @@ export default function Analytics() {
   const fetchLowStockItems = async () => {
     try {
       console.log("Fetching low stock items...");
-      const response = await productAPI.getAll();
-      console.log(
-        "Products response:",
-        response?.success,
-        "Count:",
-        response?.data?.length,
-      );
+      // OPTIMIZATION: Use dedicated endpoint instead of fetching all products
+      const response = await stockAPI.getLowStock();
+      console.log("Low stock items found:", response?.count || 0);
 
-      if (response?.success && response.data?.length > 0) {
-        // Filter products with low or zero stock
-        // Product model uses: itemName, currentStock, reorderNumber
-        const items = response.data
-          .filter((p) => {
-            const stock = p.currentStock ?? p.stock ?? p.quantity ?? 0;
-            const reorderLevel = p.reorderNumber ?? p.lowStockThreshold ?? 10;
-            return stock <= reorderLevel;
-          })
-          .map((p, idx) => {
-            const stock = p.currentStock ?? p.stock ?? p.quantity ?? 0;
-            return {
-              id: p._id || p.id || idx,
-              name: p.itemName || p.name || p.productName || "Unknown Product",
-              stocks: stock,
-              status: stock === 0 ? "Out of Stock" : "Low Stock",
-            };
-          })
-          .slice(0, 10);
+      if (response?.success && response.data) {
+        const items = response.data.map((p, idx) => ({
+          id: p._id || p.id || idx,
+          name: p.itemName || p.name || "Unknown Product",
+          stocks: p.currentStock || 0,
+          status: (p.currentStock === 0 || p.alertType === 'out_of_stock') ? "Out of Stock" : "Low Stock",
+        }));
 
-        console.log("Low stock items found:", items.length);
-        if (items.length > 0) {
-          setLowStockItems(items);
-        }
+        setLowStockItems(items);
       }
     } catch (error) {
       console.warn("Failed to fetch low stock items:", error?.message);
@@ -341,16 +321,14 @@ export default function Analytics() {
   useFocusEffect(
     useCallback(() => {
       const loadStats = async () => {
-        // Use cached data if available, only fetch if needed
-        if (!analyticsCalculated.current || cachedTransactions.length === 0) {
-          await Promise.all([fetchTransactions(false), fetchProducts(false)]);
-        }
+        // We removed the heavy "fetchTransactions" and "fetchProducts" calls here
+        // as they are not needed for the analytics view (which uses specific endpoints now)
         await fetchAnalyticsData();
         analyticsCalculated.current = true;
         setInitialLoad(false);
       };
       loadStats();
-    }, [fetchTransactions, fetchProducts]),
+    }, []),
   );
 
   // Fetch chart data AND stats when chartType changes (no global spinner)

@@ -6,20 +6,20 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    BackHandler,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  BackHandler,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import AddBrandModal from "../components/AddBrandModal";
 import AddCategoryModal from "../components/AddCategoryModal";
@@ -96,12 +96,20 @@ const generateMobileSKU = (category = "Others", variant = "") => {
   return `${categoryCode}-${randomCode}-${variantCode}`;
 };
 
-// Convert image URI to base64 for storage
+// Convert image to base64 with compression
 const convertImageToBase64 = async (uri) => {
   try {
     if (!uri) return "";
     // If already base64, return as is
     if (uri.startsWith("data:image")) return uri;
+
+    // COMPRESSION STEP: Resize and compress image
+    // Max dimension: 1024px, Quality: 0.6 (60%)
+    const manipulatedResult = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1024 } }], // Resize width to 1024, height auto-scales
+      { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+    );
 
     // Check if ExpoFileSystem is available and has the required method
     if (
@@ -112,21 +120,18 @@ const convertImageToBase64 = async (uri) => {
       return uri;
     }
 
-    // Read file as base64 - use the EncodingType enum if available, otherwise use string
+    // Read compressed file as base64
     const encodingOptions = ExpoFileSystem.EncodingType
       ? { encoding: ExpoFileSystem.EncodingType.Base64 }
       : { encoding: "base64" };
 
-    const base64 = await ExpoFileSystem.readAsStringAsync(uri, encodingOptions);
+    const base64 = await ExpoFileSystem.readAsStringAsync(manipulatedResult.uri, encodingOptions);
 
-    // Determine image type from URI
-    const extension = uri.split(".").pop()?.toLowerCase() || "jpeg";
-    const mimeType = extension === "png" ? "image/png" : "image/jpeg";
-
-    return `data:${mimeType};base64,${base64}`;
+    // Always use JPEG mime type since we converted to JPEG
+    return `data:image/jpeg;base64,${base64}`;
   } catch (error) {
-    console.error("Error converting image to base64:", error);
-    // Return the original URI as fallback so the image can still be used
+    console.error("Error converting/compressing image:", error);
+    // Return the original URI as fallback so the image can still be used locally
     return uri || "";
   }
 };
@@ -533,9 +538,9 @@ function AddItem({ onBack, item, isEditing = false }) {
     // Calculate total stock from size quantities if sizes are selected
     const totalSizeStock = hasSizesSelected
       ? selectedSizes.reduce(
-          (sum, size) => sum + (parseInt(sizeQuantities[size]) || 0),
-          0,
-        )
+        (sum, size) => sum + (parseInt(sizeQuantities[size]) || 0),
+        0,
+      )
       : 0;
 
     // Validation
@@ -691,7 +696,7 @@ function AddItem({ onBack, item, isEditing = false }) {
       Alert.alert(
         "Error",
         error.message ||
-          "Failed to save item. Please check your connection and try again.",
+        "Failed to save item. Please check your connection and try again.",
       );
     }
   };
@@ -1148,7 +1153,7 @@ function AddItem({ onBack, item, isEditing = false }) {
                         style={[
                           styles.checkbox,
                           selectedSizes.includes(size) &&
-                            styles.checkboxChecked,
+                          styles.checkboxChecked,
                         ]}
                       >
                         {selectedSizes.includes(size) && (
@@ -1306,7 +1311,7 @@ function AddItem({ onBack, item, isEditing = false }) {
                                     style={[
                                       styles.checkbox,
                                       hasMultipleVariants &&
-                                        styles.checkboxChecked,
+                                      styles.checkboxChecked,
                                     ]}
                                   >
                                     {hasMultipleVariants && (

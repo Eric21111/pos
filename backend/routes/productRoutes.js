@@ -9,7 +9,8 @@ const {
   getProductsByCategory,
   searchProducts,
   updateStockAfterTransaction,
-  toggleDisplayInTerminal
+  toggleDisplayInTerminal,
+  getInventoryStats
 } = require('../controllers/productController');
 
 
@@ -18,38 +19,52 @@ router.route('/')
   .post(createProduct);
 
 router.get('/search/:query', searchProducts);
+router.get('/inventory-stats', getInventoryStats);
 
-// Get low stock and out of stock products (for notifications)
+// Get low stock and out of stock products (optimized)
 router.get('/low-stock', async (req, res) => {
   try {
     const Product = require('../models/Product');
-    const products = await Product.find({});
-    
-    const stockAlertItems = products.filter(p => {
-      const stock = p.currentStock || 0;
-      const reorder = p.reorderNumber || 5; // Default threshold of 5 if not set
-      return stock <= reorder && stock >= 0;
-    }).map(p => {
-      const stock = p.currentStock || 0;
-      return {
-        _id: p._id,
-        itemName: p.itemName,
-        sku: p.sku,
-        currentStock: stock,
-        reorderNumber: p.reorderNumber || 5,
-        itemImage: p.itemImage || '',
-        category: p.category || '',
-        alertType: stock === 0 ? 'out_of_stock' : 'low_stock'
-      };
-    });
-    
-    // Sort: out of stock first, then low stock
-    stockAlertItems.sort((a, b) => {
-      if (a.alertType === 'out_of_stock' && b.alertType !== 'out_of_stock') return -1;
-      if (a.alertType !== 'out_of_stock' && b.alertType === 'out_of_stock') return 1;
-      return a.currentStock - b.currentStock;
-    });
-    
+
+    // Find products where currentStock <= reorderNumber (default 5)
+    // We use $expr to compare fields within the document
+    const stockAlertItems = await Product.aggregate([
+      {
+        $project: {
+          itemName: 1,
+          sku: 1,
+          currentStock: { $ifNull: ["$currentStock", 0] },
+          reorderNumber: { $ifNull: ["$reorderNumber", 5] },
+          itemImage: { $ifNull: ["$itemImage", ""] },
+          category: { $ifNull: ["$category", ""] },
+          // Determine alert type for sorting
+          alertType: {
+            $cond: {
+              if: { $eq: [{ $ifNull: ["$currentStock", 0] }, 0] },
+              then: 'out_of_stock',
+              else: 'low_stock'
+            }
+          }
+        }
+      },
+      {
+        $match: {
+          $expr: { $lte: ["$currentStock", "$reorderNumber"] }
+        }
+      },
+      {
+        $sort: {
+          alertType: -1, // 'out_of_stock' usually comes last alphabetically, so we might need custom sort or just sort by stock
+          currentStock: 1
+        }
+      },
+      { $limit: 50 } // Limit to 50 items to prevent payload issues
+    ]);
+
+    // Reshape data to match frontend expectation if needed (aggregate returns _id)
+    // The previous implementation mapped it, but aggregate result is already close.
+    // Just need to ensure consistent field names.
+
     res.json({
       success: true,
       count: stockAlertItems.length,
@@ -73,7 +88,7 @@ router.get('/sku-stats', async (req, res) => {
   try {
     const Product = require('../models/Product');
     const products = await Product.find({});
-    
+
     // Group products by brand name and count SKUs
     const brandStats = {};
     products.forEach(product => {
@@ -88,11 +103,11 @@ router.get('/sku-stats', async (req, res) => {
       brandStats[brand].skuCount += 1;
       brandStats[brand].totalStock += product.currentStock || 0;
     });
-    
+
     // Convert to array and sort by SKU count descending
     const statsArray = Object.values(brandStats)
       .sort((a, b) => b.skuCount - a.skuCount);
-    
+
     res.json({
       success: true,
       data: statsArray

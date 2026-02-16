@@ -1,22 +1,22 @@
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView
+  View
 } from "react-native";
 import { employeeAPI } from "../services/api";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function EditProfile() {
   const navigation = useNavigation();
@@ -94,7 +94,19 @@ export default function EditProfile() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setProfilePicture(result.assets[0].uri);
+        try {
+          const asset = result.assets[0];
+          // Resize and compress
+          const manipulated = await ImageManipulator.manipulateAsync(
+            asset.uri,
+            [{ resize: { width: 800 } }], // Profile pics can be smaller (800px)
+            { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+          );
+          setProfilePicture(manipulated.uri);
+        } catch (err) {
+          console.log("Error compressing image", err);
+          setProfilePicture(result.assets[0].uri); // Fallback
+        }
       }
     } catch (error) {
       console.log("Error picking image:", error);
@@ -118,7 +130,19 @@ export default function EditProfile() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setProfilePicture(result.assets[0].uri);
+        try {
+          const asset = result.assets[0];
+          // Resize and compress
+          const manipulated = await ImageManipulator.manipulateAsync(
+            asset.uri,
+            [{ resize: { width: 800 } }],
+            { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+          );
+          setProfilePicture(manipulated.uri);
+        } catch (err) {
+          console.log("Error compressing photo", err);
+          setProfilePicture(result.assets[0].uri);
+        }
       }
     } catch (error) {
       console.log("Error taking photo:", error);
@@ -163,6 +187,20 @@ export default function EditProfile() {
         profileImage: profilePicture || "",
         bio: bio.trim() // If backend supports it
       };
+
+      // Convert image to base64 if it's a local URI (newly selected)
+      if (profilePicture && !profilePicture.startsWith('http') && !profilePicture.startsWith('data:image')) {
+        try {
+          // Check if file system available
+          const { readAsStringAsync, EncodingType } = require('expo-file-system/legacy');
+          const base64 = await readAsStringAsync(profilePicture, { encoding: EncodingType.Base64 });
+          updatePayload.profileImage = `data:image/jpeg;base64,${base64}`;
+        } catch (err) {
+          console.warn("Failed to convert profile image to base64", err);
+          // If conversion fails, we might still try sending the URI or just not update the image
+          // But usually backend expects base64 or url.
+        }
+      }
 
       const res = await employeeAPI.update(employeeId, updatePayload);
 

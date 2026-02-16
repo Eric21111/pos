@@ -61,13 +61,25 @@ const generateVoidId = async () => {
 
 exports.getAllTransactions = async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
     const transactions = await SalesTransaction.find({})
+      .select('-items.itemImage -items.variant -items.selectedSize -items.sku') // Optimized projection
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
+
+    const totalCount = await SalesTransaction.estimatedDocumentCount();
 
     res.json({
       success: true,
       count: transactions.length,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page,
       data: transactions
     });
   } catch (error) {
@@ -661,12 +673,23 @@ exports.getDashboardStats = async (req, res) => {
     }
 
     // Low stock items (independent of timeframe)
-    const products = await Product.find({}).select('currentStock reorderNumber').lean();
-    const lowStockItems = products.filter(p => {
-      const stock = p.currentStock || 0;
-      const reorder = p.reorderNumber || 5;
-      return stock <= reorder;
-    }).length;
+    // Low stock items (independent of timeframe)
+    // Fallback: Fetch only necessary fields and filter in JS (Safer/Robust)
+    // Low stock items (independent of timeframe)
+    // OPTIMIZED: Use Aggregation for server-side calculation
+    const lowStockCountResult = await Product.aggregate([
+      {
+        $match: {
+          $expr: {
+            $lte: ["$currentStock", { $ifNull: ["$reorderNumber", 5] }]
+          }
+        }
+      },
+      {
+        $count: "count"
+      }
+    ]);
+    const lowStockItems = lowStockCountResult.length > 0 ? lowStockCountResult[0].count : 0;
 
     res.json({
       success: true,

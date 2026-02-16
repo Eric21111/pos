@@ -2,19 +2,19 @@ import Header from "@/components/shared/header";
 import { useData } from "@/context/DataContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { FlashList } from "@shopify/flash-list";
 import * as Print from "expo-print";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -44,28 +44,49 @@ export default function Transaction() {
   const [modalVisible, setModalVisible] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(formatDateTime());
   const [refreshing, setRefreshing] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
 
-  // Filter transactions based on search and exclude voided/return transactions
-  const transactions = useMemo(() => {
-    const filtered = cachedTransactions.filter(
-      (t) =>
-        (t.paymentMethod !== "return" || !t.originalTransactionId) &&
-        t.status !== "Voided",
-    );
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const isFetching = useRef(false);
+  const lastFetchTime = useRef(0);
 
-    if (!search) return filtered;
+  // Filter and sort transactions (optimized - single pass)
+  // Note: This filters ONLY loaded transactions
+  const filteredTransactions = useMemo(() => {
+    const searchLower = search?.toLowerCase() || "";
 
-    const searchLower = search.toLowerCase();
-    return filtered.filter(
-      (t) =>
-        t.transactionId?.toLowerCase().includes(searchLower) ||
-        t.customerName?.toLowerCase().includes(searchLower) ||
-        t.items?.some((item) => item.name?.toLowerCase().includes(searchLower)),
-    );
+    return cachedTransactions
+      .filter((t) => {
+        // Filter out voided and returns
+        if (t.status === "Voided" || (t.paymentMethod === "return" && t.originalTransactionId)) {
+          return false;
+        }
+
+        // If no search, include all non-voided
+        if (!search) return true;
+
+        // Search filter
+        const receiptNo = (t.receiptNo || t._id || "").toLowerCase();
+        const date = (t.checkedOutAt || t.createdAt || t.date || "").toLowerCase();
+        const status = (t.status || "").toLowerCase();
+        const cashier = (t.performedByName || t.userName || t.user?.name || "").toLowerCase();
+
+        return (
+          receiptNo.includes(searchLower) ||
+          date.includes(searchLower) ||
+          status.includes(searchLower) ||
+          cashier.includes(searchLower)
+        );
+      })
+      // Backend already returns sorted by date desc, but we sort again to be sure if merging updates
+      .sort((a, b) => {
+        const dateA = new Date(a.checkedOutAt || a.createdAt || a.date || 0).getTime();
+        const dateB = new Date(b.checkedOutAt || b.createdAt || b.date || 0).getTime();
+        return dateB - dateA;
+      });
   }, [cachedTransactions, search]);
-
-  const loading = transactionsLoading && initialLoad;
 
   // Update current time every minute
   useEffect(() => {
@@ -76,29 +97,78 @@ export default function Transaction() {
     return () => clearInterval(timer);
   }, []);
 
-  // Load transactions on focus (uses cached data)
-  useFocusEffect(
-    useCallback(() => {
-      const loadData = async () => {
-        await fetchCachedTransactions(false); // Uses cache if valid
-        setInitialLoad(false);
-      };
-      loadData();
-    }, [fetchCachedTransactions]),
-  );
+  const loadTransactions = useCallback(async (forceRefresh = false, loadMore = false) => {
+    if (isFetching.current) return;
 
-  // Handle manual refresh - force fetch new data
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
+    const requestedPage = loadMore ? page + 1 : 1;
+
+    // Debounce if needed, but useRef lock handles most cases
+    // if (!forceRefresh && Date.now() - lastFetchTime.current < 500) return;
+
     try {
-      invalidateCache("transactions");
-      await fetchCachedTransactions(true);
+      isFetching.current = true;
+      if (loadMore) setLoadingMore(true);
+
+      const params = {
+        page: requestedPage,
+        limit: 20
+      };
+
+      if (forceRefresh) {
+        invalidateCache('transactions');
+      }
+
+      const response = await fetchCachedTransactions(forceRefresh, params);
+
+      if (response && (response.success || response.data)) { // Handle both response structures
+        const data = response.data || response;
+        // If response has metadata (from backend update)
+        if (response.totalPages) {
+          setHasMore(requestedPage < response.totalPages);
+        } else {
+          // Fallback if backend doesn't support pagination metadata yet
+          setHasMore(data.length === 20);
+        }
+
+        if (loadMore) {
+          setPage(p => p + 1);
+        } else {
+          setPage(1);
+        }
+      }
+
+      lastFetchTime.current = Date.now();
     } catch (error) {
-      console.error("Error refreshing transactions:", error);
+      console.error("Error loading transactions:", error);
     } finally {
+      isFetching.current = false;
+      setLoadingMore(false);
       setRefreshing(false);
     }
-  }, [invalidateCache, fetchCachedTransactions]);
+  }, [fetchCachedTransactions, invalidateCache, page]);
+
+  // Initial load
+  useFocusEffect(
+    useCallback(() => {
+      // If we already have data, don't auto-refresh drastically, 
+      // but if empty, load page 1.
+      if (cachedTransactions.length === 0) {
+        loadTransactions(false, false);
+      }
+    }, [loadTransactions, cachedTransactions.length])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Reset page to 1
+    loadTransactions(true, false);
+  };
+
+  const onEndReached = () => {
+    if (!loadingMore && hasMore && !search) {
+      loadTransactions(false, true);
+    }
+  };
 
   // Function to get cashier name from transaction
   const getCashierName = (transaction) => {
@@ -109,28 +179,6 @@ export default function Transaction() {
       "Unknown"
     );
   };
-
-  const filteredTransactions = transactions
-    .filter((t) => {
-      const searchLower = search.toLowerCase();
-      const receiptNo = t.receiptNo || t._id || "";
-      const date = t.checkedOutAt || t.createdAt || t.date || "";
-      const status = t.status || "";
-      return (
-        receiptNo.toLowerCase().includes(searchLower) ||
-        date.toLowerCase().includes(searchLower) ||
-        status.toLowerCase().includes(searchLower)
-      );
-    })
-    .sort((a, b) => {
-      const dateA = new Date(
-        a.checkedOutAt || a.createdAt || a.date || 0,
-      ).getTime();
-      const dateB = new Date(
-        b.checkedOutAt || b.createdAt || b.date || 0,
-      ).getTime();
-      return dateB - dateA;
-    });
 
   const handleView = (item) => {
     setSelectedTransaction(item);
@@ -162,14 +210,13 @@ export default function Transaction() {
         <p style="text-align:center; margin:2px 0; font-size: 10px;">KM 7 Pasonanca, Zamboanga City</p>
         <p style="text-align:center; margin:0;">Cashier: ${getCashierName(selectedTransaction)}</p>
         <p style="text-align:center; margin:0;">Date & Time: ${new Date(
-          selectedTransaction.checkedOutAt ||
-            selectedTransaction.createdAt ||
-            selectedTransaction.date,
-        ).toLocaleString()}</p>
+      selectedTransaction.checkedOutAt ||
+      selectedTransaction.createdAt ||
+      selectedTransaction.date,
+    ).toLocaleString()}</p>
         <p style="text-align:center; margin:0;">Receipt No: ${selectedTransaction.receiptNo || selectedTransaction._id}</p>
-        <p style="text-align:center; margin:0;">Status: ${
-          selectedTransaction.status
-        }</p>
+        <p style="text-align:center; margin:0;">Status: ${selectedTransaction.status
+      }</p>
         <hr style="border:1px dashed #000;"/>
         <table style="width:100%; border-collapse: collapse;">
           <thead>
@@ -181,17 +228,17 @@ export default function Transaction() {
           </thead>
           <tbody>
             ${items
-              .map((item) => {
-                const name = item.name || item.productName || "Unknown";
-                const qty = item.quantity || item.qty || 0;
-                const price = item.price || item.unitPrice || 0;
-                return `<tr>
+        .map((item) => {
+          const name = item.name || item.productName || "Unknown";
+          const qty = item.quantity || item.qty || 0;
+          const price = item.price || item.unitPrice || 0;
+          return `<tr>
                     <td>${name}</td>
                     <td style="text-align:center;">${qty}</td>
                     <td style="text-align:right;">₱${price.toFixed(2)}</td>
                   </tr>`;
-              })
-              .join("")}
+        })
+        .join("")}
           </tbody>
         </table>
         <hr style="border:1px dashed #000;"/>
@@ -292,7 +339,7 @@ export default function Transaction() {
               style={styles.searchIcon}
             />
             <TextInput
-              placeholder="Search transactions..."
+              placeholder="Search loaded transactions..."
               placeholderTextColor="#B8A69B"
               style={styles.searchBox}
               value={search}
@@ -309,19 +356,21 @@ export default function Transaction() {
             )}
           </View>
           <View style={styles.listWrapper}>
-            {loading ? (
+            {(transactionsLoading && cachedTransactions.length === 0) ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#AD7F65" />
                 <Text style={styles.loadingText}>Loading transactions...</Text>
               </View>
             ) : (
-              <FlatList
+              <FlashList
                 data={filteredTransactions}
+                renderItem={renderItem}
                 keyExtractor={(item) =>
                   item._id || item.id || Math.random().toString()
                 }
-                renderItem={renderItem}
-                contentContainerStyle={styles.listContent}
+                estimatedItemSize={150}
+                onEndReached={onEndReached}
+                onEndReachedThreshold={0.5}
                 refreshControl={
                   <RefreshControl
                     refreshing={refreshing}
@@ -330,13 +379,21 @@ export default function Transaction() {
                     tintColor="#AD7F65"
                   />
                 }
+                ListFooterComponent={() =>
+                  loadingMore ? (
+                    <View style={{ padding: 10 }}>
+                      <ActivityIndicator size="small" color="#AD7F65" />
+                    </View>
+                  ) : null
+                }
                 ListEmptyComponent={
                   <View style={styles.emptyState}>
                     <Text style={styles.emptyText}>
-                      — No transaction found —
+                      {search ? "— No matching transactions found —" : "— No transactions yet —"}
                     </Text>
                   </View>
                 }
+                contentContainerStyle={styles.listContent}
               />
             )}
           </View>
@@ -364,8 +421,8 @@ export default function Transaction() {
                 <Text style={styles.receiptDate}>
                   {new Date(
                     selectedTransaction.checkedOutAt ||
-                      selectedTransaction.createdAt ||
-                      selectedTransaction.date,
+                    selectedTransaction.createdAt ||
+                    selectedTransaction.date,
                   ).toLocaleString()}
                 </Text>
                 <Text style={styles.receiptStatus}>
@@ -425,7 +482,7 @@ export default function Transaction() {
                   style={[
                     styles.printButton,
                     selectedTransaction?.status === "Voided" &&
-                      styles.disabledButton,
+                    styles.disabledButton,
                   ]}
                   onPress={
                     selectedTransaction?.status !== "Voided"
@@ -501,6 +558,7 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: "#f8f9fa",
     borderRadius: 10,
+    paddingBottom: 20, // Add padding at bottom
   },
   logItem: {
     backgroundColor: "#fff",
@@ -571,13 +629,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     textAlign: "right",
-  },
-  dateTimeContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "100%",
-    marginTop: 5,
   },
   modalOverlay: {
     flex: 1,
@@ -710,45 +761,10 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 14,
   },
-  receiptPrice: {
-    width: 60,
-    textAlign: "right",
-    fontSize: 14,
-  },
-  receiptTotals: {
-    borderTopWidth: 1,
-    borderTopColor: "#ccc",
-    width: "100%",
-    marginTop: 10,
-    paddingTop: 5,
-  },
-  buttonRow: {
-    flexDirection: "column",
-    position: "absolute",
-    top: 10,
-    right: 10,
-    gap: 8,
-    alignItems: "center",
-  },
-  iconButton: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-  },
-  printButton: {
-    backgroundColor: "#AD7F65",
-    paddingVertical: 15,
-    paddingHorizontal: 60,
-    borderRadius: 8,
-    marginTop: 15,
-    width: "95%",
-    alignSelf: "center",
-  },
-  printButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+  locationText: {
     textAlign: "center",
-  },
+    fontSize: 12,
+    color: "#555",
+    marginBottom: 5
+  }
 });

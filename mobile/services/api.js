@@ -82,7 +82,7 @@ const apiCall = async (endpoint, options = {}, forceOnline = false) => {
 
   // ONLINE MODE
   const url = `${config.API_URL}${endpoint}`;
-  const timeout = config.TIMEOUT || 10000;
+  const timeout = config.TIMEOUT || 30000;
 
   const defaultOptions = {
     headers: {
@@ -192,6 +192,11 @@ export const productAPI = {
         performedById,
       }),
     });
+  },
+
+  // Get inventory stats (value, margins, counts)
+  getInventoryStats: async () => {
+    return apiCall('/products/inventory-stats');
   },
 };
 
