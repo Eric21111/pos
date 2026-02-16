@@ -5,7 +5,7 @@ class DatabaseManager {
   constructor() {
     this.connection = null;
     this.cloudURI =
-      process.env.MONGODB_URI || "mongodb+srv://consolvestudio_db_user:7S9QKG6eFPHt7yyk@cys.biyeclf.mongodb.net/?appName=Cys";
+      process.env.MONGODB_URI || "mongodb+srv://consolvestudio_db_user:fnEHPQc0gC1dNS3U@cys.biyeclf.mongodb.net/?appName=Cys";
     this.localURI = "mongodb://localhost:27017/pos-system";
     this.currentURI = null;
     this.isOnline = false;

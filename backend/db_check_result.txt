@@ -1,0 +1,16 @@
+Connected!
+Products: 5
+Transactions: 33
+Stock Movements: 27
+--- Last 5 Transactions ---
+ID: 6991ba0ff08a66bfb7074585, Created: Sun Feb 15 2026 20:20:31 GMT+0800 (Philippine Standard Time), Amount: 711
+ID: 69311c3406f0eba3040650af, Created: Sun Feb 15 2026 14:55:01 GMT+0800 (Philippine Standard Time), Amount: 1200
+ID: 69311c4c06f0eba3040650b9, Created: Sun Feb 15 2026 14:55:01 GMT+0800 (Philippine Standard Time), Amount: 300
+ID: 69311c7206f0eba3040650c4, Created: Sun Feb 15 2026 14:55:01 GMT+0800 (Philippine Standard Time), Amount: 600
+ID: 69311faa06f0eba30406512b, Created: Sun Feb 15 2026 14:55:01 GMT+0800 (Philippine Standard Time), Amount: 600
+--- Last 5 Stock Movements ---
+ID: 69311c7206f0eba3040650c8, Created: Sun Feb 15 2026 14:55:08 GMT+0800 (Philippine Standard Time), Type: Stock-Out, Qty: 2
+ID: 69311faa06f0eba304065131, Created: Sun Feb 15 2026 14:55:08 GMT+0800 (Philippine Standard Time), Type: Stock-Out, Qty: 1
+ID: 69311faa06f0eba304065133, Created: Sun Feb 15 2026 14:55:08 GMT+0800 (Philippine Standard Time), Type: Stock-Out, Qty: 1
+ID: 69834d0923baa5d8ab584dd5, Created: Sun Feb 15 2026 14:55:08 GMT+0800 (Philippine Standard Time), Type: Stock-Out, Qty: 1
+ID: 698c60f9e00d55c3db620a38, Created: Sun Feb 15 2026 14:55:08 GMT+0800 (Philippine Standard Time), Type: Stock-In, Qty: 1
