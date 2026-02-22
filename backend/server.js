@@ -5,7 +5,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const cors = require("cors");
-const bodyParser = require("body-parser");
+const compression = require("compression");
 const connectDB = require("./config/database");
 const networkDetection = require("./middleware/networkDetection");
 const { initStockAlertCron } = require("./services/stockAlertCron");
@@ -16,8 +16,12 @@ const app = express();
 connectDB();
 
 app.use(cors());
-app.use(bodyParser.json({ limit: "50mb" }));
-app.use(bodyParser.urlencoded({ extended: true, limit: "50mb" }));
+app.use(compression()); // Gzip compress all responses (~60-80% smaller payloads for mobile)
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+// Enable ETag for conditional 304 responses (saves bandwidth on repeated requests)
+app.set('etag', 'strong');
 
 // Database connection check middleware
 app.use(networkDetection);
@@ -28,6 +32,11 @@ app.get("/", (req, res) => {
     message: "Welcome to POS System API",
     database: `${dbManager.getCurrentMode()} MongoDB`,
   });
+});
+
+// Lightweight ping for connection warmup (no DB query)
+app.get("/api/ping", (req, res) => {
+  res.json({ ok: true });
 });
 
 app.use("/api/products", require("./routes/productRoutes"));

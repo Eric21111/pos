@@ -1,13 +1,13 @@
 import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
-    FaBell,
-    FaBox,
-    FaCamera,
-    FaEye,
-    FaKey,
-    FaPalette,
-    FaSync,
-    FaUser,
+  FaBell,
+  FaBox,
+  FaCamera,
+  FaDownload,
+  FaKey,
+  FaPalette,
+  FaSync,
+  FaUser
 } from "react-icons/fa";
 import defaultAvatar from "../assets/default.jpeg";
 import SuccessModal from "../components/inventory/SuccessModal";
@@ -45,6 +45,9 @@ const Settings = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
+  const [showClearArchiveModal, setShowClearArchiveModal] = useState(false);
+  const [clearArchivesLoading, setClearArchivesLoading] = useState(false);
+  const [exportArchivesLoading, setExportArchivesLoading] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -356,6 +359,94 @@ const Settings = () => {
     );
   }, [firstName, lastName, currentUser?.name]);
 
+  const handleClearArchives = async () => {
+    setClearArchivesLoading(true);
+    setError("");
+    try {
+      const response = await fetch("http://localhost:5000/api/archive/all", {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSuccessMessage(data.message || "All archives cleared successfully!");
+        setShowSuccessModal(true);
+        setArchives([]);
+        setShowClearArchiveModal(false);
+      } else {
+        setError(data.message || "Failed to clear archives");
+      }
+    } catch (error) {
+      console.error("Error clearing archives:", error);
+      setError("Failed to clear archives. Please try again.");
+    } finally {
+      setClearArchivesLoading(false);
+    }
+  };
+
+  const handleExportArchives = async () => {
+    setExportArchivesLoading(true);
+    try {
+      const response = await fetch("http://localhost:5000/api/archive?limit=1000000000&sortBy=date-desc");
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        const archivesToExport = data.data;
+
+        if (archivesToExport.length === 0) {
+          setError("No archives available to export.");
+          return;
+        }
+
+        const headers = [
+          "Archive Number",
+          "SKU",
+          "Item Name",
+          "Category",
+          "Quantity",
+          "Price",
+          "Reason",
+          "Date & Time",
+          "Archived By",
+          "Notes"
+        ];
+
+        const csvContent = [
+          headers.join(","),
+          ...archivesToExport.map((archive, index) => {
+            return [
+              archivesToExport.length - index,
+              `"${archive.sku || ''}"`,
+              `"${archive.itemName || ''}"`,
+              `"${archive.category || ''}"`,
+              archive.quantity || 0,
+              archive.itemPrice || 0,
+              `"${archive.reason || ''} ${archive.returnReason || ''}"`,
+              `"${formatDateTime(archive.archivedAt)}"`,
+              `"${archive.archivedBy || ''}"`,
+              `"${archive.notes || ''}"`
+            ].join(",");
+          })
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `archives_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        setError("Failed to fetch archives for export.");
+      }
+    } catch (error) {
+      console.error("Error exporting archives:", error);
+      setError("Failed to export archives. Please try again.");
+    } finally {
+      setExportArchivesLoading(false);
+    }
+  };
+
   return (
     <div
       className={`p-8 min-h-screen ${theme === "dark" ? "bg-[#1E1B18]" : "bg-gray-50"}`}
@@ -366,21 +457,19 @@ const Settings = () => {
         <div className="flex gap-3 mb-6">
           <button
             onClick={() => setActiveTab("personal")}
-            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${
-              activeTab === "personal"
-                ? `text-[#AD7F65] border-b-4 border-[#AD7F65] ${theme === "dark" ? "bg-[#2A2724]" : "bg-white"}`
-                : `${theme === "dark" ? "bg-[#2A2724] text-gray-300 border border-gray-700" : "bg-white text-gray-800 border border-gray-200"}`
-            }`}
+            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${activeTab === "personal"
+              ? `text-[#AD7F65] border-b-4 border-[#AD7F65] ${theme === "dark" ? "bg-[#2A2724]" : "bg-white"}`
+              : `${theme === "dark" ? "bg-[#2A2724] text-gray-300 border border-gray-700" : "bg-white text-gray-800 border border-gray-200"}`
+              }`}
           >
             Personal Information
           </button>
           <button
             onClick={() => setActiveTab("archives")}
-            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${
-              activeTab === "archives"
-                ? `text-[#AD7F65] border-b-4 border-[#AD7F65] ${theme === "dark" ? "bg-[#2A2724]" : "bg-white"}`
-                : `${theme === "dark" ? "bg-[#2A2724] text-gray-300 border border-gray-700" : "bg-white text-gray-800 border border-gray-200"}`
-            }`}
+            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md ${activeTab === "archives"
+              ? `text-[#AD7F65] border-b-4 border-[#AD7F65] ${theme === "dark" ? "bg-[#2A2724]" : "bg-white"}`
+              : `${theme === "dark" ? "bg-[#2A2724] text-gray-300 border border-gray-700" : "bg-white text-gray-800 border border-gray-200"}`
+              }`}
           >
             Archives
           </button>
@@ -388,215 +477,223 @@ const Settings = () => {
       )}
 
       {activeTab === "archives" ? (
-        <div
-          className={`rounded-2xl shadow-lg overflow-hidden ${theme === "dark" ? "bg-[#2A2724]" : "bg-white"}`}
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead
-                className={theme === "dark" ? "bg-[#1E1B18]" : "bg-gray-50"}
-              >
-                <tr>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Archive Number
-                  </th>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Item Image
-                  </th>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    SKU
-                  </th>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Item Name
-                  </th>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Category
-                  </th>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Quantity
-                  </th>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Price
-                  </th>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Reason
-                  </th>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Date & Time
-                  </th>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Archived By
-                  </th>
-                  <th
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody
-                className={`divide-y ${theme === "dark" ? "bg-[#2A2724] divide-gray-700" : "bg-white divide-gray-200"}`}
-              >
-                {archivesLoading ? (
+        <div className="space-y-4">
+          <div className="flex justify-end pr-2 gap-3">
+            {archives.length > 0 && (
+              <>
+                <button
+                  onClick={handleExportArchives}
+                  className="bg-[#AD7F65] hover:bg-[#8e654e] text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition-colors flex items-center gap-2"
+                  disabled={exportArchivesLoading || clearArchivesLoading}
+                >
+                  <FaDownload className="w-4 h-4" />
+                  {exportArchivesLoading ? "Exporting..." : "Export Data"}
+                </button>
+                <button
+                  onClick={() => setShowClearArchiveModal(true)}
+                  className="bg-red-600/90 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition-colors"
+                  disabled={clearArchivesLoading || exportArchivesLoading}
+                >
+                  Clear All Data
+                </button>
+              </>
+            )}
+          </div>
+          <div
+            className={`rounded-2xl shadow-lg overflow-hidden ${theme === "dark" ? "bg-[#2A2724]" : "bg-white"}`}
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead
+                  className={theme === "dark" ? "bg-[#1E1B18]" : "bg-gray-50"}
+                >
                   <tr>
-                    <td
-                      colSpan="11"
-                      className="px-4 py-8 text-center text-gray-500"
+                    <th
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
                     >
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#8B7355] mb-2"></div>
-                        <span>Loading...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : archives.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="11"
-                      className="px-4 py-8 text-center text-gray-500"
+                      Archive Number
+                    </th>
+                    <th
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
                     >
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="w-24 h-24 flex items-center justify-center mb-4">
-                          <FaBox className="w-full h-full text-gray-300" />
-                        </div>
-                        <p className="text-gray-400 text-lg">No Archive yet</p>
-                      </div>
-                    </td>
+                      Item Image
+                    </th>
+                    <th
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      SKU
+                    </th>
+                    <th
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      Item Name
+                    </th>
+                    <th
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      Category
+                    </th>
+                    <th
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      Quantity
+                    </th>
+                    <th
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      Price
+                    </th>
+                    <th
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      Reason
+                    </th>
+                    <th
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      Date & Time
+                    </th>
+                    <th
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      Archived By
+                    </th>
                   </tr>
-                ) : (
-                  archives.map((archive, index) => {
-                    const archiveNumber = archives.length - index;
-                    return (
-                      <tr
-                        key={archive._id || archive.id}
-                        className={`hover:${theme === "dark" ? "bg-[#1E1B18]" : "bg-gray-50"}`}
+                </thead>
+                <tbody
+                  className={`divide-y ${theme === "dark" ? "bg-[#2A2724] divide-gray-700" : "bg-white divide-gray-200"}`}
+                >
+                  {archivesLoading ? (
+                    <tr>
+                      <td
+                        colSpan="10"
+                        className="px-4 py-8 text-center text-gray-500"
                       >
-                        <td
-                          className={`px-4 py-3 whitespace-nowrap text-sm font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}
-                        >
-                          #{archiveNumber}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {archive.itemImage ? (
-                            <img
-                              src={archive.itemImage}
-                              alt={archive.itemName}
-                              className="w-12 h-12 object-cover rounded"
-                              onError={(e) => {
-                                e.target.src = "https://via.placeholder.com/50";
-                              }}
-                            />
-                          ) : (
-                            <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-gray-400">
-                              <span className="text-xs">No Image</span>
-                            </div>
-                          )}
-                        </td>
-                        <td
-                          className={`px-4 py-3 whitespace-nowrap text-sm font-mono ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}
-                        >
-                          {archive.sku}
-                        </td>
-                        <td
-                          className={`px-4 py-3 whitespace-nowrap text-sm ${theme === "dark" ? "text-white" : "text-gray-900"}`}
-                        >
-                          <div>
-                            <div className="font-medium">
-                              {archive.itemName}
-                            </div>
-                            {archive.variant && (
-                              <div className="text-xs text-gray-500">
-                                ({archive.variant})
-                              </div>
-                            )}
-                            {archive.selectedSize && (
-                              <div className="text-xs text-gray-500">
-                                Size: {archive.selectedSize}
-                              </div>
-                            )}
-                            {archive.brandName && (
-                              <div className="text-xs text-gray-500">
-                                Brand: {archive.brandName}
-                              </div>
-                            )}
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#8B7355] mb-2"></div>
+                          <span>Loading...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : archives.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan="10"
+                        className="px-4 py-8 text-center text-gray-500"
+                      >
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="w-24 h-24 flex items-center justify-center mb-4">
+                            <FaBox className="w-full h-full text-gray-300" />
                           </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
-                            {archive.category}
-                          </span>
-                        </td>
-                        <td
-                          className={`px-4 py-3 whitespace-nowrap text-sm ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                          <p className="text-gray-400 text-lg">No Archive yet</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    archives.map((archive, index) => {
+                      const archiveNumber = archives.length - index;
+                      return (
+                        <tr
+                          key={archive._id || archive.id}
+                          className={`hover:${theme === "dark" ? "bg-[#1E1B18]" : "bg-gray-50"}`}
                         >
-                          {archive.quantity}
-                        </td>
-                        <td
-                          className={`px-4 py-3 whitespace-nowrap text-sm font-medium ${theme === "dark" ? "text-white" : "text-gray-900"}`}
-                        >
-                          ₱{parseFloat(archive.itemPrice || 0).toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700">
-                            {archive.reason}
-                          </span>
-                          {archive.returnReason && (
-                            <div className="mt-1 text-xs text-gray-600">
-                              {archive.returnReason}
-                            </div>
-                          )}
-                          {archive.notes && (
-                            <div className="mt-1 text-xs text-gray-500 italic">
-                              {archive.notes}
-                            </div>
-                          )}
-                        </td>
-                        <td
-                          className={`px-4 py-3 whitespace-nowrap text-sm ${theme === "dark" ? "text-white" : "text-gray-900"}`}
-                        >
-                          {formatDateTime(archive.archivedAt)}
-                        </td>
-                        <td
-                          className={`px-4 py-3 whitespace-nowrap text-sm ${theme === "dark" ? "text-white" : "text-gray-900"}`}
-                        >
-                          {archive.archivedBy || "N/A"}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <button
-                            onClick={() =>
-                              console.log("View archive:", archive)
-                            }
-                            className="text-green-600 hover:text-green-800"
+                          <td
+                            className={`px-4 py-3 whitespace-nowrap text-sm font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}
                           >
-                            <FaEye className="w-5 h-5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                            #{archiveNumber}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {archive.itemImage ? (
+                              <img
+                                src={archive.itemImage}
+                                alt={archive.itemName}
+                                className="w-12 h-12 object-cover rounded"
+                                onError={(e) => {
+                                  e.target.src = "https://via.placeholder.com/50";
+                                }}
+                              />
+                            ) : (
+                              <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-gray-400">
+                                <span className="text-xs">No Image</span>
+                              </div>
+                            )}
+                          </td>
+                          <td
+                            className={`px-4 py-3 whitespace-nowrap text-sm font-mono ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}
+                          >
+                            {archive.sku}
+                          </td>
+                          <td
+                            className={`px-4 py-3 whitespace-nowrap text-sm ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                          >
+                            <div>
+                              <div className="font-medium">
+                                {archive.itemName}
+                              </div>
+                              {archive.variant && (
+                                <div className="text-xs text-gray-500">
+                                  ({archive.variant})
+                                </div>
+                              )}
+                              {archive.selectedSize && (
+                                <div className="text-xs text-gray-500">
+                                  Size: {archive.selectedSize}
+                                </div>
+                              )}
+                              {archive.brandName && (
+                                <div className="text-xs text-gray-500">
+                                  Brand: {archive.brandName}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                              {archive.category}
+                            </span>
+                          </td>
+                          <td
+                            className={`px-4 py-3 whitespace-nowrap text-sm ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                          >
+                            {archive.quantity}
+                          </td>
+                          <td
+                            className={`px-4 py-3 whitespace-nowrap text-sm font-medium ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                          >
+                            ₱{parseFloat(archive.itemPrice || 0).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700">
+                              {archive.reason}
+                            </span>
+                            {archive.returnReason && (
+                              <div className="mt-1 text-xs text-gray-600">
+                                {archive.returnReason}
+                              </div>
+                            )}
+                            {archive.notes && (
+                              <div className="mt-1 text-xs text-gray-500 italic">
+                                {archive.notes}
+                              </div>
+                            )}
+                          </td>
+                          <td
+                            className={`px-4 py-3 whitespace-nowrap text-sm ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                          >
+                            {formatDateTime(archive.archivedAt)}
+                          </td>
+                          <td
+                            className={`px-4 py-3 whitespace-nowrap text-sm ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                          >
+                            {archive.archivedBy || "N/A"}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       ) : (
@@ -687,11 +784,10 @@ const Settings = () => {
                     Status:
                   </label>
                   <span
-                    className={`inline-block px-3 py-1 rounded-lg text-xs font-bold ${
-                      status === "Active"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
+                    className={`inline-block px-3 py-1 rounded-lg text-xs font-bold ${status === "Active"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-red-100 text-red-700"
+                      }`}
                   >
                     {status}
                   </span>
@@ -714,9 +810,8 @@ const Settings = () => {
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className={`w-full text-base font-semibold border-b-2 border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 bg-transparent ${
-                    theme === "dark" ? "text-white" : "text-gray-800"
-                  }`}
+                  className={`w-full text-base font-semibold border-b-2 border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 bg-transparent ${theme === "dark" ? "text-white" : "text-gray-800"
+                    }`}
                 />
               </div>
               <div>
@@ -727,9 +822,8 @@ const Settings = () => {
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className={`w-full text-base font-semibold border-b-2 border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 bg-transparent ${
-                    theme === "dark" ? "text-white" : "text-gray-800"
-                  }`}
+                  className={`w-full text-base font-semibold border-b-2 border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 bg-transparent ${theme === "dark" ? "text-white" : "text-gray-800"
+                    }`}
                 />
               </div>
               <div>
@@ -740,9 +834,8 @@ const Settings = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className={`w-full text-base font-semibold border-b-2 border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 bg-transparent ${
-                    theme === "dark" ? "text-white" : "text-gray-800"
-                  }`}
+                  className={`w-full text-base font-semibold border-b-2 border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 bg-transparent ${theme === "dark" ? "text-white" : "text-gray-800"
+                    }`}
                 />
               </div>
               <div>
@@ -753,9 +846,8 @@ const Settings = () => {
                   type="text"
                   value={contactNumber}
                   onChange={(e) => setContactNumber(e.target.value)}
-                  className={`w-full text-base font-semibold border-b-2 border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 bg-transparent ${
-                    theme === "dark" ? "text-white" : "text-gray-800"
-                  }`}
+                  className={`w-full text-base font-semibold border-b-2 border-gray-200 focus:border-[#AD7F65] focus:outline-none py-1 bg-transparent ${theme === "dark" ? "text-white" : "text-gray-800"
+                    }`}
                 />
               </div>
               <div>
@@ -799,11 +891,10 @@ const Settings = () => {
             <div className="grid grid-cols-2 gap-6">
               <button
                 onClick={() => setTheme("dark")}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${
-                  theme === "dark"
-                    ? "border-[#AD7F65] shadow-md"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
+                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${theme === "dark"
+                  ? "border-[#AD7F65] shadow-md"
+                  : "border-gray-200 hover:border-gray-300"
+                  }`}
               >
                 <div className="w-full h-16 rounded-xl bg-[#1E1B18] shadow-inner mb-2"></div>
                 <span
@@ -815,11 +906,10 @@ const Settings = () => {
 
               <button
                 onClick={() => setTheme("light")}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${
-                  theme === "light"
-                    ? "border-[#AD7F65] shadow-md"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
+                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${theme === "light"
+                  ? "border-[#AD7F65] shadow-md"
+                  : "border-gray-200 hover:border-gray-300"
+                  }`}
               >
                 <div className="w-full h-16 rounded-xl bg-white shadow-inner mb-2 border border-gray-100"></div>
                 <span
@@ -935,11 +1025,10 @@ const Settings = () => {
                         handlePinInput(e.target.value, i, "current")
                       }
                       disabled={pinLoading}
-                      className={`w-12 h-12 text-center text-lg font-bold rounded-xl border-2 shadow-sm focus:border-[#AD7F65] focus:shadow-md transition-all outline-none disabled:opacity-50 ${
-                        theme === "dark"
-                          ? "bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]"
-                          : "bg-gray-50 border-gray-200 text-gray-900 focus:bg-white"
-                      }`}
+                      className={`w-12 h-12 text-center text-lg font-bold rounded-xl border-2 shadow-sm focus:border-[#AD7F65] focus:shadow-md transition-all outline-none disabled:opacity-50 ${theme === "dark"
+                        ? "bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]"
+                        : "bg-gray-50 border-gray-200 text-gray-900 focus:bg-white"
+                        }`}
                     />
                   ))}
                 </div>
@@ -962,11 +1051,10 @@ const Settings = () => {
                       value={newPin[i]}
                       onChange={(e) => handlePinInput(e.target.value, i, "new")}
                       disabled={pinLoading}
-                      className={`w-12 h-12 text-center text-lg font-bold rounded-xl border-2 shadow-sm focus:border-[#AD7F65] focus:shadow-md transition-all outline-none disabled:opacity-50 ${
-                        theme === "dark"
-                          ? "bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]"
-                          : "bg-gray-50 border-gray-200 text-gray-900 focus:bg-white"
-                      }`}
+                      className={`w-12 h-12 text-center text-lg font-bold rounded-xl border-2 shadow-sm focus:border-[#AD7F65] focus:shadow-md transition-all outline-none disabled:opacity-50 ${theme === "dark"
+                        ? "bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]"
+                        : "bg-gray-50 border-gray-200 text-gray-900 focus:bg-white"
+                        }`}
                     />
                   ))}
                 </div>
@@ -991,11 +1079,10 @@ const Settings = () => {
                         handlePinInput(e.target.value, i, "confirm")
                       }
                       disabled={pinLoading}
-                      className={`w-12 h-12 text-center text-lg font-bold rounded-xl border-2 shadow-sm focus:border-[#AD7F65] focus:shadow-md transition-all outline-none disabled:opacity-50 ${
-                        theme === "dark"
-                          ? "bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]"
-                          : "bg-gray-50 border-gray-200 text-gray-900 focus:bg-white"
-                      }`}
+                      className={`w-12 h-12 text-center text-lg font-bold rounded-xl border-2 shadow-sm focus:border-[#AD7F65] focus:shadow-md transition-all outline-none disabled:opacity-50 ${theme === "dark"
+                        ? "bg-[#1E1B18] border-gray-600 text-white focus:bg-[#352F2A]"
+                        : "bg-gray-50 border-gray-200 text-gray-900 focus:bg-white"
+                        }`}
                     />
                   ))}
                 </div>
@@ -1009,6 +1096,37 @@ const Settings = () => {
                 className="px-8 py-2.5 rounded-xl text-white font-bold bg-[#3B82F6] hover:bg-[#2563EB] transition-all shadow-md disabled:opacity-50"
               >
                 {pinLoading ? "Changing PIN..." : "Change PIN"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showClearArchiveModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 backdrop-blur-sm bg-black/20">
+          <div className={`p-6 rounded-2xl shadow-xl w-full max-w-sm ${theme === "dark" ? "bg-[#2A2724] text-white" : "bg-white text-gray-900"}`}>
+            <h3 className="text-xl font-bold mb-4 text-center">Clear Archives</h3>
+            <p className="text-sm text-center mb-6">Are you sure you want to permanently delete all archive data? This action cannot be undone.</p>
+            {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  setShowClearArchiveModal(false);
+                  setError("");
+                }}
+                className={`flex-1 py-2 rounded-lg font-bold border transition-colors ${theme === "dark" ? "border-gray-600 hover:bg-gray-700 text-white" : "border-gray-300 hover:bg-gray-100 text-gray-700"}`}
+                disabled={clearArchivesLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearArchives}
+                className="flex-1 py-2 rounded-lg font-bold bg-red-600 text-white hover:bg-red-700 transition-colors flex justify-center items-center"
+                disabled={clearArchivesLoading}
+              >
+                {clearArchivesLoading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : "Delete All"}
               </button>
             </div>
           </div>

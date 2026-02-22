@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import config from "../config/api";
 import { employeeAPI } from "../services/api";
 
 export default function PinLogin() {
@@ -19,6 +20,12 @@ export default function PinLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const router = useRouter();
+
+  // Warm up the backend connection while user is looking at the PIN screen
+  // This pre-establishes DNS resolution, TCP connection, and TLS handshake
+  useEffect(() => {
+    fetch(`${config.API_URL}/ping`).catch(() => { });
+  }, []);
 
   const handleKeyPress = (value: string) => {
     if (value === "del") {

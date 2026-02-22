@@ -7,7 +7,14 @@ exports.getAllProducts = async (req, res) => {
     let limit = parseInt(req.query.limit);
     let skip = 0;
 
-    let query = Product.find({}, '-sizes -stockHistory').sort({ dateAdded: -1 });
+    // Build projection: always exclude sizes/stockHistory, optionally exclude heavy fields
+    // ?fields=minimal excludes itemImage (base64 strings can be 50-500KB per product)
+    const isMinimal = req.query.fields === 'minimal';
+    const projection = isMinimal
+      ? '-sizes -stockHistory -itemImage'
+      : '-sizes -stockHistory';
+
+    let query = Product.find({}, projection).sort({ dateAdded: -1 });
 
     // Only apply pagination if limit is specified (Mobile uses limit=20, Web sends none)
     if (limit) {
@@ -15,11 +22,11 @@ exports.getAllProducts = async (req, res) => {
       query = query.skip(skip).limit(limit);
     }
 
-    // OPTIMIZATION: Exclude heavy fields (images, heavy nested objects) for the list view
-    // Only fetch these when viewing specific details
-    const products = await query.lean();
-
-    const totalCount = await Product.countDocuments();
+    // Run find and count in parallel instead of sequentially
+    const [products, totalCount] = await Promise.all([
+      query.lean(),
+      Product.countDocuments()
+    ]);
 
     const formattedProducts = products.map(product => ({
       ...product,
@@ -31,7 +38,6 @@ exports.getAllProducts = async (req, res) => {
       reorderNumber: product.reorderNumber || 0,
       supplierName: product.supplierName || '',
       supplierContact: product.supplierContact || '',
-      // sizes: product.sizes || null, // Excluded in projection
       displayInTerminal: product.displayInTerminal !== undefined ? product.displayInTerminal : true,
       terminalStatus: product.displayInTerminal !== false ? 'shown' : 'not shown'
     }));
@@ -663,7 +669,7 @@ exports.getInventoryStats = async (req, res) => {
           lowStock: {
             $sum: {
               $cond: [
-                { $and: [{ $gt: ["$currentStock", 0] }, { $lt: ["$currentStock", 5] }] },
+                { $and: [{ $gt: ["$currentStock", 0] }, { $lte: ["$currentStock", 10] }] },
                 1,
                 0
               ]

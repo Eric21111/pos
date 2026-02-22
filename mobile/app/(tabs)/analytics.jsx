@@ -28,6 +28,7 @@ import {
 import { BarChart, LineChart } from "react-native-chart-kit";
 import * as XLSX from "xlsx";
 import {
+  stockAPI,
   stockMovementAPI,
   transactionAPI
 } from "../../services/api";
@@ -138,7 +139,6 @@ export default function Analytics() {
   // Fetch all analytics data
   const fetchAnalyticsData = async () => {
     try {
-      console.log("Starting analytics data fetch...");
       setLoading(true);
       await Promise.all([
         fetchDashboardStats(chartType), // Use current chartType
@@ -147,7 +147,6 @@ export default function Analytics() {
         fetchStockMovements(chartType),
         fetchTopProducts(),
       ]);
-      console.log("Analytics data fetch complete");
     } catch (error) {
       console.warn("Failed to fetch analytics:", error?.message);
     } finally {
@@ -187,9 +186,7 @@ export default function Analytics() {
   ) => {
     try {
       if (showLoader) setLoading(true);
-      console.log(`Fetching dashboard stats for ${timeframe}...`);
       const response = await transactionAPI.getDashboardStats(timeframe);
-      console.log("Dashboard stats response:", JSON.stringify(response));
 
       if (response?.success && response.data) {
         const {
@@ -267,17 +264,14 @@ export default function Analytics() {
   // Fetch low stock items
   const fetchLowStockItems = async () => {
     try {
-      console.log("Fetching low stock items...");
       // OPTIMIZATION: Use dedicated endpoint instead of fetching all products
       const response = await stockAPI.getLowStock();
-      console.log("Low stock items found:", response?.count || 0);
-
       if (response?.success && response.data) {
         const items = response.data.map((p, idx) => ({
-          id: p._id || p.id || idx,
-          name: p.itemName || p.name || "Unknown Product",
+          id: p._id || p.sku || idx,
+          name: p.itemName || "Unknown Product",
           stocks: p.currentStock || 0,
-          status: (p.currentStock === 0 || p.alertType === 'out_of_stock') ? "Out of Stock" : "Low Stock",
+          status: p.alertType === 'out_of_stock' || (p.currentStock || 0) === 0 ? "Out of Stock" : "Low Stock",
         }));
 
         setLowStockItems(items);

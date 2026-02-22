@@ -25,6 +25,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import TopSellingModal from "../../components/owner/TopSellingModal";
 import Header from "../../components/shared/header";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -63,6 +64,7 @@ const Dashboard = () => {
   const [showSalesFilter, setShowSalesFilter] = useState(false);
   const [showTopSellingFilter, setShowTopSellingFilter] = useState(false);
   const [showLowStockFilter, setShowLowStockFilter] = useState(false);
+  const [showTopSellingModal, setShowTopSellingModal] = useState(false);
 
   // Colors for charts
   const COLORS = [
@@ -192,7 +194,7 @@ const Dashboard = () => {
       };
       const apiTimeframe = timeMap[timeframe] || "daily";
 
-      let url = `http://localhost:5000/api/transactions/top-selling?sort=${topSellingSort}&limit=3&period=${apiTimeframe}`;
+      let url = `http://localhost:5000/api/transactions/top-selling?sort=${topSellingSort}&limit=10&period=${apiTimeframe}`;
       if (timeframe === "Custom" && startDate && endDate) {
         url += `&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
       }
@@ -209,37 +211,23 @@ const Dashboard = () => {
 
   const fetchLowStockProducts = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/products");
+      const response = await fetch("http://localhost:5000/api/products/low-stock");
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
-        // Filter locally as per previous implementation logic
-        const productsWithStock = data.data.map((product) => {
-          let totalStock = product.currentStock || 0;
-          if (product.sizes && typeof product.sizes === "object") {
-            const sizeStock = Object.values(product.sizes).reduce(
-              (sum, val) => {
-                if (typeof val === "number") return sum + val;
-                if (typeof val === "object" && val.quantity)
-                  return sum + val.quantity;
-                return sum;
-              },
-              0,
-            );
-            if (sizeStock > 0) totalStock = sizeStock;
-          }
-          return { ...product, calculatedStock: totalStock };
-        });
+        // Map data to match the component's expected structure
+        const mappedProducts = data.data.map((p) => ({
+          ...p,
+          calculatedStock: p.currentStock || 0,
+        }));
 
-        const lowStock = productsWithStock
+        const lowStock = mappedProducts
           .filter((p) => {
-            const reorderLevel = p.reorderLevel || 10;
-            const isLowStock =
-              p.calculatedStock <= reorderLevel && p.calculatedStock > 0;
-            const isOutOfStock = p.calculatedStock === 0;
+            const isOutOfStock = p.alertType === 'out_of_stock' || p.calculatedStock === 0;
+            const isLowStock = p.alertType === 'low_stock' && p.calculatedStock > 0;
 
             if (lowStockFilter === "Out of Stock") return isOutOfStock;
             if (lowStockFilter === "Low Stock") return isLowStock;
-            return isLowStock || isOutOfStock; // 'All'
+            return true; // 'All'
           })
           .slice(0, 5);
 
@@ -275,7 +263,7 @@ const Dashboard = () => {
     >
       {/* Top Navigation - Repurposed as Welcome Banner */}
       <Header
-        pageName={`Welcome, Miss ${userName}!`}
+        pageName={`Welcome, ${userName}!`}
         subtitle={`Here's your overview for ${timeframe === "Custom" ? "custom range" : timeframe.toLowerCase()}`}
         showTimeframeFilter={false}
         showBorder={false}
@@ -299,13 +287,12 @@ const Dashboard = () => {
                     setTimeframe(t);
                     setDateRange([null, null]); // Reset custom range when switching back to presets
                   }}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                    timeframe === t
-                      ? "bg-[#AD7F65] text-white shadow-sm"
-                      : theme === "dark"
-                        ? "text-gray-400 hover:bg-[#3A3734]"
-                        : "text-gray-500 hover:bg-gray-100"
-                  }`}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${timeframe === t
+                    ? "bg-[#AD7F65] text-white shadow-sm"
+                    : theme === "dark"
+                      ? "text-gray-400 hover:bg-[#3A3734]"
+                      : "text-gray-500 hover:bg-gray-100"
+                    }`}
                 >
                   {t}
                 </button>
@@ -316,13 +303,12 @@ const Dashboard = () => {
                     setShowDatePicker(true);
                   }
                 }}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                  timeframe === "Custom"
-                    ? "bg-[#AD7F65] text-white shadow-sm"
-                    : theme === "dark"
-                      ? "text-gray-400 hover:bg-[#3A3734] hidden"
-                      : "text-gray-500 hover:bg-gray-100 hidden" // Hide 'Custom' tab unless active, or maybe show it?
-                }`}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${timeframe === "Custom"
+                  ? "bg-[#AD7F65] text-white shadow-sm"
+                  : theme === "dark"
+                    ? "text-gray-400 hover:bg-[#3A3734] hidden"
+                    : "text-gray-500 hover:bg-gray-100 hidden" // Hide 'Custom' tab unless active, or maybe show it?
+                  }`}
               >
                 Custom
               </button>
@@ -816,7 +802,7 @@ const Dashboard = () => {
             </div>
 
             <div className="space-y-4">
-              {topSellingProducts.map((product, index) => (
+              {topSellingProducts.slice(0, 3).map((product, index) => (
                 <div
                   key={product.productId}
                   className={`flex items-center justify-between group cursor-pointer p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-[#3A3734]" : "hover:bg-gray-50"}`}
@@ -860,7 +846,7 @@ const Dashboard = () => {
               ))}
               <div className="pt-2 text-right">
                 <button
-                  onClick={() => navigate("/inventory")}
+                  onClick={() => setShowTopSellingModal(true)}
                   className="text-xs text-gray-500 hover:text-[#AD7F65] flex items-center justify-end gap-1 ml-auto cursor-pointer"
                 >
                   More {">"}
@@ -969,11 +955,10 @@ const Dashboard = () => {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
-                          className={`px-2 py-1 rounded-full text-[10px] font-bold ${
-                            product.calculatedStock === 0
-                              ? "bg-red-100 text-red-600"
-                              : "bg-orange-100 text-orange-600"
-                          }`}
+                          className={`px-2 py-1 rounded-full text-[10px] font-bold ${product.calculatedStock === 0
+                            ? "bg-red-100 text-red-600"
+                            : "bg-orange-100 text-orange-600"
+                            }`}
                         >
                           {product.calculatedStock === 0
                             ? "Out of Stock"
@@ -1006,6 +991,13 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      <TopSellingModal
+        isOpen={showTopSellingModal}
+        onClose={() => setShowTopSellingModal(false)}
+        products={topSellingProducts}
+        timeframe={timeframe}
+      />
     </div>
   );
 };

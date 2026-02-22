@@ -115,6 +115,10 @@ salesTransactionSchema.index({ referenceNo: 1 });
 salesTransactionSchema.index({ createdAt: -1 });
 salesTransactionSchema.index({ 'items.productId': 1 }); // For product transaction lookups
 
+// Compound indexes for dashboard/report queries (status + paymentMethod + date range)
+salesTransactionSchema.index({ status: 1, paymentMethod: 1, checkedOutAt: -1 });
+salesTransactionSchema.index({ status: 1, paymentMethod: 1, createdAt: -1 });
+
 // Export schema for dynamic connection
 module.exports.schema = salesTransactionSchema;
 

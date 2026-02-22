@@ -34,11 +34,11 @@ const Header = ({
   profileGap = "gap-4",
   sortOption = "newest",
   onSortChange = null,
-  // Category filter props
+
   categories = [],
   selectedCategory = "All",
   onCategoryChange = null,
-  // Timeframe filter props for Dashboard
+
   showTimeframeFilter = false,
   timeframeValue = "Daily",
   onTimeframeChange = null,
@@ -54,7 +54,7 @@ const Header = ({
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const sortButtonRef = useRef(null);
   const [dismissedItems, setDismissedItems] = useState(() => {
-    // Load dismissed items from localStorage (now stores timestamps)
+
     try {
       const saved = localStorage.getItem("dismissedLowStockAlerts");
       return saved ? JSON.parse(saved) : {};
@@ -91,17 +91,17 @@ const Header = ({
     };
   }, []);
 
-  // 5 hours in milliseconds (matching cron 0 */5 * * *)
+
   const DISMISS_COOLDOWN_MS = 5 * 60 * 60 * 1000;
 
-  // Check if a dismissed item's cooldown has expired
+
   const isDismissExpired = (dismissTimestamp) => {
     if (!dismissTimestamp) return true;
     const now = Date.now();
     return now - dismissTimestamp >= DISMISS_COOLDOWN_MS;
   };
 
-  // Update dropdown position when showing
+
   useEffect(() => {
     if (showNotifications && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
@@ -112,7 +112,7 @@ const Header = ({
     }
   }, [showNotifications]);
 
-  // Fetch low stock items
+
   useEffect(() => {
     const fetchLowStock = async () => {
       try {
@@ -124,20 +124,18 @@ const Header = ({
           const items = data.data || [];
           setLowStockItems(items);
 
-          // Clean up dismissed items:
-          // 1. Remove items that are no longer low stock (stock replenished)
-          // 2. Remove items whose 5-hour cooldown has expired
+
           const currentLowStockIds = new Set(items.map((item) => item._id));
           setDismissedItems((prev) => {
             const updated = { ...prev };
             let changed = false;
             Object.keys(updated).forEach((id) => {
-              // Remove if item is no longer low stock (replenished)
+
               if (!currentLowStockIds.has(id)) {
                 delete updated[id];
                 changed = true;
               }
-              // Remove if 5-hour cooldown has expired (notification should reappear)
+
               else if (isDismissExpired(updated[id])) {
                 delete updated[id];
                 changed = true;
@@ -158,32 +156,31 @@ const Header = ({
     };
 
     fetchLowStock();
-    // Refresh every 30 seconds
+
     const interval = setInterval(fetchLowStock, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Dismiss a notification (stores timestamp for 5-hour cooldown)
+
   const dismissNotification = (e, itemId) => {
-    e.stopPropagation(); // Prevent navigation to inventory
+    e.stopPropagation();
     setDismissedItems((prev) => {
-      const updated = { ...prev, [itemId]: Date.now() }; // Store timestamp instead of boolean
+      const updated = { ...prev, [itemId]: Date.now() };
       localStorage.setItem("dismissedLowStockAlerts", JSON.stringify(updated));
       return updated;
     });
   };
 
-  // Filter out dismissed items for display (only hide if within 5-hour cooldown)
+
   const visibleLowStockItems = lowStockItems.filter((item) => {
     const dismissTimestamp = dismissedItems[item._id];
-    // Show if not dismissed or if cooldown has expired
     return !dismissTimestamp || isDismissExpired(dismissTimestamp);
   });
 
-  // Close notification dropdown when clicking outside
+
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Check if click is outside both the dropdown and the button
+
       const isOutsideDropdown =
         notificationRef.current &&
         !notificationRef.current.contains(event.target);
@@ -194,7 +191,7 @@ const Header = ({
         setShowNotifications(false);
       }
 
-      // Close sort dropdown if clicking outside
+
       if (
         showSortDropdown &&
         sortButtonRef.current &&
@@ -258,7 +255,7 @@ const Header = ({
               </div>
             )}
             <div
-              className={`relative transition-all duration-300 ease-in-out ${sidebarExpanded ? "w-[380px]" : "w-[550px]"}`}
+              className={`relative transition-all duration-300 ease-in-out ${sidebarExpanded ? "w-[480px]" : "w-[700px]"}`}
             >
               <div
                 className="absolute left-1 top-1/2 transform -translate-y-1/2 w-10 h-9 flex items-center justify-center text-white rounded-xl"
@@ -274,24 +271,22 @@ const Header = ({
                 placeholder="Search For..."
                 value={resolvedSearchValue}
                 onChange={handleSearchChange}
-                className={`w-full h-11 pl-14 pr-4 border rounded-xl shadow-md focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent transition-colors ${
-                  theme === "dark"
-                    ? "bg-[#2A2724] border-gray-600 text-white placeholder-gray-400"
-                    : "bg-white border-gray-300 text-gray-900"
-                }`}
+                className={`w-full h-11 pl-14 pr-4 border rounded-xl shadow-md focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent transition-colors ${theme === "dark"
+                  ? "bg-[#2A2724] border-gray-600 text-white placeholder-gray-400"
+                  : "bg-white border-gray-300 text-gray-900"
+                  }`}
               />
             </div>
-            {/* Category Filter Dropdown */}
+
             {categories.length > 0 && onCategoryChange && (
               <div className="relative ml-2">
                 <select
                   value={selectedCategory}
                   onChange={(e) => onCategoryChange(e.target.value)}
-                  className={`h-11 pl-4 pr-8 border rounded-xl shadow-md focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent transition-colors appearance-none cursor-pointer text-sm font-medium ${
-                    theme === "dark"
-                      ? "bg-[#2A2724] border-gray-600 text-white"
-                      : "bg-white border-gray-300 text-gray-700"
-                  }`}
+                  className={`h-11 pl-4 pr-8 border rounded-xl shadow-md focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent transition-colors appearance-none cursor-pointer text-sm font-medium ${theme === "dark"
+                    ? "bg-[#2A2724] border-gray-600 text-white"
+                    : "bg-white border-gray-300 text-gray-700"
+                    }`}
                   style={{ minWidth: "150px" }}
                 >
                   {categories.map((cat) => (
@@ -319,11 +314,10 @@ const Header = ({
             )}
             {filterNextToSearch && showFilter && (
               <button
-                className={`ml-2 w-12 h-10 rounded-2xl flex items-center justify-center border shadow-[0_8px_16px_rgba(0,0,0,0.12)] hover:shadow-[0_12px_22px_rgba(0,0,0,0.16)] transition-colors ${
-                  theme === "dark"
-                    ? "bg-[#2A2724] border-gray-600"
-                    : "bg-white border-gray-100"
-                }`}
+                className={`ml-2 w-12 h-10 rounded-2xl flex items-center justify-center border shadow-[0_8px_16px_rgba(0,0,0,0.12)] hover:shadow-[0_12px_22px_rgba(0,0,0,0.16)] transition-colors ${theme === "dark"
+                  ? "bg-[#2A2724] border-gray-600"
+                  : "bg-white border-gray-100"
+                  }`}
               >
                 <img
                   src={filterIcon}
@@ -366,13 +360,12 @@ const Header = ({
                     }
                     role="tab"
                     aria-selected={timeframeValue === option}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:ring-offset-2 ${
-                      timeframeValue === option
-                        ? "bg-[#AD7F65] text-white"
-                        : theme === "dark"
-                          ? "bg-[#2A2724] text-gray-300 hover:bg-[#352F2A]"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:ring-offset-2 ${timeframeValue === option
+                      ? "bg-[#AD7F65] text-white"
+                      : theme === "dark"
+                        ? "bg-[#2A2724] text-gray-300 hover:bg-[#352F2A]"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
                   >
                     {option}
                   </button>
@@ -410,22 +403,21 @@ const Header = ({
                 createPortal(
                   <div
                     ref={notificationRef}
-                    className={`fixed w-80 rounded-2xl shadow-2xl border overflow-hidden ${
-                      theme === "dark"
-                        ? "bg-[#2A2724] border-gray-600"
-                        : "bg-white border-gray-100"
-                    }`}
+                    className={`fixed w-80 rounded-2xl shadow-2xl border overflow-hidden ${theme === "dark"
+                      ? "bg-[#2A2724] border-gray-600"
+                      : "bg-white border-gray-100"
+                      }`}
                     style={{
                       top: dropdownPosition.top,
                       right: dropdownPosition.right,
                       zIndex: 99999,
                     }}
                   >
-                    <div className="px-4 py-3 bg-gradient-to-r from-[#AD7F65] to-[#76462B] text-white flex items-center justify-between">
+                    <div className={`px-4 py-3 border-b flex items-center justify-between ${theme === "dark" ? "border-gray-600 text-white" : "border-gray-100 text-gray-800"}`}>
                       <span className="font-semibold">Stock Alerts</span>
                       <button
                         onClick={() => setShowNotifications(false)}
-                        className="hover:bg-white/20 rounded-full p-1"
+                        className={`rounded-full p-1 transition-colors ${theme === "dark" ? "hover:bg-gray-700 text-gray-400 hover:text-white" : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"}`}
                       >
                         <FaTimes className="text-sm" />
                       </button>
@@ -450,11 +442,10 @@ const Header = ({
                               }}
                             >
                               <div
-                                className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                  item.alertType === "out_of_stock"
-                                    ? "bg-red-100"
-                                    : "bg-orange-100"
-                                }`}
+                                className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${item.alertType === "out_of_stock"
+                                  ? "bg-red-100"
+                                  : "bg-orange-100"
+                                  }`}
                               >
                                 {item.alertType === "out_of_stock" ? (
                                   <FaTimesCircle className="text-red-500" />
@@ -512,15 +503,16 @@ const Header = ({
                 )}
             </div>
             <div
-              className={`flex items-center ${profileGap} ${profilePadding} py-2.5 rounded-full border shadow-[0_6px_14px_rgba(0,0,0,0.15)]`}
+              onClick={() => navigate('/settings')}
+              className={`flex items-center cursor-pointer ${profileGap} ${profilePadding} py-2.5 rounded-full border shadow-[0_6px_14px_rgba(0,0,0,0.15)]`}
               style={{
                 minWidth: profileMinWidth,
                 ...(theme === "dark"
                   ? {
-                      background: "rgba(42, 37, 33, 0.9)",
-                      backdropFilter: "blur(6px)",
-                      border: "1px solid #3A332E",
-                    }
+                    background: "rgba(42, 37, 33, 0.9)",
+                    backdropFilter: "blur(6px)",
+                    border: "1px solid #3A332E",
+                  }
                   : {}),
               }}
             >
@@ -557,13 +549,12 @@ const Header = ({
           <div className="relative" ref={sortButtonRef}>
             <button
               onClick={() => setShowSortDropdown(!showSortDropdown)}
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] ${
-                sortOption !== "newest"
-                  ? "border-[#AD7F65] bg-[#AD7F65]/10"
-                  : theme === "dark"
-                    ? "bg-[#2A2724] border-gray-600"
-                    : "bg-white border-gray-100"
-              }`}
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-[0_10px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_14px_26px_rgba(0,0,0,0.16)] ${sortOption !== "newest"
+                ? "border-[#AD7F65] bg-[#AD7F65]/10"
+                : theme === "dark"
+                  ? "bg-[#2A2724] border-gray-600"
+                  : "bg-white border-gray-100"
+                }`}
             >
               <img
                 src={filterIcon}
@@ -592,13 +583,12 @@ const Header = ({
                       onSortChange && onSortChange("a-z");
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${
-                      sortOption === "a-z"
-                        ? "text-[#AD7F65] font-medium bg-[#AD7F65]/5"
-                        : theme === "dark"
-                          ? "text-gray-300 hover:bg-[#2A2724]"
-                          : "text-gray-700 hover:bg-gray-50"
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${sortOption === "a-z"
+                      ? "text-[#AD7F65] font-medium bg-[#AD7F65]/5"
+                      : theme === "dark"
+                        ? "text-gray-300 hover:bg-[#2A2724]"
+                        : "text-gray-700 hover:bg-gray-50"
+                      }`}
                   >
                     Name (A-Z)
                     {sortOption === "a-z" && (
@@ -610,13 +600,12 @@ const Header = ({
                       onSortChange && onSortChange("z-a");
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${
-                      sortOption === "z-a"
-                        ? "text-[#AD7F65] font-medium bg-[#AD7F65]/5"
-                        : theme === "dark"
-                          ? "text-gray-300 hover:bg-[#2A2724]"
-                          : "text-gray-700 hover:bg-gray-50"
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${sortOption === "z-a"
+                      ? "text-[#AD7F65] font-medium bg-[#AD7F65]/5"
+                      : theme === "dark"
+                        ? "text-gray-300 hover:bg-[#2A2724]"
+                        : "text-gray-700 hover:bg-gray-50"
+                      }`}
                   >
                     Name (Z-A)
                     {sortOption === "z-a" && (
@@ -628,13 +617,12 @@ const Header = ({
                       onSortChange && onSortChange("newest");
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${
-                      sortOption === "newest"
-                        ? "text-[#AD7F65] font-medium bg-[#AD7F65]/5"
-                        : theme === "dark"
-                          ? "text-gray-300 hover:bg-[#2A2724]"
-                          : "text-gray-700 hover:bg-gray-50"
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${sortOption === "newest"
+                      ? "text-[#AD7F65] font-medium bg-[#AD7F65]/5"
+                      : theme === "dark"
+                        ? "text-gray-300 hover:bg-[#2A2724]"
+                        : "text-gray-700 hover:bg-gray-50"
+                      }`}
                   >
                     Newest First
                     {sortOption === "newest" && (
@@ -646,13 +634,12 @@ const Header = ({
                       onSortChange && onSortChange("oldest");
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${
-                      sortOption === "oldest"
-                        ? "text-[#AD7F65] font-medium bg-[#AD7F65]/5"
-                        : theme === "dark"
-                          ? "text-gray-300 hover:bg-[#2A2724]"
-                          : "text-gray-700 hover:bg-gray-50"
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${sortOption === "oldest"
+                      ? "text-[#AD7F65] font-medium bg-[#AD7F65]/5"
+                      : theme === "dark"
+                        ? "text-gray-300 hover:bg-[#2A2724]"
+                        : "text-gray-700 hover:bg-gray-50"
+                      }`}
                   >
                     Oldest First
                     {sortOption === "oldest" && (
@@ -700,11 +687,11 @@ const Header = ({
                     zIndex: 99999,
                   }}
                 >
-                  <div className="px-4 py-3 bg-gradient-to-r from-[#AD7F65] to-[#76462B] text-white flex items-center justify-between">
+                  <div className={`px-4 py-3 border-b flex items-center justify-between ${theme === "dark" ? "border-gray-600 text-white" : "border-gray-100 text-gray-800"}`}>
                     <span className="font-semibold">Stock Alerts</span>
                     <button
                       onClick={() => setShowNotifications(false)}
-                      className="hover:bg-white/20 rounded-full p-1"
+                      className={`rounded-full p-1 transition-colors ${theme === "dark" ? "hover:bg-gray-700 text-gray-400 hover:text-white" : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"}`}
                     >
                       <FaTimes className="text-sm" />
                     </button>
@@ -729,11 +716,10 @@ const Header = ({
                             }}
                           >
                             <div
-                              className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                item.alertType === "out_of_stock"
-                                  ? "bg-red-100"
-                                  : "bg-orange-100"
-                              }`}
+                              className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${item.alertType === "out_of_stock"
+                                ? "bg-red-100"
+                                : "bg-orange-100"
+                                }`}
                             >
                               {item.alertType === "out_of_stock" ? (
                                 <FaTimesCircle className="text-red-500" />
@@ -793,17 +779,17 @@ const Header = ({
         )}
         {!centerProfile && (
           <div
-            className={`flex items-center ${profileGap} ${profilePadding} py-2.5 rounded-full shadow-[0_6px_14px_rgba(0,0,0,0.15)] ${
-              theme === "dark" ? "border" : ""
-            }`}
+            onClick={() => navigate('/settings')}
+            className={`flex items-center cursor-pointer ${profileGap} ${profilePadding} py-2.5 rounded-full shadow-[0_6px_14px_rgba(0,0,0,0.15)] ${theme === "dark" ? "border" : ""
+              }`}
             style={{
               minWidth: profileMinWidth,
               ...(theme === "dark"
                 ? {
-                    background: "rgba(42, 37, 33, 0.9)",
-                    backdropFilter: "blur(6px)",
-                    border: "1px solid #3A332E",
-                  }
+                  background: "rgba(42, 37, 33, 0.9)",
+                  backdropFilter: "blur(6px)",
+                  border: "1px solid #3A332E",
+                }
                 : {}),
             }}
           >

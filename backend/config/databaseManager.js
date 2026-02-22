@@ -134,7 +134,12 @@ class DatabaseManager {
         }
       }
 
-      await mongoose.connect(this.currentURI);
+      await mongoose.connect(this.currentURI, {
+        maxPoolSize: 10,          // Max connections in pool (default is 5, 10 handles concurrent mobile+web)
+        minPoolSize: 2,           // Keep 2 warm connections ready
+        socketTimeoutMS: 45000,   // Close sockets after 45s of inactivity
+        serverSelectionTimeoutMS: 10000,  // Fail fast if no server available (10s vs default 30s)
+      });
 
       console.log(`✓ MongoDB Connected: ${mongoose.connection.host}`);
       console.log(

@@ -79,7 +79,7 @@ exports.getStockMovements = async (req, res) => {
       limit = 60
     } = req.query;
 
-    console.log('Stock movements query params:', { search, category, type, brand, reason, date, sortBy, page, limit });
+
 
     const query = {};
 
@@ -160,7 +160,7 @@ exports.getStockMovements = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    console.log('Stock movements query:', JSON.stringify(query));
+
 
     const [movements, total] = await Promise.all([
       StockMovement.find(query)
@@ -171,7 +171,7 @@ exports.getStockMovements = async (req, res) => {
       StockMovement.countDocuments(query)
     ]);
 
-    console.log(`Found ${movements.length} stock movements out of ${total} total`);
+
 
     res.json({
       success: true,
@@ -201,25 +201,30 @@ exports.getTodayStats = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const movements = await StockMovement.find({
-      createdAt: { $gte: today, $lt: tomorrow }
-    }).lean();
+    // Use aggregation pipeline instead of fetching all documents
+    const result = await StockMovement.aggregate([
+      { $match: { createdAt: { $gte: today, $lt: tomorrow } } },
+      {
+        $group: {
+          _id: '$type',
+          total: { $sum: '$quantity' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
 
     const stats = {
       stockIn: 0,
       stockOut: 0,
       pullOut: 0,
-      totalMovements: movements.length
+      totalMovements: 0
     };
 
-    movements.forEach(movement => {
-      if (movement.type === 'Stock-In') {
-        stats.stockIn += movement.quantity;
-      } else if (movement.type === 'Stock-Out') {
-        stats.stockOut += movement.quantity;
-      } else if (movement.type === 'Pull-Out') {
-        stats.pullOut += movement.quantity;
-      }
+    result.forEach(r => {
+      if (r._id === 'Stock-In') stats.stockIn = r.total;
+      else if (r._id === 'Stock-Out') stats.stockOut = r.total;
+      else if (r._id === 'Pull-Out') stats.pullOut = r.total;
+      stats.totalMovements += r.count;
     });
 
     res.json({

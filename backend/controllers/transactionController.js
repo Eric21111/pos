@@ -247,7 +247,7 @@ exports.createTransaction = async (req, res) => {
       });
     }
 
-    console.log('Creating transaction with data:', JSON.stringify(transactionData, null, 2));
+    console.log('Creating transaction, receiptNo:', transactionData.receiptNo, 'items:', transactionData.items.length);
 
     const transaction = await SalesTransaction.create(transactionData);
 
@@ -647,17 +647,20 @@ exports.getDashboardStats = async (req, res) => {
     const totalSalesToday = currentTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
     const totalTransactions = currentTransactions.length;
 
-    // Calculate Profit
+    // Calculate Profit — batch lookup instead of per-item queries
+    const allProductIds = [...new Set(
+      currentTransactions.flatMap(t => (t.items || []).map(i => i.productId?.toString()).filter(Boolean))
+    )];
+    const products = await Product.find({ _id: { $in: allProductIds } }).select('_id costPrice').lean();
+    const costMap = {};
+    products.forEach(p => { costMap[p._id.toString()] = p.costPrice || 0; });
+
     let profit = 0;
     for (const transaction of currentTransactions) {
       for (const item of transaction.items || []) {
-        // Optimizing this would require populating products or mapped lookup, keeping simple for now
-        const product = await Product.findById(item.productId).select('costPrice').lean();
-        if (product) {
-          const costPrice = product.costPrice || 0;
-          const sellingPrice = item.price || 0;
-          profit += (sellingPrice - costPrice) * (item.quantity || 1);
-        }
+        const costPrice = costMap[item.productId?.toString()] || 0;
+        const sellingPrice = item.price || 0;
+        profit += (sellingPrice - costPrice) * (item.quantity || 1);
       }
     }
 
@@ -681,7 +684,7 @@ exports.getDashboardStats = async (req, res) => {
       {
         $match: {
           $expr: {
-            $lte: ["$currentStock", { $ifNull: ["$reorderNumber", 5] }]
+            $lte: ["$currentStock", { $max: [{ $ifNull: ["$reorderNumber", 0] }, 10] }]
           }
         }
       },
@@ -1012,31 +1015,35 @@ exports.getSalesOverTime = async (req, res) => {
       }
     }
 
-    // Fetch sales for each period
-    const rawSalesData = await Promise.all(
-      periods.map(async ({ startDate, endDate, label }) => {
-        const transactions = await SalesTransaction.find({
-          $or: [
-            { checkedOutAt: { $gte: startDate, $lt: endDate } },
-            { checkedOutAt: null, createdAt: { $gte: startDate, $lt: endDate } },
-            { checkedOutAt: { $exists: false }, createdAt: { $gte: startDate, $lt: endDate } }
-          ],
-          status: { $not: { $regex: /^voided$/i } },
-          paymentMethod: { $ne: 'return' }
-        }).select('totalAmount').lean();
+    // Fetch all sales in one query spanning the full range, then bucket in JS
+    const globalStart = periods[0].startDate;
+    const globalEnd = periods[periods.length - 1].endDate;
 
-        const totalSales = transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
-        return {
-          period: label,
-          revenue: totalSales
-        };
-      })
-    );
+    const allTransactions = await SalesTransaction.find({
+      $or: [
+        { checkedOutAt: { $gte: globalStart, $lt: globalEnd } },
+        { checkedOutAt: null, createdAt: { $gte: globalStart, $lt: globalEnd } },
+        { checkedOutAt: { $exists: false }, createdAt: { $gte: globalStart, $lt: globalEnd } }
+      ],
+      status: { $not: { $regex: /^voided$/i } },
+      paymentMethod: { $ne: 'return' }
+    }).select('totalAmount checkedOutAt createdAt').lean();
+
+    // Bucket transactions into periods
+    const rawSalesData = periods.map(({ startDate, endDate, label }) => {
+      let revenue = 0;
+      for (const t of allTransactions) {
+        const txDate = t.checkedOutAt || t.createdAt;
+        if (txDate >= startDate && txDate < endDate) {
+          revenue += t.totalAmount || 0;
+        }
+      }
+      return { period: label, revenue };
+    });
 
     // Post-process to calculate growth and add target
-    // Calculate dynamic target based on highest revenue
     const maxRevenue = Math.max(...rawSalesData.map(item => item.revenue || 0));
-    const dynamicTarget = maxRevenue > 0 ? maxRevenue : 10000; // Exact max revenue, or default to 10k if no sales
+    const dynamicTarget = maxRevenue > 0 ? maxRevenue : 10000;
 
     const salesData = rawSalesData.map((item, index) => {
       let growth = 0;
@@ -1051,7 +1058,7 @@ exports.getSalesOverTime = async (req, res) => {
 
       return {
         ...item,
-        target: Math.round(dynamicTarget), // Dynamic target based on max revenue
+        target: Math.round(dynamicTarget),
         growth: Math.round(growth)
       };
     });

@@ -142,9 +142,9 @@ const Reports = () => {
           grossProfitMargin:
             inventoryValue > 0
               ? (
-                  ((inventoryValue - costOfGoodsSold) / inventoryValue) *
-                  100
-                ).toFixed(0)
+                ((inventoryValue - costOfGoodsSold) / inventoryValue) *
+                100
+              ).toFixed(0)
               : 0,
           totalItems,
           inStock,
@@ -343,13 +343,12 @@ const Reports = () => {
                   setTimePeriod(t);
                   setDateRange([null, null]); // Reset custom range when switching back to presets
                 }}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  timePeriod === t
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${timePeriod === t
                     ? "bg-[#AD7F65] text-white shadow-sm"
                     : theme === "dark"
                       ? "text-gray-400 hover:bg-[#3A3734]"
                       : "text-gray-500 hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 {t}
               </button>
@@ -360,13 +359,12 @@ const Reports = () => {
                   setShowDatePicker(true);
                 }
               }}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                timePeriod === "Custom"
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${timePeriod === "Custom"
                   ? "bg-[#AD7F65] text-white shadow-sm"
                   : theme === "dark"
                     ? "text-gray-400 hover:bg-[#3A3734] hidden"
                     : "text-gray-500 hover:bg-gray-100 hidden"
-              }`}
+                }`}
             >
               Custom
             </button>
@@ -543,9 +541,9 @@ const Reports = () => {
                         <span className="font-semibold text-red-400">
                           {inventoryAnalytics.kpis.totalUnitsSold > 0
                             ? formatCurrency(
-                                inventoryAnalytics.kpis.cogs /
-                                  inventoryAnalytics.kpis.totalUnitsSold,
-                              )
+                              inventoryAnalytics.kpis.cogs /
+                              inventoryAnalytics.kpis.totalUnitsSold,
+                            )
                             : "₱0.00"}
                         </span>
                         /unit
@@ -626,8 +624,8 @@ const Reports = () => {
                       {inventoryLoading
                         ? "..."
                         : formatCurrency(
-                            inventoryAnalytics.kpis.inventoryValue,
-                          )}
+                          inventoryAnalytics.kpis.inventoryValue,
+                        )}
                     </p>
                     <div className="flex items-center gap-3 mt-1.5">
                       <span
@@ -1057,13 +1055,12 @@ const Reports = () => {
                               </td>
                               <td className="py-2.5 text-center">
                                 <span
-                                  className={`px-2 py-1 rounded-full text-[10px] font-medium ${
-                                    item.type === "Damaged"
+                                  className={`px-2 py-1 rounded-full text-[10px] font-medium ${item.type === "Damaged"
                                       ? "bg-red-100 text-red-600"
                                       : item.type === "Expired"
                                         ? "bg-amber-100 text-amber-600"
                                         : "bg-gray-100 text-gray-600"
-                                  }`}
+                                    }`}
                                 >
                                   {item.type}
                                 </span>

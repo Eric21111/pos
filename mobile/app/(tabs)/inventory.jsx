@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  FlatList,
   Platform,
   RefreshControl,
   ScrollView,
@@ -438,10 +439,9 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
           <Text style={styles.loadingText}>Loading products...</Text>
         </View>
       ) : (
-        <FlashList
+        <FlatList
           data={items}
           renderItem={renderItem}
-          estimatedItemSize={60}
           keyExtractor={item => (item._id || item.id || Math.random()).toString()}
           contentContainerStyle={{ paddingBottom: 20 }}
           onEndReached={onEndReached}
@@ -832,7 +832,7 @@ export default function Inventory() {
                         {item.category}
                       </Text>
                       <Text style={styles.separator}>•</Text>
-                      <Text style={[styles.stockText, { color: item.stock < 5 ? '#DC2626' : '#0369A1' }]}>
+                      <Text style={[styles.stockText, { color: item.stock <= 10 ? '#DC2626' : '#0369A1' }]}>
                         {item.stock} in stock
                       </Text>
                     </View>
@@ -881,7 +881,7 @@ export default function Inventory() {
                       <Text style={styles.productPrice}>₱{Number(product.price || 0).toFixed(2)}</Text>
                       <Text style={[
                         styles.productStock,
-                        (product.stock || 0) < 5 ? styles.lowStock : null
+                        (product.stock || 0) <= 10 ? styles.lowStock : null
                       ]}>
                         {product.stock || 0} in stock
                       </Text>

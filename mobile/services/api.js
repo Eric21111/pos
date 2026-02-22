@@ -87,6 +87,7 @@ const apiCall = async (endpoint, options = {}, forceOnline = false) => {
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
+      'Accept-Encoding': 'gzip, deflate',
     },
   };
 
@@ -137,9 +138,10 @@ const apiCall = async (endpoint, options = {}, forceOnline = false) => {
 
 // ==================== PRODUCTS ====================
 export const productAPI = {
-  // Get all products
+  // Get all products (uses minimal fields to exclude heavy base64 images)
   getAll: async (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
+    const queryParams = { fields: 'minimal', ...params };
+    const queryString = new URLSearchParams(queryParams).toString();
     const endpoint = `/products${queryString ? `?${queryString}` : ''}`;
     return apiCall(endpoint);
   },

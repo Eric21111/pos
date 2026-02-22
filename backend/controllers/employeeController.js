@@ -164,8 +164,8 @@ exports.createEmployee = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: emailSent 
-        ? 'Employee created successfully. Temporary PIN sent to email.' 
+      message: emailSent
+        ? 'Employee created successfully. Temporary PIN sent to email.'
         : 'Employee created successfully.',
       data: employeeWithoutPin,
       emailSent
@@ -270,24 +270,44 @@ exports.verifyPin = async (req, res) => {
       });
     }
 
-    // Get all active employees (status is 'Active' with capital A in the schema)
-    const employees = await Employee.find({ status: 'Active' }).select('+pin');
+    // Get all active employees with pin for comparison
+    // Use .select('+pin') only — don't mix with explicit field list which breaks the +pin modifier
+    const employees = await Employee.find({ status: 'Active' })
+      .select('+pin')
+      .lean();
 
-    // Try to match PIN with any employee
-    for (const employee of employees) {
-      if (!employee.pin) continue;
+    if (employees.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid PIN'
+      });
+    }
 
-      const isMatch = await bcrypt.compare(pin, employee.pin);
-      if (isMatch) {
-        const { pin: _, ...employeeWithoutPin } = employee.toObject();
-        
-        return res.json({
-          success: true,
-          message: 'PIN verified successfully',
-          data: employeeWithoutPin,
-          requiresPinReset: employee.requiresPinReset || false
-        });
-      }
+    // Run ALL bcrypt comparisons in parallel instead of sequentially
+    // bcrypt.compare is ~100-200ms each; parallel = ~200ms total vs sequential = n×200ms
+    const comparisons = await Promise.all(
+      employees.map(async (emp) => {
+        if (!emp.pin) return { match: false, employee: emp };
+        try {
+          const isMatch = await bcrypt.compare(pin, emp.pin);
+          return { match: isMatch, employee: emp };
+        } catch {
+          return { match: false, employee: emp };
+        }
+      })
+    );
+
+    const found = comparisons.find(c => c.match);
+
+    if (found) {
+      const { pin: _, ...employeeWithoutPin } = found.employee;
+
+      return res.json({
+        success: true,
+        message: 'PIN verified successfully',
+        data: employeeWithoutPin,
+        requiresPinReset: found.employee.requiresPinReset || false
+      });
     }
 
     return res.status(401).json({
@@ -322,8 +342,8 @@ exports.resetPin = async (req, res) => {
 
     const employee = await Employee.findByIdAndUpdate(
       id,
-      { 
-        pin: hashedPin, 
+      {
+        pin: hashedPin,
         requiresPinReset: requiresPinReset !== undefined ? requiresPinReset : false,
         lastUpdated: Date.now()
       },
@@ -430,7 +450,7 @@ exports.sendTemporaryPin = async (req, res) => {
 
     // Generate temporary PIN
     const tempPin = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Hash and save the temporary PIN
     const salt = await bcrypt.genSalt(10);
     const hashedPin = await bcrypt.hash(tempPin, salt);
@@ -499,14 +519,14 @@ exports.sendTemporaryPin = async (req, res) => {
 exports.searchEmployees = async (req, res) => {
   try {
     const { query } = req.params;
-    
+
     if (!query) {
       return res.status(400).json({
         success: false,
         message: 'Search query is required'
       });
     }
-    
+
     const employees = await Employee.find({
       $or: [
         { name: { $regex: query, $options: 'i' } },
@@ -516,12 +536,12 @@ exports.searchEmployees = async (req, res) => {
         { role: { $regex: query, $options: 'i' } }
       ]
     }).sort({ dateJoined: -1 }).lean();
-    
+
     const employeesWithoutPin = employees.map(emp => {
       const { pin, ...rest } = emp;
       return rest;
     });
-    
+
     res.json({
       success: true,
       count: employeesWithoutPin.length,
@@ -542,39 +562,39 @@ exports.updatePin = async (req, res) => {
   try {
     const { id } = req.params;
     const { pin, newPin, requiresPinReset } = req.body;
-    
+
     const pinToSet = newPin || pin;
-    
+
     if (!pinToSet) {
       return res.status(400).json({
         success: false,
         message: 'PIN is required'
       });
     }
-    
+
     const salt = await bcrypt.genSalt(10);
     const hashedPin = await bcrypt.hash(pinToSet, salt);
-    
+
     const employee = await Employee.findByIdAndUpdate(
       id,
-      { 
-        pin: hashedPin, 
-        requiresPinReset: requiresPinReset !== undefined ? requiresPinReset : false, 
-        lastUpdated: Date.now() 
+      {
+        pin: hashedPin,
+        requiresPinReset: requiresPinReset !== undefined ? requiresPinReset : false,
+        lastUpdated: Date.now()
       },
       { new: true }
     );
-    
+
     if (!employee) {
       return res.status(404).json({
         success: false,
         message: 'Employee not found'
       });
     }
-    
+
     // Return employee data without PIN
     const { pin: _, ...employeeWithoutPin } = employee.toObject();
-    
+
     res.json({
       success: true,
       message: 'PIN updated successfully',

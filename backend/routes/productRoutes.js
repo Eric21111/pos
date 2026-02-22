@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const apicache = require('apicache');
 const {
   getAllProducts,
   getProductById,
@@ -13,10 +14,19 @@ const {
   getInventoryStats
 } = require('../controllers/productController');
 
+// Cache middleware — caches GET responses in memory
+const cache = apicache.middleware;
+
+// Clear product cache on any write operation
+const clearCache = (req, res, next) => {
+  apicache.clear();
+  next();
+};
+
 
 router.route('/')
-  .get(getAllProducts)
-  .post(createProduct);
+  .get(cache('30 seconds'), getAllProducts)
+  .post(clearCache, createProduct);
 
 router.get('/search/:query', searchProducts);
 router.get('/inventory-stats', getInventoryStats);
@@ -26,18 +36,20 @@ router.get('/low-stock', async (req, res) => {
   try {
     const Product = require('../models/Product');
 
-    // Find products where currentStock <= reorderNumber (default 5)
-    // We use $expr to compare fields within the document
+    // Find products where currentStock <= max(reorderNumber, 10)
+    // reorderNumber defaults to 0 in DB, so we use max with 10 as the minimum threshold
     const stockAlertItems = await Product.aggregate([
       {
         $project: {
           itemName: 1,
           sku: 1,
           currentStock: { $ifNull: ["$currentStock", 0] },
-          reorderNumber: { $ifNull: ["$reorderNumber", 5] },
+          // Use the higher of the stored reorderNumber or 10 as the effective threshold
+          effectiveThreshold: {
+            $max: [{ $ifNull: ["$reorderNumber", 0] }, 10]
+          },
           itemImage: { $ifNull: ["$itemImage", ""] },
           category: { $ifNull: ["$category", ""] },
-          // Determine alert type for sorting
           alertType: {
             $cond: {
               if: { $eq: [{ $ifNull: ["$currentStock", 0] }, 0] },
@@ -49,21 +61,17 @@ router.get('/low-stock', async (req, res) => {
       },
       {
         $match: {
-          $expr: { $lte: ["$currentStock", "$reorderNumber"] }
+          $expr: { $lte: ["$currentStock", "$effectiveThreshold"] }
         }
       },
       {
         $sort: {
-          alertType: -1, // 'out_of_stock' usually comes last alphabetically, so we might need custom sort or just sort by stock
+          alertType: -1,
           currentStock: 1
         }
       },
-      { $limit: 50 } // Limit to 50 items to prevent payload issues
+      { $limit: 50 }
     ]);
-
-    // Reshape data to match frontend expectation if needed (aggregate returns _id)
-    // The previous implementation mapped it, but aggregate result is already close.
-    // Just need to ensure consistent field names.
 
     res.json({
       success: true,
@@ -81,13 +89,13 @@ router.get('/low-stock', async (req, res) => {
 });
 
 // Update stock after successful transaction
-router.post('/update-stock', updateStockAfterTransaction);
+router.post('/update-stock', clearCache, updateStockAfterTransaction);
 
 // Get SKU counts by brand for dashboard chart
-router.get('/sku-stats', async (req, res) => {
+router.get('/sku-stats', cache('2 minutes'), async (req, res) => {
   try {
     const Product = require('../models/Product');
-    const products = await Product.find({});
+    const products = await Product.find({}).select('brandName currentStock').lean();
 
     // Group products by brand name and count SKUs
     const brandStats = {};
@@ -127,10 +135,10 @@ router.get('/category/:category', getProductsByCategory);
 
 router.route('/:id')
   .get(getProductById)
-  .put(updateProduct)
-  .delete(deleteProduct);
+  .put(clearCache, updateProduct)
+  .delete(clearCache, deleteProduct);
 
-router.patch('/:id/toggle-display', toggleDisplayInTerminal);
+router.patch('/:id/toggle-display', clearCache, toggleDisplayInTerminal);
 
 module.exports = router;
 

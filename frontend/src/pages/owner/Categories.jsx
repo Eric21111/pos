@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { FaEdit, FaPlus, FaSearch, FaTimes, FaTrash, FaUndo } from 'react-icons/fa';
 import ViewCategoryProductsModal from '../../components/owner/ViewCategoryProductsModal';
 import Header from '../../components/shared/header';
@@ -245,17 +245,19 @@ const Categories = () => {
     setShowViewProductsModal(true);
   };
 
-  const filteredCategories = categories.filter(category => {
-    // Exclude "Others" category from display
-    if (category.name === 'Others') {
-      return false;
-    }
-    const matchesSearch = category.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === 'All' ||
-      (filterStatus === 'Active' && category.status === 'active') ||
-      (filterStatus === 'Archived' && category.status === 'inactive');
-    return matchesSearch && matchesFilter;
-  });
+  const filteredCategories = useMemo(() => {
+    return categories.filter(category => {
+      // Exclude "Others" category from display
+      if (category.name === 'Others') {
+        return false;
+      }
+      const matchesSearch = category.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFilter = filterStatus === 'All' ||
+        (filterStatus === 'Active' && category.status === 'active') ||
+        (filterStatus === 'Archived' && category.status === 'inactive');
+      return matchesSearch && matchesFilter;
+    });
+  }, [categories, searchQuery, filterStatus]);
 
   return (
     <div className={`p-8 min-h-screen ${theme === 'dark' ? 'bg-[#1E1B18]' : 'bg-[#F5F5F5]'}`}>
@@ -399,7 +401,7 @@ const Categories = () => {
                   {category.status === 'active' ? (
                     <button
                       onClick={() => handleDelete(category)}
-                      className="w-8 h-8 flex items-center justify-center bg-[#EF4444] text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
+                      className="w-8 h-8 flex items-center justify-center bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors shadow-sm"
                     >
                       <FaTrash className="w-3.5 h-3.5" />
                     </button>

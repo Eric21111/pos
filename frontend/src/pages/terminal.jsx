@@ -19,7 +19,6 @@ import accessoriesIcon from "../assets/inventory-icons/accesories.svg";
 import allIcon from "../assets/inventory-icons/ALL.svg";
 import bottomsIcon from "../assets/inventory-icons/Bottoms.svg";
 import dressesIcon from "../assets/inventory-icons/dresses.svg";
-import headWearIcon from "../assets/inventory-icons/head wear.svg";
 import makeupIcon from "../assets/inventory-icons/make up.svg";
 import shoesIcon from "../assets/inventory-icons/shoe.svg";
 import topIcon from "../assets/inventory-icons/Top.svg";
@@ -84,9 +83,17 @@ const Terminal = () => {
       {},
   });
 
-  const [categories, setCategories] = useState([
+  const defaultCategories = [
     { name: "All", icon: allIcon },
-  ]);
+    { name: "Tops", icon: topIcon },
+    { name: "Bottoms", icon: bottomsIcon },
+    { name: "Dresses", icon: dressesIcon },
+    { name: "Makeup", icon: makeupIcon },
+    { name: "Shoes", icon: shoesIcon },
+    { name: "Essentials", icon: accessoriesIcon },
+  ];
+
+  const [categories, setCategories] = useState(defaultCategories);
 
   // Icon mapping for categories
   const categoryIconMap = {
@@ -94,9 +101,8 @@ const Terminal = () => {
     Bottoms: bottomsIcon,
     Dresses: dressesIcon,
     Makeup: makeupIcon,
-    Accessories: accessoriesIcon,
+    Essentials: accessoriesIcon,
     Shoes: shoesIcon,
-    "Head Wear": headWearIcon,
   };
 
   // Fetch active categories from API
@@ -107,29 +113,29 @@ const Terminal = () => {
 
       if (data.success && Array.isArray(data.data)) {
         // Filter only active categories and map with icons
-        const activeCategories = data.data
+        const activeDbCategories = data.data
           .filter((cat) => cat.status === "active")
           .map((cat) => ({
             name: cat.name,
             icon: categoryIconMap[cat.name] || allIcon,
           }));
 
-        // Add 'All' at the beginning
-        setCategories([{ name: "All", icon: allIcon }, ...activeCategories]);
+        // Merge default and DB categories, avoiding duplicates
+        const mergedCategories = [...defaultCategories];
+        const defaultNames = new Set(defaultCategories.map(c => c.name));
+
+        activeDbCategories.forEach(cat => {
+          if (!defaultNames.has(cat.name)) {
+            mergedCategories.push(cat);
+          }
+        });
+
+        setCategories(mergedCategories);
       }
     } catch (error) {
       console.error("Error fetching categories:", error);
-      // Fallback to default categories if API fails
-      setCategories([
-        { name: "All", icon: allIcon },
-        { name: "Tops", icon: topIcon },
-        { name: "Bottoms", icon: bottomsIcon },
-        { name: "Dresses", icon: dressesIcon },
-        { name: "Makeup", icon: makeupIcon },
-        { name: "Accessories", icon: accessoriesIcon },
-        { name: "Shoes", icon: shoesIcon },
-        { name: "Head Wear", icon: headWearIcon },
-      ]);
+      // Fallback is already handled by initial state, so we just set to defaultCategories again if needed
+      setCategories(defaultCategories);
     }
   };
 
@@ -400,8 +406,8 @@ const Terminal = () => {
       // Handle both formats: number or object with quantity
       availableStock =
         typeof sizeData === "object" &&
-        sizeData !== null &&
-        sizeData.quantity !== undefined
+          sizeData !== null &&
+          sizeData.quantity !== undefined
           ? sizeData.quantity
           : typeof sizeData === "number"
             ? sizeData
@@ -433,8 +439,8 @@ const Terminal = () => {
       // Handle both formats: number or object with quantity
       availableStock =
         typeof sizeData === "object" &&
-        sizeData !== null &&
-        sizeData.quantity !== undefined
+          sizeData !== null &&
+          sizeData.quantity !== undefined
           ? sizeData.quantity
           : typeof sizeData === "number"
             ? sizeData
@@ -601,7 +607,7 @@ const Terminal = () => {
       setCart(
         cart.map((item) =>
           item._id === product._id &&
-          (item.selectedSize || "") === (defaultSize || "")
+            (item.selectedSize || "") === (defaultSize || "")
             ? { ...item, quantity: item.quantity + 1 }
             : item,
         ),
@@ -769,9 +775,9 @@ const Terminal = () => {
               .trim();
             const voidSize = String(
               itemToVoid.selectedSize ||
-                itemToVoid.size ||
-                resolveItemSize(itemToVoid) ||
-                "",
+              itemToVoid.size ||
+              resolveItemSize(itemToVoid) ||
+              "",
             )
               .toLowerCase()
               .trim();
@@ -826,9 +832,9 @@ const Terminal = () => {
               .trim();
             const voidSize = String(
               itemToVoid.selectedSize ||
-                itemToVoid.size ||
-                resolveItemSize(itemToVoid) ||
-                "",
+              itemToVoid.size ||
+              resolveItemSize(itemToVoid) ||
+              "",
             )
               .toLowerCase()
               .trim();
@@ -891,9 +897,9 @@ const Terminal = () => {
                 .trim();
               const voidSize = String(
                 itemToVoid.selectedSize ||
-                  itemToVoid.size ||
-                  resolveItemSize(itemToVoid) ||
-                  "",
+                itemToVoid.size ||
+                resolveItemSize(itemToVoid) ||
+                "",
               )
                 .toLowerCase()
                 .trim();
@@ -1300,8 +1306,8 @@ const Terminal = () => {
         const errorData = await transactionResponse.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            errorData.error ||
-            `Transaction recording failed: ${transactionResponse.status} ${transactionResponse.statusText}`,
+          errorData.error ||
+          `Transaction recording failed: ${transactionResponse.status} ${transactionResponse.statusText}`,
         );
       }
 
@@ -1309,8 +1315,8 @@ const Terminal = () => {
       if (!transactionData.success) {
         throw new Error(
           transactionData.message ||
-            transactionData.error ||
-            "Failed to record transaction",
+          transactionData.error ||
+          "Failed to record transaction",
         );
       }
 
@@ -1461,7 +1467,7 @@ const Terminal = () => {
         className={`relative flex flex-col h-screen ${theme === "dark" ? "bg-[#121212]" : "bg-[#F5F5F5]"}`}
       >
         <div
-          className={`absolute top-0 left-0 right-[420px] px-6 py-4 z-40 transition-colors duration-300 ${theme === "dark" ? "bg-[#121212]" : "bg-[#F5F5F5]"}`}
+          className={`absolute top-0 left-0 right-[420px] px-6 py-4 z-40 transition-colors duration-300 flex flex-col gap-4 ${theme === "dark" ? "bg-[#121212]" : "bg-[#F5F5F5]"}`}
           style={{ paddingRight: "24px" }}
         >
           <Header
@@ -1479,14 +1485,33 @@ const Terminal = () => {
             profileGap="gap-3"
             sortOption={sortOption}
             onSortChange={setSortOption}
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onCategoryChange={setSelectedCategory}
           />
+
+          {/* Categories Chips */}
+          <div className="grid grid-cols-7 gap-3 pb-2 w-full">
+            {categories.map((cat) => (
+              <button
+                key={cat.name}
+                onClick={() => setSelectedCategory(cat.name)}
+                className={`flex items-center justify-center px-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border truncate ${selectedCategory === cat.name
+                  ? "bg-[#AD7F65] text-white border-[#AD7F65] shadow-md"
+                  : theme === "dark"
+                    ? "bg-[#2A2724] text-gray-300 border-gray-600 hover:bg-[#352F2A]"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                  }`}
+                title={cat.name}
+              >
+                <span className="truncate w-full text-center">{cat.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-          <div className="flex-1 overflow-auto p-6 pt-24">
+          <div
+            className="flex-1 overflow-auto p-6"
+            style={{ paddingTop: `${130 + Math.ceil(categories.length / 7) * 50}px` }}
+          >
             <div>
               <h2
                 className={`text-lg font-semibold mb-3 ${theme === "dark" ? "text-white" : "text-gray-800"}`}

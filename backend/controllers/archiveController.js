@@ -3,7 +3,7 @@ const Archive = require('../models/Archive');
 exports.createArchiveItem = async (req, res) => {
   try {
     const archiveData = { ...req.body };
-    
+
     // Validate required fields based on the Archive model schema
     if (!archiveData.productId) {
       return res.status(400).json({
@@ -42,9 +42,9 @@ exports.createArchiveItem = async (req, res) => {
     if (!archiveData.source) {
       archiveData.source = archiveData.originalTransactionId ? 'return' : 'stock-out';
     }
-    
+
     const archiveItem = await Archive.create(archiveData);
-    
+
     res.status(201).json({
       success: true,
       message: 'Item archived successfully',
@@ -182,6 +182,23 @@ exports.deleteArchiveItem = async (req, res) => {
   }
 };
 
+exports.deleteAllArchiveItems = async (req, res) => {
+  try {
+    await Archive.deleteMany({});
+    res.json({
+      success: true,
+      message: 'All archive items deleted permanently'
+    });
+  } catch (error) {
+    console.error('Error deleting all archive items:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting all archive items',
+      error: error.message
+    });
+  }
+};
+
 exports.restoreArchiveItem = async (req, res) => {
   try {
     const archiveItem = await Archive.findById(req.params.id);
@@ -193,7 +210,7 @@ exports.restoreArchiveItem = async (req, res) => {
       });
     }
 
-  
+
     res.json({
       success: true,
       message: 'Item data retrieved for restoration',
