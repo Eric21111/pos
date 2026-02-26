@@ -1,22 +1,36 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFonts } from "expo-font";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React, { useState, useCallback } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { usePathname, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { stockAPI } from "../../services/api";
+import { checkAndNotify } from "../../services/notificationService";
 
 const Header = () => {
   const router = useRouter();
+  const pathname = usePathname();
   const [notificationCount, setNotificationCount] = useState(0);
 
-  const [fontsLoaded] = useFonts({
-    Allura: require("../shared/fontz/Allura-Regular.ttf"),
-    Insta: require("../shared/fontz/Instagram Sans.ttf"),
-    DancingS: require("../shared/fontz/DancingScript.ttf"),
-    Poppins: require("../shared/fontz/Poppins-Bold.ttf"),
-  });
+  // Map router paths to display titles
+  const getPageTitle = (path) => {
+    switch (path) {
+      case "/":
+      case "/index":
+        return "Dashboard";
+      case "/transaction":
+        return "Transactions";
+      case "/analytics":
+        return "Analytics";
+      case "/inventory":
+        return "Inventory";
+      case "/profile":
+        return "Profile";
+      case "/Notification":
+        return "Notifications";
+      default:
+        return "Create your style";
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -26,6 +40,8 @@ const Header = () => {
           if (response && response.success) {
             setNotificationCount(response.count || 0);
           }
+          // Fire phone push notifications for new alerts (if enabled)
+          await checkAndNotify();
         } catch (error) {
           console.error("Error fetching notifications:", error);
         }
@@ -35,23 +51,16 @@ const Header = () => {
     }, [])
   );
 
-  if (!fontsLoaded) return null;
-
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={["#C2A68C", "#AD7F65", "#76462B"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerBackground}
-      >
-        <Text style={styles.headerTitle}>Create your style</Text>
+      <View style={styles.headerBackground}>
+        <Text style={styles.headerTitle}>{getPageTitle(pathname)}</Text>
 
         <TouchableOpacity
           style={styles.notificationButton}
           onPress={() => router.push("/Notification")}
         >
-          <Ionicons name="notifications-outline" size={25} color="#fff" />
+          <Ionicons name="notifications-outline" size={25} color="#1a1a1a" />
           {notificationCount > 0 && (
             <View style={styles.notificationDot}>
               <Text style={styles.notificationText}>
@@ -60,14 +69,18 @@ const Header = () => {
             </View>
           )}
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    zIndex: 10,
+  },
   headerBackground: {
     height: 100,
+    backgroundColor: "#fff",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -76,14 +89,15 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     marginTop: -1,
-    fontSize: 18,
-    color: "#fff",
+    fontSize: 22,
+    color: "#1a1a1a",
     fontFamily: "Poppins",
   },
   notificationButton: {
     position: "relative",
     bottom: 3,
     padding: 8,
+    zIndex: 10,
   },
   notificationDot: {
     position: "absolute",

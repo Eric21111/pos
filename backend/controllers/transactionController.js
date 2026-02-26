@@ -548,7 +548,7 @@ exports.getTransactionStats = async (req, res) => {
 };
 
 // Get dashboard stats (sales, transactions, profit, low stock) with timeframe support
-// Get dashboard stats (sales, transactions, profit, low stock) with timeframe support and growth rate
+// OPTIMIZED: Uses MongoDB aggregation pipelines instead of fetching all docs into memory
 exports.getDashboardStats = async (req, res) => {
   try {
     const { timeframe = 'daily', startDate: customStartDate, endDate: customEndDate } = req.query;
@@ -559,7 +559,6 @@ exports.getDashboardStats = async (req, res) => {
       let start, end;
       const d = new Date(date);
 
-      // Check if custom dates are provided and timeframe is 'custom'
       if (tf.toLowerCase() === 'custom' && customStartDate && customEndDate) {
         start = new Date(customStartDate);
         start.setHours(0, 0, 0, 0);
@@ -589,12 +588,11 @@ exports.getDashboardStats = async (req, res) => {
           end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
           break;
         case 'yearly':
-          // Show current calendar year (Jan 1 - Dec 31 of current year)
-          start = new Date(d.getFullYear(), 0, 1); // Jan 1st of current year
+          start = new Date(d.getFullYear(), 0, 1);
           start.setHours(0, 0, 0, 0);
-          end = new Date(d.getFullYear() + 1, 0, 1); // Jan 1st of next year
+          end = new Date(d.getFullYear() + 1, 0, 1);
           break;
-        default: // daily
+        default:
           start = new Date(d);
           start.setHours(0, 0, 0, 0);
           end = new Date(start);
@@ -611,9 +609,7 @@ exports.getDashboardStats = async (req, res) => {
     let previous = { start: new Date(), end: new Date() };
 
     if (timeframe.toLowerCase() === 'custom' && customStartDate && customEndDate) {
-      // Calculate duration of custom range
       const duration = current.end.getTime() - current.start.getTime();
-      // Previous period ends just before current start
       const previousEnd = new Date(current.start.getTime() - 1);
       const previousStart = new Date(previousEnd.getTime() - duration);
       previous = { start: previousStart, end: previousEnd };
@@ -622,76 +618,100 @@ exports.getDashboardStats = async (req, res) => {
       else if (timeframe === 'weekly') previousDate.setDate(previousDate.getDate() - 7);
       else if (timeframe === 'monthly') previousDate.setMonth(previousDate.getMonth() - 1);
       else if (timeframe === 'yearly') previousDate.setFullYear(previousDate.getFullYear() - 1);
-
       previous = getDateRange(timeframe, previousDate);
     }
 
-    // Fetch transactions
-    const getTransactions = async (start, end) => {
-      return SalesTransaction.find({
-        $or: [
-          { checkedOutAt: { $gte: start, $lte: end } },
-          { checkedOutAt: { $exists: false }, createdAt: { $gte: start, $lte: end } }
-        ],
-        status: { $not: { $regex: /^voided$/i } },
-        paymentMethod: { $ne: 'return' }
-      }).lean();
+    // Build match filter for non-voided, non-return transactions in a date range
+    const buildMatchFilter = (start, end) => ({
+      $or: [
+        { checkedOutAt: { $gte: start, $lte: end } },
+        { checkedOutAt: { $exists: false }, createdAt: { $gte: start, $lte: end } }
+      ],
+      status: { $not: { $regex: /^voided$/i } },
+      paymentMethod: { $ne: 'return' }
+    });
+
+    // Aggregation pipeline: compute totalSales, count, and profit in one query
+    const getStatsAggregation = (start, end) => {
+      return SalesTransaction.aggregate([
+        { $match: buildMatchFilter(start, end) },
+        // Compute total sales and count at transaction level
+        {
+          $facet: {
+            summary: [
+              {
+                $group: {
+                  _id: null,
+                  totalSales: { $sum: { $ifNull: ['$totalAmount', 0] } },
+                  totalTransactions: { $sum: 1 }
+                }
+              }
+            ],
+            profit: [
+              { $unwind: { path: '$items', preserveNullAndEmptyArrays: false } },
+              {
+                $lookup: {
+                  from: 'products',
+                  localField: 'items.productId',
+                  foreignField: '_id',
+                  as: 'productInfo'
+                }
+              },
+              { $unwind: { path: '$productInfo', preserveNullAndEmptyArrays: true } },
+              {
+                $group: {
+                  _id: null,
+                  totalProfit: {
+                    $sum: {
+                      $multiply: [
+                        { $subtract: [{ $ifNull: ['$items.price', 0] }, { $ifNull: ['$productInfo.costPrice', 0] }] },
+                        { $ifNull: ['$items.quantity', 1] }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]);
     };
 
-    const [currentTransactions, previousTransactions] = await Promise.all([
-      getTransactions(current.start, current.end),
-      getTransactions(previous.start, previous.end)
+    // Run current + previous period aggregations AND low stock count in parallel
+    const [currentResult, previousResult, lowStockCountResult] = await Promise.all([
+      getStatsAggregation(current.start, current.end),
+      getStatsAggregation(previous.start, previous.end),
+      Product.aggregate([
+        {
+          $match: {
+            $expr: {
+              $lte: ['$currentStock', { $max: [{ $ifNull: ['$reorderNumber', 0] }, 10] }]
+            }
+          }
+        },
+        { $count: 'count' }
+      ])
     ]);
 
-    // Calculate Metrics
-    const totalSalesToday = currentTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
-    const totalTransactions = currentTransactions.length;
+    // Extract current period results
+    const currentSummary = currentResult[0]?.summary[0] || {};
+    const currentProfit = currentResult[0]?.profit[0] || {};
+    const totalSalesToday = currentSummary.totalSales || 0;
+    const totalTransactions = currentSummary.totalTransactions || 0;
+    const profit = currentProfit.totalProfit || 0;
 
-    // Calculate Profit — batch lookup instead of per-item queries
-    const allProductIds = [...new Set(
-      currentTransactions.flatMap(t => (t.items || []).map(i => i.productId?.toString()).filter(Boolean))
-    )];
-    const products = await Product.find({ _id: { $in: allProductIds } }).select('_id costPrice').lean();
-    const costMap = {};
-    products.forEach(p => { costMap[p._id.toString()] = p.costPrice || 0; });
+    // Extract previous period results
+    const previousSummary = previousResult[0]?.summary[0] || {};
+    const totalSalesPrevious = previousSummary.totalSales || 0;
 
-    let profit = 0;
-    for (const transaction of currentTransactions) {
-      for (const item of transaction.items || []) {
-        const costPrice = costMap[item.productId?.toString()] || 0;
-        const sellingPrice = item.price || 0;
-        profit += (sellingPrice - costPrice) * (item.quantity || 1);
-      }
-    }
-
-    // Previous Period Sales for Growth Rate
-    const totalSalesPrevious = previousTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
-
-    // Calculate Growth Rate
+    // Growth rate
     let growthRate = 0;
     if (totalSalesPrevious > 0) {
       growthRate = ((totalSalesToday - totalSalesPrevious) / totalSalesPrevious) * 100;
     } else if (totalSalesToday > 0) {
-      growthRate = 100; // 100% growth if previous was 0 and now we have sales
+      growthRate = 100;
     }
 
-    // Low stock items (independent of timeframe)
-    // Low stock items (independent of timeframe)
-    // Fallback: Fetch only necessary fields and filter in JS (Safer/Robust)
-    // Low stock items (independent of timeframe)
-    // OPTIMIZED: Use Aggregation for server-side calculation
-    const lowStockCountResult = await Product.aggregate([
-      {
-        $match: {
-          $expr: {
-            $lte: ["$currentStock", { $max: [{ $ifNull: ["$reorderNumber", 0] }, 10] }]
-          }
-        }
-      },
-      {
-        $count: "count"
-      }
-    ]);
     const lowStockItems = lowStockCountResult.length > 0 ? lowStockCountResult[0].count : 0;
 
     res.json({

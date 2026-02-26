@@ -1,15 +1,34 @@
+import * as Notifications from "expo-notifications";
 import { Tabs } from "expo-router";
+import { useEffect } from "react";
 import { Image, useWindowDimensions } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { Colors } from "@/constants/theme";
 import { DataProvider } from "@/context/DataContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { setupNotificationChannel } from "@/services/notificationService";
+
+// Show notifications even when the app is in the foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+
+  // Set up notification channel on app start
+  useEffect(() => {
+    setupNotificationChannel();
+  }, []);
 
   return (
     <DataProvider>

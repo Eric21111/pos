@@ -1,153 +1,77 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Modal,
+  Alert,
   StyleSheet,
   Switch,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import {
+  isNotificationsEnabled,
+  requestPermissions,
+  setNotificationsEnabled,
+  setupNotificationChannel,
+} from "../services/notificationService";
 
 export default function SettingsScreen() {
-  const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(false);
-  // confirmation switch state
-  const [confirmRequired, setConfirmRequired] = useState(false);
-  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-  const [pendingConfirmValue, setPendingConfirmValue] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const toggleDarkMode = () => {
-    setDarkMode((prev) => !prev);
-    console.log("Dark Mode:", !darkMode);
+  // Load persisted preference on mount
+  useEffect(() => {
+    (async () => {
+      const enabled = await isNotificationsEnabled();
+      setNotifications(enabled);
+      setLoading(false);
+    })();
+  }, []);
+
+  const toggleNotifications = async () => {
+    const newValue = !notifications;
+
+    if (newValue) {
+      // Request permission first
+      await setupNotificationChannel();
+      const granted = await requestPermissions();
+      if (!granted) {
+        Alert.alert(
+          "Permission Required",
+          "Please enable notifications in your device settings to receive stock alerts.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+    }
+
+    setNotifications(newValue);
+    await setNotificationsEnabled(newValue);
   };
 
-  const toggleNotifications = () => {
-    setNotifications((prev) => !prev);
-    console.log("Notifications:", !notifications);
-  };
-
-  const requestToggleConfirm = (value: boolean) => {
-    // ask user to confirm the change before applying
-    setPendingConfirmValue(value);
-    setConfirmModalVisible(true);
-  };
-
-  const applyPendingConfirm = () => {
-    setConfirmRequired(Boolean(pendingConfirmValue));
-    console.log("Confirm Required:", pendingConfirmValue);
-    setPendingConfirmValue(false);
-    setConfirmModalVisible(false);
-  };
-
-  const cancelPendingConfirm = () => {
-    setPendingConfirmValue(false);
-    setConfirmModalVisible(false);
-  };
+  if (loading) return null;
 
   return (
-    <>
-      <View
-        style={[
-          styles.container,
-          { backgroundColor: darkMode ? "#1A1A1A" : "#FAF6F2" },
-        ]}
-      >
-        {/* Dark Mode Switch */}
-        <View style={styles.switchContainer}>
-          <Text
-            style={[styles.label, { color: darkMode ? "#000000ff" : "#333" }]}
-          >
-            {darkMode ? "Dark Mode" : "Light Mode"}
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: "#FAF6F2" },
+      ]}
+    >
+      {/* Notifications Switch */}
+      <View style={styles.switchContainer}>
+        <View>
+          <Text style={styles.label}>Push Notifications</Text>
+          <Text style={styles.sublabel}>
+            {notifications ? "You will receive stock alerts" : "Notifications are off"}
           </Text>
-          <Switch
-            trackColor={{ false: "#ccc", true: "#76462B" }}
-            thumbColor="#fff"
-            value={darkMode}
-            onValueChange={toggleDarkMode}
-          />
         </View>
-
-        {/* Notifications Switch */}
-        <View style={styles.switchContainer}>
-          <Text
-            style={[styles.label, { color: darkMode ? "#000000ff" : "#333" }]}
-          >
-            Notifications
-          </Text>
-          <Switch
-            trackColor={{ false: "#ccc", true: "#76462B" }}
-            thumbColor="#fff"
-            value={notifications}
-            onValueChange={toggleNotifications}
-          />
-        </View>
-
-        {/* Confirm-on-toggle Switch (with Yes/No modal) */}
-        <View style={styles.switchContainer}>
-          <View>
-            <Text
-              style={[styles.label, { color: darkMode ? "#000000ff" : "#333" }]}
-            >
-              Owner Status
-            </Text>
-            <Text
-              style={[
-                styles.statusText,
-                { color: confirmRequired ? "#09A046" : "#999" },
-              ]}
-            >
-              {confirmRequired ? "Active" : "Inactive"}
-            </Text>
-          </View>
-          <Switch
-            trackColor={{ false: "#ccc", true: "#76462B" }}
-            thumbColor="#fff"
-            value={confirmRequired}
-            onValueChange={(v) => requestToggleConfirm(v)}
-          />
-        </View>
-
-        <Text
-          style={[styles.description, { color: darkMode ? "#ccc" : "#777" }]}
-        ></Text>
+        <Switch
+          trackColor={{ false: "#ccc", true: "#16a34a" }}
+          thumbColor="#fff"
+          value={notifications}
+          onValueChange={toggleNotifications}
+        />
       </View>
-
-      {/* Confirmation modal */}
-      <Modal
-        visible={confirmModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={cancelPendingConfirm}
-      >
-        <View style={styles.modalWrap}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Confirm Change</Text>
-            <Text style={styles.modalMessage}>
-              Are you sure you want to{" "}
-              {pendingConfirmValue ? "enable" : "disable"} confirmation?
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalCancel]}
-                onPress={cancelPendingConfirm}
-              >
-                <Text style={[styles.modalButtonText, styles.modalCancelText]}>
-                  No
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalConfirm]}
-                onPress={applyPendingConfirm}
-              >
-                <Text style={[styles.modalButtonText, styles.modalConfirmText]}>
-                  Yes
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </>
+    </View>
   );
 }
 
@@ -173,71 +97,11 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "500",
-  },
-  description: {
-    marginTop: 10,
-    fontSize: 14,
-  },
-  modalWrap: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-  modalBox: {
-    width: "100%",
-    maxWidth: 420,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 18,
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#333",
-    marginBottom: 8,
-  },
-  modalMessage: {
-    fontSize: 14,
-    color: "#555",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    width: "100%",
-    justifyContent: "space-between",
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginHorizontal: 6,
-  },
-  modalCancel: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ccc",
-  },
-  modalConfirm: {
-    backgroundColor: "#76462B",
-  },
-  modalButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  modalCancelText: {
     color: "#333",
   },
-  modalConfirmText: {
-    color: "#fff",
-  },
-  statusText: {
+  sublabel: {
     fontSize: 12,
-    marginTop: 4,
-    fontWeight: "600",
+    color: "#999",
+    marginTop: 3,
   },
 });

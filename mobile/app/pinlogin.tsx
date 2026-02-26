@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -19,13 +20,62 @@ export default function PinLogin() {
   const [showModal, setShowModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [showBiometricModal, setShowBiometricModal] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
   const router = useRouter();
 
   // Warm up the backend connection while user is looking at the PIN screen
-  // This pre-establishes DNS resolution, TCP connection, and TLS handshake
   useEffect(() => {
     fetch(`${config.API_URL}/ping`).catch(() => { });
+    checkBiometricOnMount();
   }, []);
+
+  // Check if biometric login is available and enabled on mount
+  const checkBiometricOnMount = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      const hasBiometric = hasHardware && isEnrolled;
+      setBiometricAvailable(hasBiometric);
+
+      if (!hasBiometric) return;
+
+      const enabled = await AsyncStorage.getItem('@biometric_enabled');
+      if (enabled === 'true') {
+        setBiometricEnabled(true);
+        // Auto-trigger biometric login
+        attemptBiometricLogin();
+      }
+    } catch (error) {
+      console.error('Biometric check error:', error);
+    }
+  };
+
+  // Attempt biometric authentication for login
+  const attemptBiometricLogin = async () => {
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Verify to login',
+        cancelLabel: 'Use PIN',
+        disableDeviceFallback: true,
+      });
+
+      if (result.success) {
+        // Load stored employee data and navigate
+        const storedEmployee = await AsyncStorage.getItem('currentEmployee');
+        if (storedEmployee) {
+          router.replace("/(tabs)");
+        } else {
+          // No stored employee — need PIN login first
+          console.log('No stored employee data, falling back to PIN');
+        }
+      }
+      // If failed/cancelled, user stays on PIN screen
+    } catch (error) {
+      console.error('Biometric auth error:', error);
+    }
+  };
 
   const handleKeyPress = (value: string) => {
     if (value === "del") {
@@ -46,8 +96,20 @@ export default function PinLogin() {
       const response = await employeeAPI.verifyOwnerPin(pin);
 
       if (response.success && response.data) {
-        // Store owner employee data for later use
+        // Store owner employee data for later use (also needed for biometric login)
         await AsyncStorage.setItem('currentEmployee', JSON.stringify(response.data));
+
+        // Check if we should ask about biometrics
+        if (biometricAvailable) {
+          const alreadyAsked = await AsyncStorage.getItem('@biometric_asked');
+          if (alreadyAsked !== 'true') {
+            // Show the biometric enable modal
+            setShowBiometricModal(true);
+            setIsLoading(false);
+            return;
+          }
+        }
+
         router.replace("/(tabs)");
       } else {
         setErrorMessage(response.message || "Invalid PIN. Only owner account can access the mobile app.");
@@ -62,6 +124,41 @@ export default function PinLogin() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Handle biometric enable - Allow
+  const handleBiometricAllow = async () => {
+    setShowBiometricModal(false);
+
+    try {
+      // Verify the user with biometrics right now
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Verify your identity',
+        cancelLabel: 'Cancel',
+        disableDeviceFallback: true,
+      });
+
+      if (result.success) {
+        await AsyncStorage.setItem('@biometric_enabled', 'true');
+        await AsyncStorage.setItem('@biometric_asked', 'true');
+        setBiometricEnabled(true);
+      } else {
+        // Verification failed, still mark as asked
+        await AsyncStorage.setItem('@biometric_asked', 'true');
+      }
+    } catch (error) {
+      console.error('Biometric setup error:', error);
+      await AsyncStorage.setItem('@biometric_asked', 'true');
+    }
+
+    router.replace("/(tabs)");
+  };
+
+  // Handle biometric enable - Not Now
+  const handleBiometricSkip = async () => {
+    setShowBiometricModal(false);
+    await AsyncStorage.setItem('@biometric_asked', 'true');
+    router.replace("/(tabs)");
   };
 
   return (
@@ -95,22 +192,34 @@ export default function PinLogin() {
 
         <View style={styles.keypad}>
           {[
-            ["7", "8", "9"],
-            ["4", "5", "6"],
             ["1", "2", "3"],
-            ["0", "del"],
+            ["4", "5", "6"],
+            ["7", "8", "9"],
+            [biometricEnabled ? "bio" : "empty", "0", "del"],
           ].map((row, rIdx) => (
             <View key={rIdx} style={styles.keypadRow}>
               {row.map((key) => (
-                <TouchableOpacity
-                  key={key}
-                  style={styles.key}
-                  onPress={() => handleKeyPress(key)}
-                >
-                  <Text style={styles.keyText}>
-                    {key === "del" ? "⌫" : key}
-                  </Text>
-                </TouchableOpacity>
+                key === "empty" ? (
+                  <View key={key} style={[styles.key, { backgroundColor: 'transparent', elevation: 0, shadowOpacity: 0 }]} />
+                ) : key === "bio" ? (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.key, { backgroundColor: '#f0f7f0' }]}
+                    onPress={attemptBiometricLogin}
+                  >
+                    <Text style={{ fontSize: 26 }}>🔒</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    key={key}
+                    style={styles.key}
+                    onPress={() => handleKeyPress(key)}
+                  >
+                    <Text style={styles.keyText}>
+                      {key === "del" ? "⌫" : key}
+                    </Text>
+                  </TouchableOpacity>
+                )
               ))}
             </View>
           ))}
@@ -132,6 +241,7 @@ export default function PinLogin() {
         </TouchableOpacity>
       </View>
 
+      {/* Error Modal */}
       <Modal visible={showModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -146,6 +256,34 @@ export default function PinLogin() {
             >
               <Text style={styles.modalButtonText}>OK</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Biometric Enable Modal */}
+      <Modal visible={showBiometricModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={{ fontSize: 48, marginBottom: 16 }}>🔐</Text>
+            <Text style={styles.modalTitle}>Want to use phone biometrics?</Text>
+            <Text style={styles.modalMessage}>
+              Use your fingerprint or face to login faster next time. You can always change this in settings.
+            </Text>
+
+            <View style={styles.biometricButtons}>
+              <TouchableOpacity
+                style={[styles.biometricBtn, styles.biometricBtnSkip]}
+                onPress={handleBiometricSkip}
+              >
+                <Text style={styles.biometricBtnSkipText}>Not Now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.biometricBtn, styles.biometricBtnAllow]}
+                onPress={handleBiometricAllow}
+              >
+                <Text style={styles.biometricBtnAllowText}>Allow</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -177,10 +315,10 @@ const styles = StyleSheet.create({
     paddingTop: 40,
   },
   title: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "bold",
     marginBottom: 20,
-    color: "#333",
+    color: "#000",
   },
   pinContainer: {
     flexDirection: "row",
@@ -188,86 +326,66 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   pinBox: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginHorizontal: 6,
-    backgroundColor: "#f5f5f5",
+    width: 42,
+    height: 48,
+    borderRadius: 6,
+    marginHorizontal: 4,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 1.2,
-    elevation: 1.5,
   },
   pinBoxFilled: {
-    backgroundColor: "#f5f5f5",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1.5,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 3,
+    borderColor: "#333",
   },
   pinFilled: {
     color: "#000",
   },
   pinText: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "bold",
     color: "#000",
     textAlign: "center",
-    lineHeight: 30,
   },
   keypad: {
     marginBottom: 12,
-    paddingLeft: 10,
   },
   keypadRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "center",
     marginVertical: 8,
   },
   key: {
-    width: 70,
-    height: 70,
-    marginLeft: 7,
-    marginRight: 7,
-    backgroundColor: "#f6f6f6",
-    borderRadius: 35,
+    width: 65,
+    height: 65,
+    marginHorizontal: 10,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 32.5,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
   },
   keyText: {
-    fontSize: 24,
-    fontWeight: "light",
-    color: "#333",
+    fontSize: 22,
+    fontWeight: "600",
+    color: "#000",
   },
   loginButton: {
-    width: "59%",
-    backgroundColor: "#7C4A21",
-    borderRadius: 20,
-    paddingVertical: 11,
+    width: "65%",
+    backgroundColor: "rgb(38, 38, 38)",
+    borderRadius: 8,
+    paddingVertical: 14,
     alignItems: "center",
+    alignSelf: "center",
+    marginTop: 10,
   },
   loginButtonDisabled: {
     opacity: 0.6,
-    color: "#000000ff",
   },
   loginButtonText: {
-    color: "#ffff",
-    fontSize: 15,
-    fontWeight: "600",
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
   },
 
   // Modal Styles
@@ -289,6 +407,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#7C4A21",
     marginBottom: 10,
+    textAlign: "center",
   },
   modalMessage: {
     textAlign: "center",
@@ -306,5 +425,35 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  biometricButtons: {
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  biometricBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  biometricBtnSkip: {
+    backgroundColor: "#f3f4f6",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  biometricBtnSkipText: {
+    color: "#6b7280",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  biometricBtnAllow: {
+    backgroundColor: "#1f1f1f",
+  },
+  biometricBtnAllowText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

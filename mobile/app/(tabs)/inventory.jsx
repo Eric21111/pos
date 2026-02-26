@@ -751,7 +751,7 @@ export default function Inventory() {
             {/* TOP ACTION BUTTONS */}
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#8B4513', flex: 1 }]}
+                style={[styles.actionButton, { backgroundColor: '#16a34a', flex: 1 }]}
                 onPress={() => setShowAddItem(true)}
               >
                 <Ionicons name="add" size={20} color="#fff" style={styles.buttonIcon} />
@@ -767,44 +767,28 @@ export default function Inventory() {
             </TouchableOpacity> */}
             </View>
 
-            {/* INVENTORY VALUE CARD */}
-            <View style={styles.card}>
-              <Text style={styles.mainValue}>₱{inventoryStats.inventoryValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-              <Text style={styles.title}>Inventory Value</Text>
 
-              <View style={styles.row}>
-                <View style={styles.column}>
-                  <Text style={styles.subValue}>₱{inventoryStats.totalCostValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                  <Text style={styles.subLabel}>Total Cost Value</Text>
-                </View>
-                <View style={styles.column}>
-                  <Text style={[styles.subValue, { color: inventoryStats.grossMargin >= 0 ? '#2ECC71' : '#E74C3C' }]}>
-                    {inventoryStats.grossMargin.toFixed(1)}%
-                  </Text>
-                  <Text style={styles.subLabel}>Gross Profit Margin</Text>
-                </View>
-              </View>
-            </View>
+
 
             {/* SUMMARY STATS */}
             <View style={styles.statsRow}>
-              <View style={[styles.statCard, { borderLeftColor: "#E74C3C" }]}>
-                <Text style={styles.statValue}>{inventoryStats.totalItems}</Text>
-                <Text style={styles.statLabel}>Total Item</Text>
+              <View style={[styles.statCard, styles.statCardDark]}>
+                <Text style={[styles.statValue, { color: "#fff" }]}>{inventoryStats.totalItems}</Text>
+                <Text style={[styles.statLabel, { color: "#d1d5db" }]}>Total Items</Text>
               </View>
-              <View style={[styles.statCard, { borderLeftColor: "#3498DB" }]}>
-                <Text style={styles.statValue}>{inventoryStats.inStock}</Text>
-                <Text style={styles.statLabel}>In Stock</Text>
+              <View style={styles.statCard}>
+                <Text style={[styles.statValue, { color: "#16a34a" }]}>{inventoryStats.inStock}</Text>
+                <Text style={styles.statLabel}>In-Stock</Text>
               </View>
             </View>
 
             <View style={styles.statsRow}>
-              <View style={[styles.statCard, { borderLeftColor: "#F1C40F" }]}>
-                <Text style={styles.statValue}>{inventoryStats.lowStock}</Text>
+              <View style={styles.statCard}>
+                <Text style={[styles.statValue, { color: "#D97706" }]}>{inventoryStats.lowStock}</Text>
                 <Text style={styles.statLabel}>Low Stock</Text>
               </View>
-              <View style={[styles.statCard, { borderLeftColor: "#2ECC71" }]}>
-                <Text style={styles.statValue}>{inventoryStats.outOfStock}</Text>
+              <View style={styles.statCard}>
+                <Text style={[styles.statValue, { color: "#DC2626" }]}>{inventoryStats.outOfStock}</Text>
                 <Text style={styles.statLabel}>Out of Stock</Text>
               </View>
             </View>
@@ -846,7 +830,7 @@ export default function Inventory() {
             <View style={[styles.actionButtonsContainer, { justifyContent: 'center', marginTop: 5, marginBottom: 10 }]}>
               <TouchableOpacity
                 style={[styles.actionButton, {
-                  backgroundColor: '#5D4037',
+                  backgroundColor: '#1f1f1f',
                   width: '90%',
                   maxWidth: '100%',
                   paddingVertical: 15
@@ -1181,27 +1165,33 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: "#f7f2ef",
-    padding: 14,
+    backgroundColor: "#fff",
+    padding: 16,
     borderRadius: 14,
-    marginHorizontal: 6,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
+  statCardDark: {
+    backgroundColor: "#1f1f1f",
+    borderColor: "#1f1f1f",
+  },
   statValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#53321c",
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#1a1a1a",
+    letterSpacing: -0.5,
   },
   statLabel: {
     fontSize: 13,
     marginTop: 4,
     fontWeight: "600",
-    color: "#7c5a43",
-  },
-  statDesc: {
-    fontSize: 12,
-    marginTop: 2,
-    color: "#8b776a",
+    color: "#6b7280",
   },
   colcontainer: {
     backgroundColor: "#fafafa",

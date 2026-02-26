@@ -1,8 +1,11 @@
 import Header from "@/components/shared/header";
-import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import * as LocalAuthentication from "expo-local-authentication";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Image,
   Modal,
@@ -10,10 +13,8 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import React from "react";
 import { employeeAPI } from "../../services/api";
 
 const AccountSettings = () => {
@@ -25,6 +26,8 @@ const AccountSettings = () => {
   const [toastIcon, setToastIcon] = useState("sync");
   const toastTranslate = useRef(new Animated.Value(-60)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
 
   const [profile, setProfile] = useState({
     name: "",
@@ -38,14 +41,8 @@ const AccountSettings = () => {
 
   const loadProfile = async () => {
     try {
-      setSyncMessage("Loading profile...");
-      setSyncModalVisible(true);
-
       const stored = await AsyncStorage.getItem("currentEmployee");
-      if (!stored) {
-        setSyncMessage("No current employee found");
-        return;
-      }
+      if (!stored) return;
       const parsed = JSON.parse(stored);
 
       let latest = parsed;
@@ -71,13 +68,8 @@ const AccountSettings = () => {
         image: latest.profileImage || latest.image || null,
         id: latest._id || latest.id,
       });
-
-      setSyncMessage("Profile up to date");
     } catch (error) {
-      setSyncMessage("Failed to load profile");
       console.warn("Failed to load profile:", error?.message);
-    } finally {
-      setTimeout(() => setSyncModalVisible(false), 1200);
     }
   };
 
@@ -85,9 +77,44 @@ const AccountSettings = () => {
   useFocusEffect(
     React.useCallback(() => {
       loadProfile();
+      loadBiometricState();
       return () => { };
     }, [])
   );
+
+  const loadBiometricState = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      setBiometricAvailable(hasHardware && isEnrolled);
+      const enabled = await AsyncStorage.getItem('@biometric_enabled');
+      setBiometricEnabled(enabled === 'true');
+    } catch (e) {
+      console.error('Biometric check error:', e);
+    }
+  };
+
+  const toggleBiometric = async () => {
+    if (!biometricEnabled) {
+      // Turning ON — verify user first
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Verify your identity to enable biometric login',
+        cancelLabel: 'Cancel',
+        disableDeviceFallback: true,
+      });
+      if (result.success) {
+        await AsyncStorage.setItem('@biometric_enabled', 'true');
+        await AsyncStorage.setItem('@biometric_asked', 'true');
+        setBiometricEnabled(true);
+      } else {
+        Alert.alert('Verification Failed', 'Could not verify your identity.');
+      }
+    } else {
+      // Turning OFF
+      await AsyncStorage.setItem('@biometric_enabled', 'false');
+      setBiometricEnabled(false);
+    }
+  };
 
   useEffect(() => {
     if (syncModalVisible) {
@@ -252,9 +279,25 @@ const AccountSettings = () => {
                 style={styles.settingIcon}
               />
               <Text style={styles.settingText}>
-                Push Notification and Preferences
+                Push Notification
               </Text>
             </TouchableOpacity>
+
+            {/* Biometric Login */}
+            {biometricAvailable && (
+              <View style={[styles.settingItem, { justifyContent: 'space-between' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, marginRight: 15, width: 20, textAlign: 'center' }}>🔒</Text>
+                  <Text style={styles.settingText}>Biometric Login</Text>
+                </View>
+                <Switch
+                  trackColor={{ false: '#ccc', true: '#16a34a' }}
+                  thumbColor="#fff"
+                  value={biometricEnabled}
+                  onValueChange={toggleBiometric}
+                />
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.settingItem}

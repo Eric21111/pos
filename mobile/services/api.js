@@ -243,6 +243,11 @@ export const transactionAPI = {
     return apiCall(`/transactions/sales-over-time?timeframe=${encodeURIComponent(tf)}`);
   },
 
+  // Get sales by category
+  getSalesByCategory: async () => {
+    return apiCall('/transactions/sales-by-category');
+  },
+
   // Get top selling products
   getTopSelling: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();

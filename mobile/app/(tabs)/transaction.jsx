@@ -44,6 +44,9 @@ export default function Transaction() {
   const [modalVisible, setModalVisible] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(formatDateTime());
   const [refreshing, setRefreshing] = useState(false);
+  const [timeFilter, setTimeFilter] = useState("All");
+
+  const TIME_FILTERS = ["All", "Today", "Yesterday", "This Week", "This Month"];
 
   // Pagination State
   const [page, setPage] = useState(1);
@@ -57,11 +60,29 @@ export default function Transaction() {
   const filteredTransactions = useMemo(() => {
     const searchLower = search?.toLowerCase() || "";
 
+    // Calculate date boundaries for time filter
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
     return cachedTransactions
       .filter((t) => {
         // Filter out voided and returns
         if (t.status === "Voided" || (t.paymentMethod === "return" && t.originalTransactionId)) {
           return false;
+        }
+
+        // Time filter
+        if (timeFilter !== "All") {
+          const txDate = new Date(t.checkedOutAt || t.createdAt || t.date || 0);
+          if (timeFilter === "Today" && txDate < startOfToday) return false;
+          if (timeFilter === "Yesterday" && (txDate < startOfYesterday || txDate >= startOfToday)) return false;
+          if (timeFilter === "This Week" && txDate < startOfWeek) return false;
+          if (timeFilter === "This Month" && txDate < startOfMonth) return false;
         }
 
         // If no search, include all non-voided
@@ -80,13 +101,12 @@ export default function Transaction() {
           cashier.includes(searchLower)
         );
       })
-      // Backend already returns sorted by date desc, but we sort again to be sure if merging updates
       .sort((a, b) => {
         const dateA = new Date(a.checkedOutAt || a.createdAt || a.date || 0).getTime();
         const dateB = new Date(b.checkedOutAt || b.createdAt || b.date || 0).getTime();
         return dateB - dateA;
       });
-  }, [cachedTransactions, search]);
+  }, [cachedTransactions, search, timeFilter]);
 
   // Update current time every minute
   useEffect(() => {
@@ -355,6 +375,24 @@ export default function Transaction() {
               </TouchableOpacity>
             )}
           </View>
+
+          {/* Time Filter Pills */}
+          <View style={styles.filterRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15 }}>
+              {TIME_FILTERS.map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.filterPill, timeFilter === f && styles.filterPillActive]}
+                  onPress={() => setTimeFilter(f)}
+                >
+                  <Text style={[styles.filterPillText, timeFilter === f && styles.filterPillTextActive]}>
+                    {f}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
           <View style={styles.listWrapper}>
             {(transactionsLoading && cachedTransactions.length === 0) ? (
               <View style={styles.loadingContainer}>
@@ -477,26 +515,6 @@ export default function Transaction() {
                     This is not an official receipt
                   </Text>
                 </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.printButton,
-                    selectedTransaction?.status === "Voided" &&
-                    styles.disabledButton,
-                  ]}
-                  onPress={
-                    selectedTransaction?.status !== "Voided"
-                      ? handlePrint
-                      : null
-                  }
-                  disabled={selectedTransaction?.status === "Voided"}
-                >
-                  <Text style={styles.printButtonText}>
-                    {selectedTransaction?.status === "Voided"
-                      ? "Cannot Print Voided Receipt"
-                      : "Print Receipt"}
-                  </Text>
-                </TouchableOpacity>
               </>
             )}
           </View>
@@ -662,7 +680,7 @@ const styles = StyleSheet.create({
   receiptHeader: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#AD7F65",
+    color: "#000000",
     textAlign: "center",
     marginBottom: 10,
   },
@@ -766,5 +784,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#555",
     marginBottom: 5
+  },
+
+  // Time filter pills
+  filterRow: {
+    marginBottom: 8,
+  },
+  filterPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "#f3f4f6",
+    marginRight: 8,
+  },
+  filterPillActive: {
+    backgroundColor: "#1f1f1f",
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6b7280",
+  },
+  filterPillTextActive: {
+    color: "#fff",
   }
 });

@@ -25,7 +25,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { BarChart, LineChart } from "react-native-chart-kit";
+import { BarChart } from "react-native-chart-kit";
+import Animated, {
+  FadeIn,
+  Layout
+} from "react-native-reanimated";
 import * as XLSX from "xlsx";
 import {
   stockAPI,
@@ -42,6 +46,8 @@ export default function Analytics() {
     fetchTransactions,
     fetchProducts,
     invalidateCache,
+    inventoryStats,
+    calculateDashboardStats,
   } = useData();
 
   const [expanded, setExpanded] = useState(false);
@@ -49,6 +55,7 @@ export default function Analytics() {
   const [refreshing, setRefreshing] = useState(false);
   const [chartType, setChartType] = useState("daily");
   const [initialLoad, setInitialLoad] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
   const analyticsCalculated = useRef(false);
 
   // Real-time data states
@@ -59,6 +66,8 @@ export default function Analytics() {
     salesGrowthRate: 0,
     previousPeriodSales: 0,
     previousPeriodTransactions: 0,
+    profit: 0,
+    cogs: 0,
   });
 
   const [chartData, setChartData] = useState({
@@ -146,6 +155,7 @@ export default function Analytics() {
         fetchLowStockItems(),
         fetchStockMovements(chartType),
         fetchTopProducts(),
+        calculateDashboardStats(true), // Fetch inventory stats from DataContext
       ]);
     } catch (error) {
       console.warn("Failed to fetch analytics:", error?.message);
@@ -195,11 +205,15 @@ export default function Analytics() {
           growthRate,
           lowStockItems,
           totalSalesPrevious,
+          profit,
         } = response.data;
         // totalSalesToday in response is actually totalSales for the period requested
 
         const avgValue =
           totalTransactions > 0 ? totalSalesToday / totalTransactions : 0;
+
+        // COGS = Total Sales - Profit
+        const cogs = (totalSalesToday || 0) - (profit || 0);
 
         setDashboardStats({
           totalSalesToday: totalSalesToday || 0,
@@ -208,6 +222,8 @@ export default function Analytics() {
           salesGrowthRate: growthRate || 0,
           previousPeriodSales: totalSalesPrevious || 0,
           previousPeriodTransactions: 0,
+          profit: profit || 0,
+          cogs: cogs > 0 ? cogs : 0,
         });
       }
     } catch (error) {
@@ -325,14 +341,39 @@ export default function Analytics() {
     }, []),
   );
 
+  // Cache stats per filter to avoid re-fetching when switching back
+  const statsCache = useRef({});
+
   // Fetch chart data AND stats when chartType changes (no global spinner)
   // Also fetch top products when chartType changes
   useFocusEffect(
     useCallback(() => {
-      fetchSalesOverTime();
-      fetchDashboardStats(chartType, false);
-      fetchStockMovements(chartType);
-      fetchTopProducts(); // Re-fetch top products based on new chartType
+      const updateForFilter = async () => {
+        // If we have cached data for this filter, show it instantly (no skeleton)
+        if (statsCache.current[chartType]) {
+          setDashboardStats(statsCache.current[chartType]);
+          setStatsLoading(false);
+        } else {
+          setStatsLoading(true);
+        }
+
+        // Fetch fresh data in background
+        await Promise.all([
+          fetchSalesOverTime(),
+          fetchDashboardStats(chartType, false),
+          fetchStockMovements(chartType),
+          fetchTopProducts(),
+        ]);
+
+        // Cache the updated stats for this filter
+        setDashboardStats(prev => {
+          statsCache.current[chartType] = prev;
+          return prev;
+        });
+
+        setStatsLoading(false);
+      };
+      updateForFilter();
     }, [chartType]),
   );
 
@@ -340,6 +381,7 @@ export default function Analytics() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     invalidateCache("all");
+    statsCache.current = {}; // Clear stats cache on refresh
     analyticsCalculated.current = false;
     await Promise.all([fetchTransactions(true), fetchProducts(true)]);
     // Re-fetch everything with current chartType
@@ -366,6 +408,39 @@ export default function Analytics() {
   const formatCurrency = (value) => {
     return `₱${(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
+
+  // Format currency short (e.g. ₱25.4K, ₱150K, ₱1.2M)
+  const formatCurrencyShort = (v) => {
+    const n = Number(v) || 0;
+    if (n === 0) return "₱0";
+    if (n >= 1000000) {
+      const m = n / 1000000;
+      return `₱${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)}M`;
+    }
+    if (n >= 1000) {
+      const k = n / 1000;
+      return `₱${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}K`;
+    }
+    return `₱${n.toLocaleString("en-PH", { maximumFractionDigits: 0 })}`;
+  };
+
+  // Get period label text for descriptions
+  const getPeriodLabel = () => {
+    switch (chartType) {
+      case "daily": return "today";
+      case "weekly": return "this week";
+      case "monthly": return "this month";
+      case "yearly": return "this year";
+      default: return "today";
+    }
+  };
+
+  const TAB_LABELS = [
+    { label: "Today", value: "daily" },
+    { label: "Week", value: "weekly" },
+    { label: "Month", value: "monthly" },
+    { label: "Year", value: "yearly" },
+  ];
 
   // Format percentage
   const formatPercentage = (value) => {
@@ -501,166 +576,114 @@ export default function Analytics() {
             />
           }
         >
-          {/* SEARCH BAR + BUTTONS */}
-          <View style={styles.searchContainer}>
-            <Text style={styles.anafont}>Analytics</Text>
-            <TouchableOpacity style={styles.printButton} onPress={handlePrint}>
-              <Image
-                source={require("./iconz/print.png")}
-                style={{ width: 21, height: 21 }}
-              />
-            </TouchableOpacity>
+          {/* TIME FILTER TABS */}
+          <View style={styles.filterRow}>
+            <View style={styles.tabRow}>
+              {TAB_LABELS.map((t) => (
+                <TouchableOpacity
+                  key={t.value}
+                  style={[styles.filterTab, chartType === t.value && styles.filterTabActive]}
+                  onPress={() => setChartType(t.value)}
+                >
+                  <Text style={[styles.filterTabText, chartType === t.value && styles.filterTabTextActive]}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.filterActions}>
+              <TouchableOpacity style={styles.filterIconBtn} onPress={handleExportExcel}>
+                <Image
+                  source={require("./iconz/print.png")}
+                  style={{ width: 19, height: 19 }}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* DASHBOARD STATS */}
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>
-                {formatCurrency(dashboardStats.totalSalesToday)}
-              </Text>
-              <Text style={styles.statLabel}>
-                Total Sales (
-                {chartType.charAt(0).toUpperCase() + chartType.slice(1)})
-              </Text>
-              <Text style={styles.statLabel1}>
-                Total sales made this{" "}
-                {chartType === "daily"
-                  ? "day"
-                  : chartType === "monthly"
-                    ? "month"
-                    : "year"}
-              </Text>
-              <Text style={styles.statLabel2}>
-                {getComparisonText(
-                  dashboardStats.totalSalesToday,
-                  dashboardStats.previousPeriodSales,
-                )}
-              </Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>
-                {dashboardStats.totalTransactions}
-              </Text>
-              <Text style={styles.statLabel}>
-                Total Transactions (
-                {chartType.charAt(0).toUpperCase() + chartType.slice(1)})
-              </Text>
-              <Text style={styles.statLabel1}>
-                Transactions made this{" "}
-                {chartType === "daily"
-                  ? "day"
-                  : chartType === "monthly"
-                    ? "month"
-                    : "year"}
-              </Text>
-              <Text style={styles.statLabel2}>
-                {getComparisonText(
-                  dashboardStats.totalTransactions,
-                  dashboardStats.previousPeriodTransactions,
-                )}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>
-                {formatCurrency(dashboardStats.averageTransactionValue)}
-              </Text>
-              <Text style={styles.statLabel}>
-                Avg. Transaction (
-                {chartType.charAt(0).toUpperCase() + chartType.slice(1)})
-              </Text>
-              <Text style={styles.statLabel1}>
-                Average amount spent per transaction.
-              </Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text
-                style={[
-                  styles.statValue,
-                  dashboardStats.salesGrowthRate >= 0
-                    ? styles.statValuePositive
-                    : styles.statValueNegative,
-                ]}
-              >
-                {formatPercentage(dashboardStats.salesGrowthRate)}
-              </Text>
-              <Text style={styles.statLabel}>Sales Growth Rate</Text>
-              <Text style={styles.statLabel1}>
-                Growth rate vs previous period
-              </Text>
-            </View>
-          </View>
-
-          {/* Sales Over Time Chart */}
-          <View style={[styles.chartContainer, { marginBottom: 24 }]}>
-            <View style={styles.chartHeader}>
-              <Text style={styles.chartTitle}>Sales Over Time</Text>
-              <View style={styles.buttonContainer}>
-                {["daily", "monthly", "yearly"].map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.chartButton,
-                      chartType === type && styles.activeButton,
-                    ]}
-                    onPress={() => setChartType(type)}
-                  >
-                    <Text
-                      style={[
-                        styles.buttonText,
-                        chartType === type && styles.activeButtonText,
-                      ]}
-                    >
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+          {statsLoading ? (
+            <View style={styles.statsLoadingContainer}>
+              <View style={styles.statsRow}>
+                <View style={[styles.statCard, styles.statCardSkeleton]}>
+                  <View style={styles.skeletonValue} />
+                  <View style={styles.skeletonLabel} />
+                  <View style={styles.skeletonDesc} />
+                </View>
+                <View style={[styles.statCard, styles.statCardSkeleton]}>
+                  <View style={styles.skeletonValue} />
+                  <View style={styles.skeletonLabel} />
+                  <View style={styles.skeletonDesc} />
+                </View>
+              </View>
+              <View style={styles.statsRow}>
+                <View style={[styles.statCard, styles.statCardSkeleton]}>
+                  <View style={styles.skeletonValue} />
+                  <View style={styles.skeletonLabel} />
+                  <View style={styles.skeletonDesc} />
+                </View>
+                <View style={[styles.statCard, styles.statCardSkeleton]}>
+                  <View style={styles.skeletonValue} />
+                  <View style={styles.skeletonLabel} />
+                  <View style={styles.skeletonDesc} />
+                </View>
               </View>
             </View>
-            <LineChart
-              data={{
-                labels:
-                  salesData.labels.length > 0 ? salesData.labels : ["No Data"],
-                datasets: [
-                  {
-                    data:
-                      salesData.datasets[0].data.length > 0
-                        ? salesData.datasets[0].data
-                        : [0],
-                  },
-                ],
-              }}
-              width={screenWidth}
-              height={220}
-              chartConfig={salesChartConfig}
-              bezier
-              style={[styles.chart, { marginLeft: -16 }]}
-              renderDotContent={({ x, y, index }) => (
-                <View
-                  style={{
-                    position: "absolute",
-                    top: y - 24,
-                    left: x - 10,
-                  }}
-                  key={index}
-                />
-              )}
-              formatXLabel={(label) => {
-                // Shorten labels for daily view to prevent overlap (e.g., "Feb 9" -> "9")
-                if (chartType === "daily") {
-                  const parts = label.split(" ");
-                  return parts.length > 1 ? parts[parts.length - 1] : label;
-                }
-                return label;
-              }}
-              withVerticalLines={false}
-              withInnerLines={false}
-              withShadow={false}
-              fromZero
-            />
-          </View>
+          ) : (
+            <Animated.View entering={FadeIn.duration(350)} layout={Layout}>
+              <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>
+                    {formatCurrencyShort(dashboardStats.totalSalesToday)}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: "#2563EB" }]}>Total Sales</Text>
+                  <Text style={styles.statLabel1}>
+                    Total revenue {getPeriodLabel()}
+                  </Text>
+                  <Text style={styles.statLabel2}>
+                    {getComparisonText(
+                      dashboardStats.totalSalesToday,
+                      dashboardStats.previousPeriodSales,
+                    )}
+                  </Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>
+                    {formatCurrencyShort(dashboardStats.profit)}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: "#16a34a" }]}>Total Profit</Text>
+                  <Text style={styles.statLabel1}>
+                    Total earnings {getPeriodLabel()}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>
+                    {formatCurrencyShort(dashboardStats.cogs)}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: "#D97706" }]}>Cost of Goods Sold</Text>
+                  <Text style={styles.statLabel1}>
+                    Cost of items sold {getPeriodLabel()}
+                  </Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text
+                    style={styles.statValue}
+                  >
+                    {formatCurrencyShort(inventoryStats.inventoryValue || 0)}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: "#DC2626" }]}>Inventory Value</Text>
+                  <Text style={styles.statLabel1}>
+                    Total value of products in inventory
+                  </Text>
+                </View>
+              </View>
+            </Animated.View>
+          )}
+
+
 
           <View style={[styles.chartContainer, { marginBottom: 24 }]}>
             <Text style={[styles.chartTitle, { marginBottom: 16 }]}>
@@ -962,30 +985,74 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 15,
     paddingTop: 2,
   },
-  searchContainer: {
+  filterRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 16,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
+    marginTop: 8,
   },
-  anafont: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#333",
+  tabRow: {
+    flexDirection: "row",
+    backgroundColor: "#f3f4f6",
+    borderRadius: 10,
+    padding: 3,
     flex: 1,
+    marginRight: 12,
   },
-  printButton: {
-    backgroundColor: "#f5f5f5",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  filterTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
     borderRadius: 8,
-    marginLeft: 8,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    marginTop: 10,
+  },
+  filterTabActive: {
+    backgroundColor: "#1f1f1f",
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6b7280",
+  },
+  filterTabTextActive: {
+    color: "#fff",
+  },
+  filterActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  filterIconBtn: {
+    backgroundColor: "#f3f4f6",
+    padding: 10,
+    borderRadius: 10,
+  },
+  statsLoadingContainer: {
+    marginBottom: 4,
+  },
+  statCardSkeleton: {
+    justifyContent: "center",
+    minHeight: 100,
+  },
+  skeletonValue: {
+    width: "60%",
+    height: 22,
+    borderRadius: 6,
+    backgroundColor: "#e5e7eb",
+    marginBottom: 8,
+  },
+  skeletonLabel: {
+    width: "50%",
+    height: 12,
+    borderRadius: 4,
+    backgroundColor: "#e5e7eb",
+    marginBottom: 6,
+  },
+  skeletonDesc: {
+    width: "80%",
+    height: 8,
+    borderRadius: 3,
+    backgroundColor: "#f3f4f6",
   },
   statsRow: {
     flexDirection: "row",
@@ -994,16 +1061,24 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: "#f7f2ef",
-    padding: 14,
-    borderRadius: 14,
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 12,
     marginHorizontal: 6,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#53321c",
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#1a1a1a",
+    letterSpacing: -0.5,
+    marginBottom: 4,
   },
   statValuePositive: {
     color: "#09A046",
@@ -1013,18 +1088,17 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 13,
-    marginTop: 4,
-    fontWeight: "600",
-    color: "#7c5a43",
+    fontWeight: "700",
+    fontStyle: "italic",
+    marginBottom: 6,
   },
   statLabel1: {
-    fontSize: 11,
-    color: "#999",
-    textAlign: "left",
-    lineHeight: 13,
+    fontSize: 9,
+    color: "#9ca3af",
+    lineHeight: 12,
   },
   statLabel2: {
-    fontSize: 11,
+    fontSize: 10,
     color: "#09A046",
     marginTop: 4,
     fontWeight: "500",
