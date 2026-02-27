@@ -34,6 +34,7 @@ export default function PinLogin() {
   // Check if biometric login is available and enabled on mount
   const checkBiometricOnMount = async () => {
     try {
+      if (!LocalAuthentication?.hasHardwareAsync) return;
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
       const hasBiometric = hasHardware && isEnrolled;
@@ -48,7 +49,8 @@ export default function PinLogin() {
         attemptBiometricLogin();
       }
     } catch (error) {
-      console.error('Biometric check error:', error);
+      // Silently disable biometrics if not available
+      setBiometricAvailable(false);
     }
   };
 
@@ -58,7 +60,7 @@ export default function PinLogin() {
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Verify to login',
         cancelLabel: 'Use PIN',
-        disableDeviceFallback: true,
+        disableDeviceFallback: false,
       });
 
       if (result.success) {

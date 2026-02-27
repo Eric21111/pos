@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View
@@ -84,35 +85,40 @@ const AccountSettings = () => {
 
   const loadBiometricState = async () => {
     try {
+      if (!LocalAuthentication?.hasHardwareAsync) return;
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
       setBiometricAvailable(hasHardware && isEnrolled);
       const enabled = await AsyncStorage.getItem('@biometric_enabled');
       setBiometricEnabled(enabled === 'true');
     } catch (e) {
-      console.error('Biometric check error:', e);
+      // Silently disable biometric features if not available
+      setBiometricAvailable(false);
     }
   };
 
   const toggleBiometric = async () => {
-    if (!biometricEnabled) {
-      // Turning ON — verify user first
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Verify your identity to enable biometric login',
-        cancelLabel: 'Cancel',
-        disableDeviceFallback: true,
-      });
-      if (result.success) {
-        await AsyncStorage.setItem('@biometric_enabled', 'true');
-        await AsyncStorage.setItem('@biometric_asked', 'true');
-        setBiometricEnabled(true);
+    try {
+      if (!biometricEnabled) {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Verify your identity to enable biometric login',
+          cancelLabel: 'Cancel',
+          disableDeviceFallback: false,
+        });
+        if (result.success) {
+          await AsyncStorage.setItem('@biometric_enabled', 'true');
+          await AsyncStorage.setItem('@biometric_asked', 'true');
+          setBiometricEnabled(true);
+        } else if (result.error !== 'user_cancel') {
+          Alert.alert('Verification Failed', 'Could not verify your identity. Please try again.');
+        }
       } else {
-        Alert.alert('Verification Failed', 'Could not verify your identity.');
+        await AsyncStorage.setItem('@biometric_enabled', 'false');
+        setBiometricEnabled(false);
       }
-    } else {
-      // Turning OFF
-      await AsyncStorage.setItem('@biometric_enabled', 'false');
-      setBiometricEnabled(false);
+    } catch (error) {
+      console.error('Biometric toggle error:', error);
+      Alert.alert('Error', 'Biometric authentication is not available on this device.');
     }
   };
 

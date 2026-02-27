@@ -5,6 +5,7 @@ import StockOutModal from "@/components/inventory/StockOutModal";
 import Header from "@/components/shared/header";
 import { useData } from "@/context/DataContext";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -247,9 +248,20 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
       const totalStock = Object.values(updatedSizes).reduce((sum, sizeData) => sum + getSizeQty(sizeData), 0);
       const stockBefore = fullProduct.currentStock || 0;
 
-      // Prepare user info - Mock for mobile if not available in global state
-      const handledBy = 'Mobile User';
-      const handledById = 'mobile_user_id';
+      // Prepare user info - Fetch actual logged-in user from AsyncStorage
+      const storedEmployeeStr = await AsyncStorage.getItem("currentEmployee");
+      let handledBy = 'Mobile User';
+      let handledById = 'mobile_user_id';
+
+      if (storedEmployeeStr) {
+        try {
+          const parsedUser = JSON.parse(storedEmployeeStr);
+          handledBy = parsedUser.name || `${parsedUser.firstName || ''} ${parsedUser.lastName || ''}`.trim() || 'Mobile User';
+          handledById = parsedUser._id || parsedUser.id || 'mobile_user_id';
+        } catch (e) {
+          console.error("Failed to parse current employee", e);
+        }
+      }
 
       // Calculate size quantities that were added
       const sizeQuantitiesAdded = {};
@@ -273,7 +285,7 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
       Alert.alert('Success', 'Stock added successfully');
       setShowStockIn(false);
       setStockItem(null);
-      onRefresh();
+      onRefresh(true);
 
     } catch (error) {
       console.error('Error adding stock:', error);
@@ -346,9 +358,20 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
           ? 'Pull-Out'
           : 'Stock-Out';
 
-      // Values for tracking
-      const handledBy = 'Mobile User';
-      const handledById = 'mobile_user_id';
+      // Values for tracking - Fetch actual logged-in user from AsyncStorage
+      const storedEmployeeStr = await AsyncStorage.getItem("currentEmployee");
+      let handledBy = 'Mobile User';
+      let handledById = 'mobile_user_id';
+
+      if (storedEmployeeStr) {
+        try {
+          const parsedUser = JSON.parse(storedEmployeeStr);
+          handledBy = parsedUser.name || `${parsedUser.firstName || ''} ${parsedUser.lastName || ''}`.trim() || 'Mobile User';
+          handledById = parsedUser._id || parsedUser.id || 'mobile_user_id';
+        } catch (e) {
+          console.error("Failed to parse current employee", e);
+        }
+      }
 
       const sizeQuantitiesRemoved = {};
       stockData.selectedSizes.forEach(size => {
@@ -402,7 +425,7 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
       Alert.alert('Success', 'Stock removed successfully');
       setShowStockOut(false);
       setStockItem(null);
-      onRefresh();
+      onRefresh(true);
 
     } catch (error) {
       console.error('Error removing stock:', error);
