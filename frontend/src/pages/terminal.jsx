@@ -122,9 +122,9 @@ const Terminal = () => {
 
         // Merge default and DB categories, avoiding duplicates
         const mergedCategories = [...defaultCategories];
-        const defaultNames = new Set(defaultCategories.map(c => c.name));
+        const defaultNames = new Set(defaultCategories.map((c) => c.name));
 
-        activeDbCategories.forEach(cat => {
+        activeDbCategories.forEach((cat) => {
           if (!defaultNames.has(cat.name)) {
             mergedCategories.push(cat);
           }
@@ -406,8 +406,8 @@ const Terminal = () => {
       // Handle both formats: number or object with quantity
       availableStock =
         typeof sizeData === "object" &&
-          sizeData !== null &&
-          sizeData.quantity !== undefined
+        sizeData !== null &&
+        sizeData.quantity !== undefined
           ? sizeData.quantity
           : typeof sizeData === "number"
             ? sizeData
@@ -439,8 +439,8 @@ const Terminal = () => {
       // Handle both formats: number or object with quantity
       availableStock =
         typeof sizeData === "object" &&
-          sizeData !== null &&
-          sizeData.quantity !== undefined
+        sizeData !== null &&
+        sizeData.quantity !== undefined
           ? sizeData.quantity
           : typeof sizeData === "number"
             ? sizeData
@@ -607,7 +607,7 @@ const Terminal = () => {
       setCart(
         cart.map((item) =>
           item._id === product._id &&
-            (item.selectedSize || "") === (defaultSize || "")
+          (item.selectedSize || "") === (defaultSize || "")
             ? { ...item, quantity: item.quantity + 1 }
             : item,
         ),
@@ -775,9 +775,9 @@ const Terminal = () => {
               .trim();
             const voidSize = String(
               itemToVoid.selectedSize ||
-              itemToVoid.size ||
-              resolveItemSize(itemToVoid) ||
-              "",
+                itemToVoid.size ||
+                resolveItemSize(itemToVoid) ||
+                "",
             )
               .toLowerCase()
               .trim();
@@ -832,9 +832,9 @@ const Terminal = () => {
               .trim();
             const voidSize = String(
               itemToVoid.selectedSize ||
-              itemToVoid.size ||
-              resolveItemSize(itemToVoid) ||
-              "",
+                itemToVoid.size ||
+                resolveItemSize(itemToVoid) ||
+                "",
             )
               .toLowerCase()
               .trim();
@@ -897,9 +897,9 @@ const Terminal = () => {
                 .trim();
               const voidSize = String(
                 itemToVoid.selectedSize ||
-                itemToVoid.size ||
-                resolveItemSize(itemToVoid) ||
-                "",
+                  itemToVoid.size ||
+                  resolveItemSize(itemToVoid) ||
+                  "",
               )
                 .toLowerCase()
                 .trim();
@@ -1306,8 +1306,8 @@ const Terminal = () => {
         const errorData = await transactionResponse.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-          errorData.error ||
-          `Transaction recording failed: ${transactionResponse.status} ${transactionResponse.statusText}`,
+            errorData.error ||
+            `Transaction recording failed: ${transactionResponse.status} ${transactionResponse.statusText}`,
         );
       }
 
@@ -1315,8 +1315,8 @@ const Terminal = () => {
       if (!transactionData.success) {
         throw new Error(
           transactionData.message ||
-          transactionData.error ||
-          "Failed to record transaction",
+            transactionData.error ||
+            "Failed to record transaction",
         );
       }
 
@@ -1396,21 +1396,30 @@ const Terminal = () => {
     setShowQRPaymentModal(true);
   };
 
-  const handleQRProceed = async (referenceNo, screenshot, receiptNo) => {
-    console.log("handleQRProceed received receiptNo:", receiptNo);
-    try {
-      const result = await finalizeTransaction({
-        paymentMethod: "gcash",
-        referenceNo,
-        screenshot,
-        receiptNo,
-      });
-      setShowQRPaymentModal(false);
-      return result;
-    } catch (error) {
-      // Don't close modal on error - let user retry
-      throw error;
-    }
+  /**
+   * Called by QRCodePaymentModal when GCash payment is confirmed via webhook.
+   * The transaction is already created in the backend by the payment controller,
+   * so we just need to clear cart, invalidate caches, and refresh products.
+   */
+  const handleGCashTransactionComplete = (paymentData) => {
+    console.log("[GCash] Transaction complete:", paymentData);
+
+    // Clear cart — transaction already saved in backend by gcashPaymentController
+    setCart([]);
+    setSelectedDiscounts([]);
+    setDiscountAmount("");
+
+    // Invalidate caches
+    invalidateCache("products");
+    invalidateCache("transactions");
+
+    // Refresh products (stock was updated by webhook handler)
+    fetchProducts().catch((err) =>
+      console.warn("Background product refresh failed:", err),
+    );
+
+    // Close QR modal
+    setShowQRPaymentModal(false);
   };
 
   const handleSelectDiscount = (discountItem) => {
@@ -1493,12 +1502,13 @@ const Terminal = () => {
               <button
                 key={cat.name}
                 onClick={() => setSelectedCategory(cat.name)}
-                className={`flex items-center justify-center px-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border truncate ${selectedCategory === cat.name
-                  ? "bg-[#AD7F65] text-white border-[#AD7F65] shadow-md"
-                  : theme === "dark"
-                    ? "bg-[#2A2724] text-gray-300 border-gray-600 hover:bg-[#352F2A]"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                  }`}
+                className={`flex items-center justify-center px-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border truncate ${
+                  selectedCategory === cat.name
+                    ? "bg-[#AD7F65] text-white border-[#AD7F65] shadow-md"
+                    : theme === "dark"
+                      ? "bg-[#2A2724] text-gray-300 border-gray-600 hover:bg-[#352F2A]"
+                      : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
                 title={cat.name}
               >
                 <span className="truncate w-full text-center">{cat.name}</span>
@@ -1510,7 +1520,9 @@ const Terminal = () => {
         <div className="flex flex-1 overflow-hidden">
           <div
             className="flex-1 overflow-auto p-6"
-            style={{ paddingTop: `${130 + Math.ceil(categories.length / 7) * 50}px` }}
+            style={{
+              paddingTop: `${130 + Math.ceil(categories.length / 7) * 50}px`,
+            }}
           >
             <div>
               <h2
@@ -1598,8 +1610,14 @@ const Terminal = () => {
         isOpen={showQRPaymentModal}
         onClose={() => setShowQRPaymentModal(false)}
         totalAmount={total}
-        onProceed={handleQRProceed}
+        subtotalAmount={subtotal}
+        discountAmount={discount}
+        selectedDiscounts={selectedDiscounts}
         cartItems={cart}
+        userId={userId}
+        performedById={currentUser?._id || currentUser?.id}
+        performedByName={currentUser?.name}
+        onTransactionComplete={handleGCashTransactionComplete}
       />
 
       <DiscountModal

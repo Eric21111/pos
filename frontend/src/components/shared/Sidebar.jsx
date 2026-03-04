@@ -1,19 +1,19 @@
-import { useState, useEffect, memo, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import terminalIcon from '../../assets/icons/terminal.svg';
-import inventoryIcon from '../../assets/icons/invenory.svg';
-import transactionIcon from '../../assets/icons/transaction.svg';
-import settingsIcon from '../../assets/icons/Settings.svg';
-import logoutIcon from '../../assets/icons/Logout.svg';
-import dashboardIcon from '../../assets/owner/dashboard.svg';
-import reportsIcon from '../../assets/owner/reports.svg';
-import manageIcon from '../../assets/owner/manage.svg';
-import LogoutConfirmationModal from './LogoutConfirmationModal';
+import { memo, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Link, useLocation } from "react-router-dom";
+import inventoryIcon from "../../assets/icons/invenory.svg";
+import logoutIcon from "../../assets/icons/Logout.svg";
+import settingsIcon from "../../assets/icons/Settings.svg";
+import terminalIcon from "../../assets/icons/terminal.svg";
+import transactionIcon from "../../assets/icons/transaction.svg";
+import dashboardIcon from "../../assets/owner/dashboard.svg";
+import manageIcon from "../../assets/owner/manage.svg";
+import reportsIcon from "../../assets/owner/reports.svg";
+import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
+import LogoutConfirmationModal from "./LogoutConfirmationModal";
 
-import logo from '../../assets/logo.png';
+import logo from "../../assets/logo.png";
 
 // Tooltip component that renders outside the sidebar using portal
 const SidebarTooltip = ({ label, targetRef, show, theme }) => {
@@ -24,7 +24,7 @@ const SidebarTooltip = ({ label, targetRef, show, theme }) => {
       const rect = targetRef.current.getBoundingClientRect();
       setPosition({
         top: rect.top + rect.height / 2,
-        left: rect.right + 12
+        left: rect.right + 12,
       });
     }
   }, [show, targetRef]);
@@ -34,17 +34,19 @@ const SidebarTooltip = ({ label, targetRef, show, theme }) => {
   return createPortal(
     <div
       className={`fixed px-3 py-2 rounded-lg text-sm font-medium shadow-lg whitespace-nowrap z-[9999] transform -translate-y-1/2 pointer-events-none ${
-        theme === 'dark' ? 'bg-[#2A2724] text-gray-200 border border-[#4A4037]' : 'bg-white text-gray-700'
+        theme === "dark"
+          ? "bg-[#2A2724] text-gray-200 border border-[#4A4037]"
+          : "bg-white text-gray-700"
       }`}
       style={{
         top: position.top,
         left: position.left,
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
       }}
     >
       {label}
     </div>,
-    document.body
+    document.body,
   );
 };
 
@@ -61,80 +63,87 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
   // Define all menu items in the correct order
   const allMenuItems = [
     {
-      name: 'Dashboard',
+      name: "Dashboard",
       icon: dashboardIcon,
-      path: '/dashboard',
-      gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
+      path: "/dashboard",
+      gradient:
+        "linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)",
       ownerOnly: true,
-      requiredPermission: null // Owner only, no permission check needed
+      requiredPermission: null, // Owner only, no permission check needed
     },
     {
-      name: 'POS',
+      name: "POS",
       icon: terminalIcon,
-      path: '/terminal',
-      gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
+      path: "/terminal",
+      gradient:
+        "linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)",
       ownerOnly: false,
-      requiredPermission: 'posTerminal'
+      requiredPermission: "posTerminal",
     },
     {
-      name: 'Inventory',
+      name: "Inventory",
       icon: inventoryIcon,
-      path: '/inventory',
-      gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
+      path: "/inventory",
+      gradient:
+        "linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)",
       ownerOnly: false,
-      requiredPermission: 'inventory'
+      requiredPermission: "inventory",
     },
     {
-      name: 'Transactions',
+      name: "Transactions",
       icon: transactionIcon,
-      path: '/transactions',
-      gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
+      path: "/transactions",
+      gradient:
+        "linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)",
       ownerOnly: false,
-      requiredPermission: 'viewTransactions'
+      requiredPermission: "viewTransactions",
     },
     {
-      name: 'Reports / Analytics',
+      name: "Reports / Analytics",
       icon: reportsIcon,
-      path: '/reports',
-      gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
+      path: "/reports",
+      gradient:
+        "linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)",
       ownerOnly: true,
-      requiredPermission: 'generateReports'
+      requiredPermission: "generateReports",
     },
     {
-      name: 'Manage Employees',
+      name: "Manage Employees",
       icon: manageIcon,
-      path: '/manage-employees',
-      gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
+      path: "/manage-employees",
+      gradient:
+        "linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)",
       ownerOnly: true,
-      requiredPermission: null // Owner only
+      requiredPermission: null, // Owner only
     },
     {
-      name: 'Settings',
+      name: "Settings",
       icon: settingsIcon,
-      path: '/settings',
-      gradient: 'linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)',
+      path: "/settings",
+      gradient:
+        "linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)",
       ownerOnly: false,
-      requiredPermission: null // Everyone can access settings
-    }
+      requiredPermission: null, // Everyone can access settings
+    },
   ];
 
   // Filter menu items based on user role and permissions
-  const menuItems = allMenuItems.filter(item => {
+  const menuItems = allMenuItems.filter((item) => {
     // Owner has access to everything
     if (isOwner()) {
       return true;
     }
-    
+
     // If item is owner-only and user is not owner, hide it
     if (item.ownerOnly) {
       return false;
     }
-    
+
     // If no permission required, show it
     if (!item.requiredPermission) {
       return true;
     }
-    
+
     // Check if user has the required permission
     return hasPermission(item.requiredPermission);
   });
@@ -144,7 +153,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
   };
 
   const confirmLogout = () => {
-    console.log('Logging out...');
+    console.log("Logging out...");
     setShowLogoutModal(false);
     logout();
     // Navigation will be handled by the logout redirect in AuthContext
@@ -156,67 +165,74 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
 
   // Check if any inventory sub-route is active
   const isInventoryActive = () => {
-    const inventoryPaths = ['/inventory', '/stock-movement', '/brand-partners', '/categories'];
-    return inventoryPaths.some(path => location.pathname === path);
+    const inventoryPaths = [
+      "/inventory",
+      "/stock-movement",
+      "/brand-partners",
+      "/categories",
+    ];
+    return inventoryPaths.some((path) => location.pathname === path);
   };
 
   // Check if any POS/Transaction sub-route is active
   const isPosActive = () => {
-    const posPaths = ['/terminal', '/discount-management'];
-    return posPaths.some(path => location.pathname === path);
+    const posPaths = ["/terminal", "/discount-management"];
+    return posPaths.some((path) => location.pathname === path);
   };
 
   // Inventory sub-menu items
   const inventorySubItems = [
-    { name: 'Products', path: '/inventory' },
-    { name: 'Logs', path: '/stock-movement' },
-    { name: 'Brand Partners', path: '/brand-partners' },
-    { name: 'Categories', path: '/categories' }
+    { name: "Products", path: "/inventory" },
+    { name: "Logs", path: "/stock-movement" },
+    { name: "Brand Partners", path: "/brand-partners" },
+    { name: "Categories", path: "/categories" },
   ];
 
-
   const posSubItems = [
-    { name: 'Terminal', path: '/terminal' },
-   
-    { name: 'Discount Management', path: '/discount-management' }
+    { name: "Terminal", path: "/terminal" },
+
+    { name: "Discount Management", path: "/discount-management" },
   ];
 
   // Auto-expand inventory if on any inventory sub-route
   useEffect(() => {
-    const inventoryPaths = ['/inventory', '/stock-movement', '/brand-partners', '/categories'];
-    if (inventoryPaths.some(path => location.pathname === path)) {
+    const inventoryPaths = [
+      "/inventory",
+      "/stock-movement",
+      "/brand-partners",
+      "/categories",
+    ];
+    if (inventoryPaths.some((path) => location.pathname === path)) {
       setInventoryExpanded(true);
     }
   }, [location.pathname]);
 
   // Auto-expand POS if on any POS sub-route
   useEffect(() => {
-    const posPaths = ['/terminal', '/discount-management'];
-    if (posPaths.some(path => location.pathname === path)) {
+    const posPaths = ["/terminal", "/discount-management"];
+    if (posPaths.some((path) => location.pathname === path)) {
       setPosExpanded(true);
     }
   }, [location.pathname]);
 
   return (
     <>
-      
       <div
         className={`fixed left-0 top-0 h-screen transition-all duration-300 ease-in-out z-50 flex flex-col cursor-pointer ${
-          isExpanded ? 'w-70' : 'w-20'
-        } ${theme === 'dark' ? 'bg-[#2A2724]' : 'bg-white'}`}
+          isExpanded ? "w-70" : "w-20"
+        } ${theme === "dark" ? "bg-[#2A2724]" : "bg-white"}`}
         style={{
-          borderRadius: '0 30px 30px 0',
-          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.2)'
+          borderRadius: "0 30px 30px 0",
+          boxShadow: "0 4px 24px rgba(0, 0, 0, 0.2)",
         }}
         onClick={() => {
           // Toggle sidebar - clicking anywhere expands/collapses it
           setIsExpanded(!isExpanded);
         }}
       >
-      
-        <div 
-          className={`relative flex items-center px-4 py-4 overflow-hidden ${isExpanded ? '' : 'justify-center'}`}
-          style={{ minHeight: '120px' }}
+        <div
+          className={`relative flex items-center px-4 py-4 overflow-hidden ${isExpanded ? "" : "justify-center"}`}
+          style={{ minHeight: "120px" }}
           onClick={(e) => {
             e.stopPropagation();
           }}
@@ -228,48 +244,58 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
               setIsExpanded(!isExpanded);
             }}
             className={`p-2 rounded-lg transition-all duration-300 shrink-0 z-10 ${
-              theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-100'
+              theme === "dark" ? "hover:bg-[#352F2A]" : "hover:bg-gray-100"
             }`}
           >
             <div className="flex flex-col justify-center items-center w-6 h-6 shrink-0">
-              <span className={`block h-0.5 w-5 rounded transition-all duration-300 ${
-                theme === 'dark' ? 'bg-gray-400' : 'bg-gray-600'
-              }`}></span>
-              <span className={`block h-0.5 w-5 rounded transition-all duration-300 my-1 ${
-                theme === 'dark' ? 'bg-gray-400' : 'bg-gray-600'
-              }`}></span>
-              <span className={`block h-0.5 w-5 rounded transition-all duration-300 ${
-                theme === 'dark' ? 'bg-gray-400' : 'bg-gray-600'
-              }`}></span>
+              <span
+                className={`block h-0.5 w-5 rounded transition-all duration-300 ${
+                  theme === "dark" ? "bg-gray-400" : "bg-gray-600"
+                }`}
+              ></span>
+              <span
+                className={`block h-0.5 w-5 rounded transition-all duration-300 my-1 ${
+                  theme === "dark" ? "bg-gray-400" : "bg-gray-600"
+                }`}
+              ></span>
+              <span
+                className={`block h-0.5 w-5 rounded transition-all duration-300 ${
+                  theme === "dark" ? "bg-gray-400" : "bg-gray-600"
+                }`}
+              ></span>
             </div>
           </button>
-          
+
           {/* Logo - only shown when expanded, positioned after hamburger */}
           {isExpanded && (
             <div className="flex-1 flex items-center justify-center pointer-events-none">
-              <img 
-                src={logo} 
-                alt="Create Your Style Logo" 
+              <img
+                src={logo}
+                alt="Create Your Style Logo"
                 className="h-20 w-auto object-contain transition-all duration-300"
-                style={{ 
-                  filter: 'invert(53%) sepia(23%) saturate(828%) hue-rotate(343deg) brightness(92%) contrast(91%)'
+                style={{
+                  filter:
+                    "invert(53%) sepia(23%) saturate(828%) hue-rotate(343deg) brightness(92%) contrast(91%)",
                 }}
               />
             </div>
           )}
         </div>
 
-        
-        <nav className={`flex-1 pb-8 px-2 ${
-          isExpanded ? 'pt-15 overflow-y-auto overflow-x-hidden' : 'pt-15 overflow-visible'
-        }`}>
+        <nav
+          className={`flex-1 pb-8 px-2 ${
+            isExpanded
+              ? "pt-15 overflow-y-auto overflow-x-hidden"
+              : "pt-15 overflow-visible"
+          }`}
+        >
           <div className="space-y-3">
             {menuItems.map((item) => {
-             
-              if (item.name === 'POS') {
+              if (item.name === "POS") {
                 const posActive = isPosActive();
-                const hasPosPermission = isOwner() || hasPermission('posTerminal');
-                
+                const hasPosPermission =
+                  isOwner() || hasPermission("posTerminal");
+
                 if (!hasPosPermission) return null;
 
                 return (
@@ -281,105 +307,140 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                           setPosExpanded(!posExpanded);
                         }}
                         className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
-                          posActive 
-                            ? 'shadow-lg' 
-                            : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
+                          posActive
+                            ? "shadow-lg"
+                            : theme === "dark"
+                              ? "hover:bg-[#352F2A]"
+                              : "hover:bg-gray-50"
                         }`}
-                        style={posActive ? {
-                          background: item.gradient,
-                          boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
-                        } : {}}
+                        style={
+                          posActive
+                            ? {
+                                background: item.gradient,
+                                boxShadow: "0 4px 12px rgba(118, 70, 43, 0.25)",
+                              }
+                            : {}
+                        }
                       >
-                      <div className="flex items-center flex-1">
-                        <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
-                          <img 
-                            src={item.icon} 
-                            alt={item.name}
-                            className={`w-6 h-6 transition-all duration-300 ${
-                              posActive ? 'brightness-0 invert' : theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
-                            }`}
-                          />
+                        <div className="flex items-center flex-1">
+                          <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
+                            <img
+                              src={item.icon}
+                              alt={item.name}
+                              className={`w-6 h-6 transition-all duration-300 ${
+                                posActive
+                                  ? "brightness-0 invert"
+                                  : theme === "dark"
+                                    ? "brightness-0 invert opacity-90 group-hover:opacity-100"
+                                    : "opacity-80 group-hover:opacity-100"
+                              }`}
+                            />
+                          </div>
+
+                          {isExpanded && (
+                            <span
+                              className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
+                                posActive
+                                  ? "text-white"
+                                  : theme === "dark"
+                                    ? "text-gray-200 group-hover:text-[#C2A68C]"
+                                    : "text-gray-800 group-hover:text-[#76462B]"
+                              }`}
+                              style={{
+                                fontSize: "16px",
+                              }}
+                            >
+                              {item.name}
+                            </span>
+                          )}
                         </div>
-                        
+
                         {isExpanded && (
-                          <span
-                            className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
-                              posActive ? 'text-white' : theme === 'dark' ? 'text-gray-200 group-hover:text-[#C2A68C]' : 'text-gray-800 group-hover:text-[#76462B]'
-                            }`}
-                            style={{
-                              fontSize: '16px'
-                            }}
+                          <svg
+                            className={`w-5 h-5 mr-4 transition-transform duration-300 ${
+                              posExpanded ? "rotate-180" : ""
+                            } ${posActive ? "text-white" : theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            {item.name}
-                          </span>
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
                         )}
-                      </div>
 
-                      {isExpanded && (
-                        <svg
-                          className={`w-5 h-5 mr-4 transition-transform duration-300 ${
-                            posExpanded ? 'rotate-180' : ''
-                          } ${posActive ? 'text-white' : theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      )}
-
-                      {posActive && (
-                        <div 
-                          className="absolute inset-0 rounded-2xl"
-                          style={{
-                            background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)',
-                            pointerEvents: 'none'
-                          }}
-                        />
-                      )}
-                    </button>
+                        {posActive && (
+                          <div
+                            className="absolute inset-0 rounded-2xl"
+                            style={{
+                              background:
+                                "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)",
+                              pointerEvents: "none",
+                            }}
+                          />
+                        )}
+                      </button>
                     ) : (
                       <Link
                         to="/terminal"
-                        ref={(el) => (itemRefs.current['pos-terminal'] = el)}
+                        ref={(el) => (itemRefs.current["pos-terminal"] = el)}
                         onClick={(e) => {
                           e.stopPropagation();
                         }}
-                        onMouseEnter={() => !isExpanded && setHoveredItem('pos-terminal')}
+                        onMouseEnter={() =>
+                          !isExpanded && setHoveredItem("pos-terminal")
+                        }
                         onMouseLeave={() => setHoveredItem(null)}
                         className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
-                          posActive 
-                            ? 'shadow-lg' 
-                            : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
+                          posActive
+                            ? "shadow-lg"
+                            : theme === "dark"
+                              ? "hover:bg-[#352F2A]"
+                              : "hover:bg-gray-50"
                         }`}
-                        style={posActive ? {
-                          background: item.gradient,
-                          boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
-                        } : {}}
+                        style={
+                          posActive
+                            ? {
+                                background: item.gradient,
+                                boxShadow: "0 4px 12px rgba(118, 70, 43, 0.25)",
+                              }
+                            : {}
+                        }
                       >
                         <div className="flex items-center flex-1">
                           <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4 relative">
-                            <img 
-                              src={item.icon} 
+                            <img
+                              src={item.icon}
                               alt={item.name}
                               className={`w-6 h-6 transition-all duration-300 ${
-                                posActive ? 'brightness-0 invert' : theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
+                                posActive
+                                  ? "brightness-0 invert"
+                                  : theme === "dark"
+                                    ? "brightness-0 invert opacity-90 group-hover:opacity-100"
+                                    : "opacity-80 group-hover:opacity-100"
                               }`}
                             />
                           </div>
                         </div>
-                        <SidebarTooltip 
-                          label={item.name} 
-                          targetRef={{ current: itemRefs.current['pos-terminal'] }} 
-                          show={hoveredItem === 'pos-terminal' && !isExpanded}
+                        <SidebarTooltip
+                          label={item.name}
+                          targetRef={{
+                            current: itemRefs.current["pos-terminal"],
+                          }}
+                          show={hoveredItem === "pos-terminal" && !isExpanded}
                           theme={theme}
                         />
                         {posActive && (
-                          <div 
+                          <div
                             className="absolute inset-0 rounded-2xl"
                             style={{
-                              background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)',
-                              pointerEvents: 'none'
+                              background:
+                                "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)",
+                              pointerEvents: "none",
                             }}
                           />
                         )}
@@ -400,8 +461,12 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               }}
                               className={`w-full flex items-center rounded-lg transition-all duration-300 group relative overflow-hidden py-2.5 ${
                                 subActive
-                                  ? theme === 'dark' ? 'bg-[#352F2A]' : 'bg-[#F5E6D3]'
-                                  : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
+                                  ? theme === "dark"
+                                    ? "bg-[#352F2A]"
+                                    : "bg-[#F5E6D3]"
+                                  : theme === "dark"
+                                    ? "hover:bg-[#352F2A]"
+                                    : "hover:bg-gray-50"
                               }`}
                             >
                               {subActive && (
@@ -409,12 +474,16 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               )}
                               <span
                                 className={`font-medium transition-all duration-300 whitespace-nowrap ml-6 ${
-                                  subActive 
-                                    ? theme === 'dark' ? 'text-[#C2A68C] font-semibold' : 'text-[#76462B] font-semibold' 
-                                    : theme === 'dark' ? 'text-gray-300 group-hover:text-[#C2A68C]' : 'text-gray-700 group-hover:text-[#76462B]'
+                                  subActive
+                                    ? theme === "dark"
+                                      ? "text-[#C2A68C] font-semibold"
+                                      : "text-[#76462B] font-semibold"
+                                    : theme === "dark"
+                                      ? "text-gray-300 group-hover:text-[#C2A68C]"
+                                      : "text-gray-700 group-hover:text-[#76462B]"
                                 }`}
                                 style={{
-                                  fontSize: '15px'
+                                  fontSize: "15px",
                                 }}
                               >
                                 {subItem.name}
@@ -429,10 +498,11 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
               }
 
               // Special handling for Inventory dropdown
-              if (item.name === 'Inventory') {
+              if (item.name === "Inventory") {
                 const inventoryActive = isInventoryActive();
-                const hasInventoryPermission = isOwner() || hasPermission('inventory');
-                
+                const hasInventoryPermission =
+                  isOwner() || hasPermission("inventory");
+
                 if (!hasInventoryPermission) return null;
 
                 return (
@@ -444,105 +514,138 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                           setInventoryExpanded(!inventoryExpanded);
                         }}
                         className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
-                          inventoryActive 
-                            ? 'shadow-lg' 
-                            : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
+                          inventoryActive
+                            ? "shadow-lg"
+                            : theme === "dark"
+                              ? "hover:bg-[#352F2A]"
+                              : "hover:bg-gray-50"
                         }`}
-                        style={inventoryActive ? {
-                          background: item.gradient,
-                          boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
-                        } : {}}
+                        style={
+                          inventoryActive
+                            ? {
+                                background: item.gradient,
+                                boxShadow: "0 4px 12px rgba(118, 70, 43, 0.25)",
+                              }
+                            : {}
+                        }
                       >
-                      <div className="flex items-center flex-1">
-                        <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
-                          <img 
-                            src={item.icon} 
-                            alt={item.name}
-                            className={`w-6 h-6 transition-all duration-300 ${
-                              inventoryActive ? 'brightness-0 invert' : theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
-                            }`}
-                          />
+                        <div className="flex items-center flex-1">
+                          <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4">
+                            <img
+                              src={item.icon}
+                              alt={item.name}
+                              className={`w-6 h-6 transition-all duration-300 ${
+                                inventoryActive
+                                  ? "brightness-0 invert"
+                                  : theme === "dark"
+                                    ? "brightness-0 invert opacity-90 group-hover:opacity-100"
+                                    : "opacity-80 group-hover:opacity-100"
+                              }`}
+                            />
+                          </div>
+
+                          {isExpanded && (
+                            <span
+                              className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
+                                inventoryActive
+                                  ? "text-white"
+                                  : theme === "dark"
+                                    ? "text-gray-200 group-hover:text-[#C2A68C]"
+                                    : "text-gray-800 group-hover:text-[#76462B]"
+                              }`}
+                              style={{
+                                fontSize: "16px",
+                              }}
+                            >
+                              {item.name}
+                            </span>
+                          )}
                         </div>
-                        
+
                         {isExpanded && (
-                          <span
-                            className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
-                              inventoryActive ? 'text-white' : theme === 'dark' ? 'text-gray-200 group-hover:text-[#C2A68C]' : 'text-gray-800 group-hover:text-[#76462B]'
-                            }`}
-                            style={{
-                              fontSize: '16px'
-                            }}
+                          <svg
+                            className={`w-5 h-5 mr-4 transition-transform duration-300 ${
+                              inventoryExpanded ? "rotate-180" : ""
+                            } ${inventoryActive ? "text-white" : theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            {item.name}
-                          </span>
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
                         )}
-                      </div>
 
-                      {isExpanded && (
-                        <svg
-                          className={`w-5 h-5 mr-4 transition-transform duration-300 ${
-                            inventoryExpanded ? 'rotate-180' : ''
-                          } ${inventoryActive ? 'text-white' : theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      )}
-
-                      {inventoryActive && (
-                        <div 
-                          className="absolute inset-0 rounded-2xl"
-                          style={{
-                            background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)',
-                            pointerEvents: 'none'
-                          }}
-                        />
-                      )}
-                    </button>
+                        {inventoryActive && (
+                          <div
+                            className="absolute inset-0 rounded-2xl"
+                            style={{
+                              background:
+                                "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)",
+                              pointerEvents: "none",
+                            }}
+                          />
+                        )}
+                      </button>
                     ) : (
                       <Link
                         to="/inventory"
-                        ref={(el) => (itemRefs.current['inventory'] = el)}
+                        ref={(el) => (itemRefs.current["inventory"] = el)}
                         onClick={(e) => {
                           e.stopPropagation();
                         }}
-                        onMouseEnter={() => !isExpanded && setHoveredItem('inventory')}
+                        onMouseEnter={() =>
+                          !isExpanded && setHoveredItem("inventory")
+                        }
                         onMouseLeave={() => setHoveredItem(null)}
                         className={`w-full flex items-center justify-between rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
-                          inventoryActive 
-                            ? 'shadow-lg' 
-                            : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
+                          inventoryActive
+                            ? "shadow-lg"
+                            : theme === "dark"
+                              ? "hover:bg-[#352F2A]"
+                              : "hover:bg-gray-50"
                         }`}
-                        style={inventoryActive ? {
-                          background: item.gradient,
-                          boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
-                        } : {}}
+                        style={
+                          inventoryActive
+                            ? {
+                                background: item.gradient,
+                                boxShadow: "0 4px 12px rgba(118, 70, 43, 0.25)",
+                              }
+                            : {}
+                        }
                       >
                         <div className="flex items-center flex-1">
                           <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4 relative">
-                            <img 
-                              src={item.icon} 
+                            <img
+                              src={item.icon}
                               alt={item.name}
                               className={`w-6 h-6 transition-all duration-300 ${
-                                inventoryActive ? 'brightness-0 invert' : theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
+                                inventoryActive
+                                  ? "brightness-0 invert"
+                                  : theme === "dark"
+                                    ? "brightness-0 invert opacity-90 group-hover:opacity-100"
+                                    : "opacity-80 group-hover:opacity-100"
                               }`}
                             />
                           </div>
                         </div>
-                        <SidebarTooltip 
-                          label={item.name} 
-                          targetRef={{ current: itemRefs.current['inventory'] }} 
-                          show={hoveredItem === 'inventory' && !isExpanded}
+                        <SidebarTooltip
+                          label={item.name}
+                          targetRef={{ current: itemRefs.current["inventory"] }}
+                          show={hoveredItem === "inventory" && !isExpanded}
                           theme={theme}
                         />
                         {inventoryActive && (
-                          <div 
+                          <div
                             className="absolute inset-0 rounded-2xl"
                             style={{
-                              background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)',
-                              pointerEvents: 'none'
+                              background:
+                                "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)",
+                              pointerEvents: "none",
                             }}
                           />
                         )}
@@ -563,8 +666,12 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               }}
                               className={`w-full flex items-center rounded-lg transition-all duration-300 group relative overflow-hidden py-2.5 ${
                                 subActive
-                                  ? theme === 'dark' ? 'bg-[#352F2A]' : 'bg-[#F5E6D3]'
-                                  : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
+                                  ? theme === "dark"
+                                    ? "bg-[#352F2A]"
+                                    : "bg-[#F5E6D3]"
+                                  : theme === "dark"
+                                    ? "hover:bg-[#352F2A]"
+                                    : "hover:bg-gray-50"
                               }`}
                             >
                               {subActive && (
@@ -572,12 +679,16 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                               )}
                               <span
                                 className={`font-medium transition-all duration-300 whitespace-nowrap ml-6 ${
-                                  subActive 
-                                    ? theme === 'dark' ? 'text-[#C2A68C] font-semibold' : 'text-[#76462B] font-semibold' 
-                                    : theme === 'dark' ? 'text-gray-300 group-hover:text-[#C2A68C]' : 'text-gray-700 group-hover:text-[#76462B]'
+                                  subActive
+                                    ? theme === "dark"
+                                      ? "text-[#C2A68C] font-semibold"
+                                      : "text-[#76462B] font-semibold"
+                                    : theme === "dark"
+                                      ? "text-gray-300 group-hover:text-[#C2A68C]"
+                                      : "text-gray-700 group-hover:text-[#76462B]"
                                 }`}
                                 style={{
-                                  fontSize: '15px'
+                                  fontSize: "15px",
                                 }}
                               >
                                 {subItem.name}
@@ -593,7 +704,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
 
               // Regular menu items (non-Inventory)
               const active = isActive(item.path);
-              
+
               return (
                 <Link
                   key={item.path}
@@ -605,53 +716,66 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
                   onMouseEnter={() => !isExpanded && setHoveredItem(item.path)}
                   onMouseLeave={() => setHoveredItem(null)}
                   className={`w-full flex items-center rounded-2xl transition-all duration-300 group relative overflow-hidden py-3.5 ${
-                    active 
-                      ? 'shadow-lg' 
-                      : theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
+                    active
+                      ? "shadow-lg"
+                      : theme === "dark"
+                        ? "hover:bg-[#352F2A]"
+                        : "hover:bg-gray-50"
                   }`}
-                  style={active ? {
-                    background: item.gradient,
-                    boxShadow: '0 4px 12px rgba(118, 70, 43, 0.25)'
-                  } : {}}
+                  style={
+                    active
+                      ? {
+                          background: item.gradient,
+                          boxShadow: "0 4px 12px rgba(118, 70, 43, 0.25)",
+                        }
+                      : {}
+                  }
                 >
-              
                   <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4 relative">
-                    <img 
-                      src={item.icon} 
+                    <img
+                      src={item.icon}
                       alt={item.name}
                       className={`w-6 h-6 transition-all duration-300 ${
-                        active ? 'brightness-0 invert' : theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
+                        active
+                          ? "brightness-0 invert"
+                          : theme === "dark"
+                            ? "brightness-0 invert opacity-90 group-hover:opacity-100"
+                            : "opacity-80 group-hover:opacity-100"
                       }`}
                     />
                   </div>
-                  
-                  <SidebarTooltip 
-                    label={item.name} 
-                    targetRef={{ current: itemRefs.current[item.path] }} 
+
+                  <SidebarTooltip
+                    label={item.name}
+                    targetRef={{ current: itemRefs.current[item.path] }}
                     show={hoveredItem === item.path && !isExpanded}
                     theme={theme}
                   />
-                
+
                   {isExpanded && (
                     <span
                       className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
-                        active ? 'text-white' : theme === 'dark' ? 'text-gray-200 group-hover:text-[#C2A68C]' : 'text-gray-800 group-hover:text-[#76462B]'
+                        active
+                          ? "text-white"
+                          : theme === "dark"
+                            ? "text-gray-200 group-hover:text-[#C2A68C]"
+                            : "text-gray-800 group-hover:text-[#76462B]"
                       }`}
                       style={{
-                        fontSize: '16px'
+                        fontSize: "16px",
                       }}
                     >
                       {item.name}
                     </span>
                   )}
 
-                 
                   {active && (
-                    <div 
+                    <div
                       className="absolute inset-0 rounded-2xl"
                       style={{
-                        background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)',
-                        pointerEvents: 'none'
+                        background:
+                          "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.08) 100%)",
+                        pointerEvents: "none",
                       }}
                     />
                   )}
@@ -661,42 +785,45 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
           </div>
         </nav>
 
-       
         <div className="py-6 px-2">
           <button
-            ref={(el) => (itemRefs.current['logout'] = el)}
+            ref={(el) => (itemRefs.current["logout"] = el)}
             onClick={(e) => {
               e.stopPropagation();
               handleLogout();
             }}
-            onMouseEnter={() => !isExpanded && setHoveredItem('logout')}
+            onMouseEnter={() => !isExpanded && setHoveredItem("logout")}
             onMouseLeave={() => setHoveredItem(null)}
             className={`w-full flex items-center rounded-2xl transition-all duration-300 group py-3.5 ${
-              theme === 'dark' ? 'hover:bg-[#352F2A]' : 'hover:bg-gray-50'
+              theme === "dark" ? "hover:bg-[#352F2A]" : "hover:bg-gray-50"
             }`}
           >
             <div className="shrink-0 w-7 h-7 flex items-center justify-center ml-4 relative">
-              <img 
-                src={logoutIcon} 
+              <img
+                src={logoutIcon}
                 alt="Log Out"
                 className={`w-6 h-6 transition-all duration-300 ${
-                  theme === 'dark' ? 'brightness-0 invert opacity-90 group-hover:opacity-100' : 'opacity-80 group-hover:opacity-100'
+                  theme === "dark"
+                    ? "brightness-0 invert opacity-90 group-hover:opacity-100"
+                    : "opacity-80 group-hover:opacity-100"
                 }`}
               />
             </div>
-            <SidebarTooltip 
-              label="Log Out" 
-              targetRef={{ current: itemRefs.current['logout'] }} 
-              show={hoveredItem === 'logout' && !isExpanded}
+            <SidebarTooltip
+              label="Log Out"
+              targetRef={{ current: itemRefs.current["logout"] }}
+              show={hoveredItem === "logout" && !isExpanded}
               theme={theme}
             />
             {isExpanded && (
               <span
                 className={`font-medium transition-all duration-300 whitespace-nowrap ml-4 ${
-                  theme === 'dark' ? 'text-gray-200 group-hover:text-[#C2A68C]' : 'text-gray-800 group-hover:text-[#76462B]'
+                  theme === "dark"
+                    ? "text-gray-200 group-hover:text-[#C2A68C]"
+                    : "text-gray-800 group-hover:text-[#76462B]"
                 }`}
                 style={{
-                  fontSize: '16px'
+                  fontSize: "16px",
                 }}
               >
                 Log Out
@@ -716,4 +843,3 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
 };
 
 export default memo(Sidebar);
-
