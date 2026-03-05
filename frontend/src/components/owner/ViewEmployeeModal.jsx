@@ -68,12 +68,29 @@ const ViewEmployeeModal = ({
                     Permissions:
                   </label>
                   <div className="flex gap-2 flex-wrap">
-                    <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
-                      POS Terminal
-                    </span>
-                    <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
-                      View Transaction
-                    </span>
+                    {employee.permissions?.posTerminal && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
+                        POS Terminal
+                      </span>
+                    )}
+                    {employee.permissions?.inventory && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
+                        Inventory
+                      </span>
+                    )}
+                    {employee.permissions?.viewTransactions && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
+                        View Transactions
+                      </span>
+                    )}
+                    {employee.permissions?.generateReports && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
+                        Generate Reports
+                      </span>
+                    )}
+                    {!employee.permissions?.posTerminal && !employee.permissions?.inventory && !employee.permissions?.viewTransactions && !employee.permissions?.generateReports && (
+                      <span className="text-xs text-gray-400 italic">No active permissions</span>
+                    )}
                   </div>
                 </div>
 

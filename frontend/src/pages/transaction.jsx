@@ -1,22 +1,22 @@
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    memo,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  FaCheckCircle,
-  FaChevronDown,
-  FaChevronLeft,
-  FaChevronRight,
-  FaExclamationTriangle,
-  FaEye,
-  FaPrint,
-  FaSearch,
-  FaUndoAlt
+    FaCheckCircle,
+    FaChevronDown,
+    FaChevronLeft,
+    FaChevronRight,
+    FaExclamationTriangle,
+    FaEye,
+    FaPrint,
+    FaSearch,
+    FaUndoAlt
 } from "react-icons/fa";
 import CompletedIcon from "../assets/completed.svg";
 import TotalTransactionIcon from "../assets/total-transaction.svg";
@@ -1140,42 +1140,7 @@ const Transaction = () => {
               </button>
             )}
 
-            <button
-              onClick={() =>
-                document.getElementById("transaction-csv-file-input").click()
-              }
-              className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${theme === "dark"
-                  ? "bg-[#2A2724] hover:bg-[#352F2A]"
-                  : "bg-white hover:bg-gray-50"
-                }`}
-              style={{ minWidth: "100px" }}
-            >
-              <svg
-                className={`w-8 h-8 mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-700"}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-              <div
-                className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-700"}`}
-              >
-                Import
-              </div>
-            </button>
-            <input
-              id="transaction-csv-file-input"
-              type="file"
-              accept=".csv"
-              onChange={handleImportFromCSV}
-              style={{ display: "none" }}
-            />
+
           </div>
         </div>
 

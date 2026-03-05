@@ -163,12 +163,22 @@ const EditEmployeeProfile = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
                         POS Terminal
                       </span>
                     )}
-                    {permissions.viewTransactions && (
+                    {permissions.inventory && (
                       <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
-                        View Transaction
+                        Inventory
                       </span>
                     )}
-                    {!permissions.posTerminal && !permissions.viewTransactions && (
+                    {permissions.viewTransactions && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
+                        View Transactions
+                      </span>
+                    )}
+                    {permissions.generateReports && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium border border-[#E5E7EB] text-gray-600 bg-gray-50">
+                        Generate Reports
+                      </span>
+                    )}
+                    {!permissions.posTerminal && !permissions.inventory && !permissions.viewTransactions && !permissions.generateReports && (
                       <span className="text-xs text-gray-400 italic">No active permissions</span>
                     )}
                   </div>

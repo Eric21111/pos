@@ -1,30 +1,29 @@
 import {
-    memo,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    FaBell,
-    FaBox,
-    FaCamera,
-    FaCheckCircle,
-    FaCog,
-    FaDownload,
-    FaEye,
-    FaEyeSlash,
-    FaKey,
-    FaLink,
-    FaPalette,
-    FaShieldAlt,
-    FaSpinner,
-    FaSync,
-    FaTimesCircle,
-    FaTrash,
-    FaUser,
+  FaBox,
+  FaCamera,
+  FaCheckCircle,
+  FaCog,
+  FaDownload,
+  FaEye,
+  FaEyeSlash,
+  FaKey,
+  FaLink,
+  FaPalette,
+  FaShieldAlt,
+  FaSpinner,
+  FaSync,
+  FaTimesCircle,
+  FaTrash,
+  FaUser
 } from "react-icons/fa";
 import defaultAvatar from "../assets/default.jpeg";
 import SuccessModal from "../components/inventory/SuccessModal";
@@ -677,7 +676,7 @@ const Settings = () => {
     <div
       className={`p-8 min-h-screen ${theme === "dark" ? "bg-[#1E1B18]" : "bg-gray-50"}`}
     >
-      <Header pageName="Account Settings" showBorder={false} />
+      <Header pageName="Settings" showBorder={false} />
 
       {isOwner() && (
         <div className="flex gap-3 mb-6">
@@ -689,7 +688,7 @@ const Settings = () => {
                 : `${theme === "dark" ? "bg-[#2A2724] text-gray-300 border border-gray-700" : "bg-white text-gray-800 border border-gray-200"}`
             }`}
           >
-            Personal Information
+            Account
           </button>
           <button
             onClick={() => setActiveTab("archives")}
@@ -1449,6 +1448,31 @@ const Settings = () => {
                 </p>
               </div>
             </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mt-4 rounded-xl p-3.5 flex items-center gap-2.5 bg-red-50 text-red-700 border border-red-200">
+                <FaTimesCircle className="w-4 h-4 flex-shrink-0" />
+                <span className="text-sm font-medium">{error}</span>
+              </div>
+            )}
+
+            {/* Save Changes Button */}
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => saveProfile()}
+                disabled={profileLoading}
+                className="px-8 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-green-200/30 hover:shadow-green-300/40"
+              >
+                {profileLoading ? (
+                  <>
+                    <FaSpinner className="w-4 h-4 animate-spin" /> Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Appearance Card */}
@@ -1501,36 +1525,6 @@ const Settings = () => {
             </div>
           </div>
 
-          {/* Notification Card */}
-          <div
-            className={`rounded-3xl shadow-lg p-8 ${theme === "dark" ? "bg-[#2A2724]" : "bg-white"}`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#AD7F65] flex items-center justify-center text-white">
-                  <FaBell className="w-5 h-5" />
-                </div>
-                <h3
-                  className={`text-lg font-bold ${theme === "dark" ? "text-white" : "text-gray-800"}`}
-                >
-                  Notification
-                </h3>
-              </div>
-
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={notificationsEnabled}
-                  onChange={() =>
-                    setNotificationsEnabled(!notificationsEnabled)
-                  }
-                />
-                <div className="w-14 h-7 bg-gray-200 rounded-full peer peer-checked:bg-[#AD7F65] peer-focus:ring-2 peer-focus:ring-[#AD7F65]/20 transition-all"></div>
-                <div className="absolute left-[3px] top-[3px] w-6 h-6 bg-white rounded-full transition-transform peer-checked:translate-x-7 shadow-sm"></div>
-              </label>
-            </div>
-          </div>
 
           {/* Data Synchronization Card */}
           <div
