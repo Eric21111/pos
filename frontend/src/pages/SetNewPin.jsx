@@ -1,13 +1,13 @@
-import { memo, useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import bgImage from '../assets/bg.png';
-import defaultAvatar from '../assets/default.jpeg';
-import logo from '../assets/logo.png';
-import { useAuth } from '../context/AuthContext';
-import { validatePinSecurity } from '../utils/pinValidation';
+import { memo, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import bgImage from "../assets/bg.png";
+import defaultAvatar from "../assets/default.jpeg";
+import logo from "../assets/logo.png";
+import { useAuth } from "../context/AuthContext";
+import { validatePinSecurity } from "../utils/pinValidation";
 
 const PIN_LENGTH = 6;
-const EMPTY_PIN = Array(PIN_LENGTH).fill('');
+const EMPTY_PIN = Array(PIN_LENGTH).fill("");
 
 const SetNewPin = () => {
   const location = useLocation();
@@ -16,35 +16,38 @@ const SetNewPin = () => {
   const employee = location.state?.employee || currentUser;
   const [pendingTempData, setPendingTempData] = useState(() => {
     if (location.state?.tempPin && location.state?.employee?._id) {
-      const payload = { pin: location.state.tempPin, employeeId: location.state.employee._id };
-      if (typeof window !== 'undefined') {
+      const payload = {
+        pin: location.state.tempPin,
+        employeeId: location.state.employee._id,
+      };
+      if (typeof window !== "undefined") {
         try {
-          sessionStorage.setItem('pendingTempPin', JSON.stringify(payload));
+          sessionStorage.setItem("pendingTempPin", JSON.stringify(payload));
         } catch (storageError) {
-          console.warn('Unable to persist temporary PIN', storageError);
+          console.warn("Unable to persist temporary PIN", storageError);
         }
       }
       return payload;
     }
-    if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('pendingTempPin');
+    if (typeof window !== "undefined") {
+      const cached = sessionStorage.getItem("pendingTempPin");
       if (cached) {
         try {
           return JSON.parse(cached);
         } catch {
-          sessionStorage.removeItem('pendingTempPin');
+          sessionStorage.removeItem("pendingTempPin");
         }
       }
     }
     return null;
   });
-  const pendingTempPin = pendingTempData?.pin || '';
+  const pendingTempPin = pendingTempData?.pin || "";
   const pendingEmployeeId = pendingTempData?.employeeId || null;
 
   const [newPinDigits, setNewPinDigits] = useState(EMPTY_PIN);
   const [confirmPinDigits, setConfirmPinDigits] = useState(EMPTY_PIN);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [pinUpdated, setPinUpdated] = useState(false);
 
   const newPinRefs = useRef([]);
@@ -52,21 +55,24 @@ const SetNewPin = () => {
 
   useEffect(() => {
     if (!employee) {
-      navigate('/');
+      navigate("/");
     } else if (!employee.requiresPinReset) {
-      navigate('/dashboard');
+      navigate("/dashboard");
     }
   }, [employee, navigate]);
 
   useEffect(() => {
     if (location.state?.tempPin && location.state?.employee?._id) {
-      const payload = { pin: location.state.tempPin, employeeId: location.state.employee._id };
+      const payload = {
+        pin: location.state.tempPin,
+        employeeId: location.state.employee._id,
+      };
       setPendingTempData(payload);
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         try {
-          sessionStorage.setItem('pendingTempPin', JSON.stringify(payload));
+          sessionStorage.setItem("pendingTempPin", JSON.stringify(payload));
         } catch (storageError) {
-          console.warn('Unable to persist temporary PIN', storageError);
+          console.warn("Unable to persist temporary PIN", storageError);
         }
       }
     }
@@ -77,16 +83,18 @@ const SetNewPin = () => {
   }
 
   const redirectAfterLogin = (updatedEmployee) => {
-    if (updatedEmployee.role === 'Owner') {
-      navigate('/dashboard');
+    if (updatedEmployee.role === "Owner") {
+      navigate("/dashboard");
     } else if (updatedEmployee.permissions?.posTerminal) {
-      navigate('/terminal');
+      navigate("/terminal");
     } else if (updatedEmployee.permissions?.inventory) {
-      navigate('/inventory');
+      navigate("/inventory");
     } else if (updatedEmployee.permissions?.viewTransactions) {
-      navigate('/transactions');
+      navigate("/transactions");
+    } else if (updatedEmployee.permissions?.generateReports) {
+      navigate("/reports");
     } else {
-      navigate('/settings');
+      navigate("/settings");
     }
   };
 
@@ -99,26 +107,26 @@ const SetNewPin = () => {
       return;
     }
 
-    const setter = type === 'new' ? setNewPinDigits : setConfirmPinDigits;
-    const refs = type === 'new' ? newPinRefs : confirmPinRefs;
+    const setter = type === "new" ? setNewPinDigits : setConfirmPinDigits;
+    const refs = type === "new" ? newPinRefs : confirmPinRefs;
 
     setter((prev) => {
       const updated = [...prev];
       updated[index] = value;
 
       // Real-time validation for new PIN when complete
-      if (type === 'new') {
-        const pinString = updated.join('');
+      if (type === "new") {
+        const pinString = updated.join("");
         if (pinString.length === PIN_LENGTH) {
           const pinValidation = validatePinSecurity(pinString);
           if (!pinValidation.isValid) {
             setError(pinValidation.error);
           } else {
-            setError('');
+            setError("");
           }
-        } else if (updated.join('').length < PIN_LENGTH) {
+        } else if (updated.join("").length < PIN_LENGTH) {
           // Clear error if PIN is incomplete
-          setError('');
+          setError("");
         }
       }
 
@@ -131,12 +139,12 @@ const SetNewPin = () => {
   };
 
   const handleKeyDown = (type, index, event) => {
-    if (event.key !== 'Backspace') {
+    if (event.key !== "Backspace") {
       return;
     }
 
-    const values = type === 'new' ? newPinDigits : confirmPinDigits;
-    const refs = type === 'new' ? newPinRefs : confirmPinRefs;
+    const values = type === "new" ? newPinDigits : confirmPinDigits;
+    const refs = type === "new" ? newPinRefs : confirmPinRefs;
 
     if (!values[index] && index > 0) {
       refs.current[index - 1]?.focus();
@@ -145,16 +153,19 @@ const SetNewPin = () => {
 
   const handlePaste = (type, event) => {
     event.preventDefault();
-    const pasted = event.clipboardData.getData('Text').replace(/\D/g, '').slice(0, PIN_LENGTH);
+    const pasted = event.clipboardData
+      .getData("Text")
+      .replace(/\D/g, "")
+      .slice(0, PIN_LENGTH);
     if (!pasted) {
       return;
     }
 
-    const setter = type === 'new' ? setNewPinDigits : setConfirmPinDigits;
-    const refs = type === 'new' ? newPinRefs : confirmPinRefs;
-    const digits = pasted.split('');
+    const setter = type === "new" ? setNewPinDigits : setConfirmPinDigits;
+    const refs = type === "new" ? newPinRefs : confirmPinRefs;
+    const digits = pasted.split("");
     while (digits.length < PIN_LENGTH) {
-      digits.push('');
+      digits.push("");
     }
     setter(digits);
     const lastFilledIndex = Math.min(PIN_LENGTH - 1, pasted.length - 1);
@@ -164,13 +175,13 @@ const SetNewPin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const newPin = newPinDigits.join('');
-    const confirmPin = confirmPinDigits.join('');
+    const newPin = newPinDigits.join("");
+    const confirmPin = confirmPinDigits.join("");
 
     // Get employee ID from employee object or pending data
     // Use explicit null checks to avoid accessing properties on undefined
     let employeeId = null;
-    if (employee && typeof employee === 'object') {
+    if (employee && typeof employee === "object") {
       employeeId = employee._id || employee.id;
     }
     if (!employeeId && pendingEmployeeId) {
@@ -178,33 +189,33 @@ const SetNewPin = () => {
     }
 
     if (!employeeId) {
-      setError('Session expired. Please log in again.');
-      navigate('/');
+      setError("Session expired. Please log in again.");
+      navigate("/");
       return;
     }
 
     if (!pendingTempPin || pendingTempPin.length !== PIN_LENGTH) {
-      setError('Session expired. Please log in with your temporary PIN again.');
+      setError("Session expired. Please log in with your temporary PIN again.");
       return;
     }
 
     if (pendingEmployeeId && employeeId && pendingEmployeeId !== employeeId) {
-      setError('Selected account mismatch. Please log in again.');
+      setError("Selected account mismatch. Please log in again.");
       return;
     }
 
     if (newPin.length !== PIN_LENGTH || confirmPin.length !== PIN_LENGTH) {
-      setError('New PIN must have exactly 6 digits.');
+      setError("New PIN must have exactly 6 digits.");
       return;
     }
 
     if (newPin !== confirmPin) {
-      setError('New PIN and confirmation do not match.');
+      setError("New PIN and confirmation do not match.");
       return;
     }
 
     if (!/^\d{6}$/.test(newPin)) {
-      setError('PIN should contain numbers only.');
+      setError("PIN should contain numbers only.");
       return;
     }
 
@@ -215,21 +226,24 @@ const SetNewPin = () => {
       return;
     }
 
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
-      const response = await fetch(`http://localhost:5000/api/employees/${employeeId}/pin`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
+      const response = await fetch(
+        `http://localhost:5000/api/employees/${employeeId}/pin`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            currentPin: pendingTempPin,
+            newPin,
+            requiresPinReset: false,
+          }),
         },
-        body: JSON.stringify({
-          currentPin: pendingTempPin,
-          newPin,
-          requiresPinReset: false
-        })
-      });
+      );
 
       const data = await response.json();
 
@@ -237,22 +251,22 @@ const SetNewPin = () => {
         const updatedEmployee = {
           ...data.data,
           id: data.data._id || data.data.id,
-          image: data.data.profileImage || employee?.image || defaultAvatar
+          image: data.data.profileImage || employee?.image || defaultAvatar,
         };
         login(updatedEmployee);
         setPinUpdated(true);
         setNewPinDigits(EMPTY_PIN);
         setConfirmPinDigits(EMPTY_PIN);
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('pendingTempPin');
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("pendingTempPin");
         }
         redirectAfterLogin(updatedEmployee);
       } else {
-        setError(data.message || 'Failed to update PIN. Please try again.');
+        setError(data.message || "Failed to update PIN. Please try again.");
       }
     } catch (err) {
-      console.error('Error updating PIN:', err);
-      setError('Unable to connect to the server. Please verify your network.');
+      console.error("Error updating PIN:", err);
+      setError("Unable to connect to the server. Please verify your network.");
     } finally {
       setLoading(false);
     }
@@ -269,7 +283,9 @@ const SetNewPin = () => {
               refs.current[index] = node;
             }}
             value={digit}
-            onChange={(event) => handleDigitChange(type, index, event.target.value)}
+            onChange={(event) =>
+              handleDigitChange(type, index, event.target.value)
+            }
             onKeyDown={(event) => handleKeyDown(type, index, event)}
             onPaste={(event) => handlePaste(type, event)}
             type="password"
@@ -286,11 +302,14 @@ const SetNewPin = () => {
   return (
     <div className="relative w-screen h-screen overflow-hidden">
       <div className="flex w-full h-full overflow-hidden flex-col lg:flex-row">
-        <div className="flex-1 relative flex items-center justify-center p-8 min-h-[40vh] lg:min-h-full" style={{ backgroundColor: '#FFFFFF' }}>
+        <div
+          className="flex-1 relative flex items-center justify-center p-8 min-h-[40vh] lg:min-h-full"
+          style={{ backgroundColor: "#FFFFFF" }}
+        >
           <div
             className="absolute inset-8 lg:inset-8 rounded-[20px] bg-cover bg-center"
             style={{
-              backgroundImage: `linear-gradient(rgba(139, 115, 85, 0.7), rgba(139, 115, 85, 0.7)), url(${bgImage})`
+              backgroundImage: `linear-gradient(rgba(139, 115, 85, 0.7), rgba(139, 115, 85, 0.7)), url(${bgImage})`,
             }}
           />
           <div className="relative z-10 text-center p-12 flex items-center justify-center">
@@ -301,10 +320,15 @@ const SetNewPin = () => {
             />
           </div>
         </div>
-        <div className="flex-1 flex items-center justify-center p-8 min-h-[60vh] lg:min-h-full" style={{ backgroundColor: '#FFFFFF' }}>
+        <div
+          className="flex-1 flex items-center justify-center p-8 min-h-[60vh] lg:min-h-full"
+          style={{ backgroundColor: "#FFFFFF" }}
+        >
           <div className="w-full max-w-[600px]">
             <div className="text-center mb-12">
-              <h2 className="text-5xl font-bold text-[#8B7355] mb-4 tracking-[8px]">CYSPOS</h2>
+              <h2 className="text-5xl font-bold text-[#8B7355] mb-4 tracking-[8px]">
+                CYSPOS
+              </h2>
               <div className="w-full h-0 pb-6 border-b-[3px] border-[#8B7355]"></div>
             </div>
           </div>
@@ -330,8 +354,21 @@ const SetNewPin = () => {
 
           <div className="flex flex-col items-center gap-6 text-center">
             <div className="w-28 h-28 rounded-full bg-[#F4E6DD] flex items-center justify-center">
-              <svg width="72" height="72" viewBox="0 0 54 54" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="9" width="48" height="40" rx="12" fill="#C7A086" />
+              <svg
+                width="72"
+                height="72"
+                viewBox="0 0 54 54"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect
+                  x="3"
+                  y="9"
+                  width="48"
+                  height="40"
+                  rx="12"
+                  fill="#C7A086"
+                />
                 <path
                   d="M36 21H18C16.8954 21 16 21.8954 16 23V35C16 36.1046 16.8954 37 18 37H36C37.1046 37 38 36.1046 38 35V23C38 21.8954 37.1046 21 36 21Z"
                   stroke="#5E3B28"
@@ -349,8 +386,12 @@ const SetNewPin = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-semibold text-[#1F140E]">Set New PIN</h1>
-              <p className="text-sm text-gray-500 mt-1">Please create your new PIN</p>
+              <h1 className="text-2xl font-semibold text-[#1F140E]">
+                Set New PIN
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Please create your new PIN
+              </p>
             </div>
             <div className="flex flex-col items-center gap-1">
               <div className="w-16 h-16 rounded-2xl overflow-hidden shadow">
@@ -360,7 +401,9 @@ const SetNewPin = () => {
                   className="w-full h-full object-cover"
                 />
               </div>
-              <p className="text-base font-semibold text-[#2F1D13]">{employee.name}</p>
+              <p className="text-base font-semibold text-[#2F1D13]">
+                {employee.name}
+              </p>
               <p className="text-xs text-gray-500">{employee.email}</p>
             </div>
           </div>
@@ -371,18 +414,27 @@ const SetNewPin = () => {
                 {error}
               </div>
             )}
-            {renderPinInputs('New PIN', newPinDigits, 'new', newPinRefs)}
-            {renderPinInputs('Confirm PIN', confirmPinDigits, 'confirm', confirmPinRefs)}
+            {renderPinInputs("New PIN", newPinDigits, "new", newPinRefs)}
+            {renderPinInputs(
+              "Confirm PIN",
+              confirmPinDigits,
+              "confirm",
+              confirmPinRefs,
+            )}
             <button
               type="submit"
               disabled={loading}
               className="w-full py-4 rounded-[18px] text-white font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
-              style={{ background: 'linear-gradient(135deg, #b37a5c 0%, #7a4b2e 100%)' }}
+              style={{
+                background: "linear-gradient(135deg, #b37a5c 0%, #7a4b2e 100%)",
+              }}
             >
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? "Saving..." : "Save"}
             </button>
             <p className="text-center text-xs text-gray-500">
-              {pinUpdated ? 'PIN updated successfully.' : 'Temporary PIN verified. Please create a new one.'}
+              {pinUpdated
+                ? "PIN updated successfully."
+                : "Temporary PIN verified. Please create a new one."}
             </p>
           </form>
         </div>
@@ -392,4 +444,3 @@ const SetNewPin = () => {
 };
 
 export default memo(SetNewPin);
-

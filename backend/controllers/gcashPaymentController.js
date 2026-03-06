@@ -61,13 +61,18 @@ const notifyPaymentUpdate = (merchantOrderId, data) => {
  * Helper: Generate unique receipt number
  */
 const generateUniqueReceiptNumber = async () => {
-  const timestamp = Date.now().toString().slice(-6);
-  let receiptNo = timestamp.padStart(6, "0");
-  const existing = await SalesTransaction.findOne({ receiptNo });
-  if (existing) {
-    receiptNo = (timestamp + Math.floor(Math.random() * 10)).slice(-6);
+  let attempts = 0;
+  while (attempts < 10) {
+    const receiptNo = Math.floor(100000 + Math.random() * 900000).toString();
+    const existing = await SalesTransaction.findOne({ receiptNo });
+    if (!existing) {
+      return receiptNo;
+    }
+    attempts++;
   }
-  return receiptNo;
+  const timestamp = Date.now().toString().slice(-4);
+  const random = Math.floor(10 + Math.random() * 90).toString();
+  return `${timestamp}${random}`;
 };
 
 /**
@@ -326,21 +331,22 @@ exports.handleWebhook = async (req, res) => {
     const signatureHeader = req.headers["paymongo-signature"];
     const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET;
 
-    // Step 1: Verify signature (skip in development if no secret configured)
-    if (webhookSecret) {
-      const isValid = gcashService.verifyWebhookSignature(
-        rawBody,
-        signatureHeader,
-        webhookSecret,
+    // Step 1: Verify webhook signature (MANDATORY — never skip in any environment)
+    if (!webhookSecret) {
+      console.error(
+        "[GCash Webhook] PAYMONGO_WEBHOOK_SECRET is not configured — rejecting webhook for security",
       );
-      if (!isValid) {
-        console.warn("[GCash Webhook] Invalid signature — rejecting");
-        return res.status(401).json({ message: "Invalid signature" });
-      }
-    } else {
-      console.warn(
-        "[GCash Webhook] No webhook secret configured — skipping signature verification (dev mode)",
-      );
+      return res.status(500).json({ message: "Webhook secret not configured" });
+    }
+
+    const isValid = gcashService.verifyWebhookSignature(
+      rawBody,
+      signatureHeader,
+      webhookSecret,
+    );
+    if (!isValid) {
+      console.warn("[GCash Webhook] Invalid signature — rejecting");
+      return res.status(401).json({ message: "Invalid signature" });
     }
 
     const event = req.body?.data;
@@ -443,8 +449,7 @@ exports.handleWebhook = async (req, res) => {
       return res.status(500).json({ message: "Payment creation failed" });
     }
 
-    // Step 7: Update transaction → PAID
-    transaction.gcashStatus = "PAID";
+    // Step 7: Prepare transaction data (but don't save PAID status yet)
     transaction.gcashPaymentId = paymentResult.paymentId;
     transaction.gcashPaidAt = paymentResult.paidAt || new Date();
     transaction.gcashReference = paymentResult.gcashReference;
@@ -453,8 +458,6 @@ exports.handleWebhook = async (req, res) => {
     transaction.amountReceived = transaction.totalAmount;
     transaction.referenceNo =
       paymentResult.gcashReference || paymentResult.paymentId;
-    transaction.status = "Completed";
-    await transaction.save();
 
     console.log("[GCash Webhook] ✅ Payment confirmed:", {
       merchantOrderId,
@@ -463,7 +466,19 @@ exports.handleWebhook = async (req, res) => {
       gcashReference: paymentResult.gcashReference,
     });
 
-    // Step 8: Notify POS frontend via WebSocket
+    // Step 8: Update stock BEFORE marking as PAID (so poll/refresh gets updated data)
+    try {
+      await updateStockAfterPayment(transaction);
+    } catch (stockErr) {
+      console.error("[GCash] Stock update error:", stockErr.message);
+    }
+
+    // Step 9: NOW mark as PAID and save (poll endpoint will see PAID only after stock is updated)
+    transaction.gcashStatus = "PAID";
+    transaction.status = "Completed";
+    await transaction.save();
+
+    // Step 10: Notify POS frontend via WebSocket (stock is already updated)
     notifyPaymentUpdate(merchantOrderId, {
       status: "PAID",
       paidAt: transaction.gcashPaidAt,
@@ -471,11 +486,6 @@ exports.handleWebhook = async (req, res) => {
       receiptNo: transaction.receiptNo,
       totalAmount: transaction.totalAmount,
     });
-
-    // Step 9: Update stock asynchronously
-    updateStockAfterPayment(transaction).catch((err) =>
-      console.error("[GCash] Stock update error:", err.message),
-    );
 
     // Respond 200 to acknowledge webhook
     res.status(200).json({ message: "Payment processed successfully" });
@@ -557,59 +567,134 @@ exports.getConfigStatus = async (req, res) => {
 
 /**
  * Update product stock after successful GCash payment.
- * Mirrors the stock update logic used in the cash payment flow.
+ * Mirrors the stock update logic used in the cash payment flow (updateStockAfterTransaction).
  */
 async function updateStockAfterPayment(transaction) {
   if (!transaction || !transaction.items || transaction.items.length === 0)
     return;
 
-  const stockUpdates = transaction.items.map((item) => ({
-    _id: item.productId,
-    sku: item.sku || null,
-    size: item.selectedSize || null,
-    quantity: item.quantity || 1,
-  }));
+  // Helper to get quantity from size data (handles both {quantity: 5, price: 200} and plain number 5)
+  const getSizeQty = (sizeData) => {
+    if (
+      typeof sizeData === "object" &&
+      sizeData !== null &&
+      sizeData.quantity !== undefined
+    ) {
+      return sizeData.quantity;
+    }
+    return typeof sizeData === "number" ? sizeData : 0;
+  };
 
-  for (const update of stockUpdates) {
+  // Helper to get price from size data
+  const getSizePrice = (sizeData) => {
+    if (
+      typeof sizeData === "object" &&
+      sizeData !== null &&
+      sizeData.price !== undefined
+    ) {
+      return sizeData.price;
+    }
+    return null;
+  };
+
+  // Helper to find size key case-insensitively
+  const findSizeKey = (sizes, targetSize) => {
+    if (!sizes || !targetSize) return null;
+    const keys =
+      typeof sizes.keys === "function"
+        ? Array.from(sizes.keys())
+        : Object.keys(sizes);
+    return (
+      keys.find((k) => k.toLowerCase() === targetSize.toLowerCase()) || null
+    );
+  };
+
+  for (const item of transaction.items) {
     try {
-      const product = await Product.findById(update._id);
-      if (!product) continue;
-
-      if (update.size && product.sizes && typeof product.sizes === "object") {
-        // Size-based stock update
-        const sizeData = product.sizes.get
-          ? product.sizes.get(update.size)
-          : product.sizes[update.size];
-        if (sizeData) {
-          if (typeof sizeData === "object" && sizeData.quantity !== undefined) {
-            sizeData.quantity = Math.max(
-              0,
-              sizeData.quantity - update.quantity,
-            );
-          }
-          if (product.sizes.set) {
-            product.sizes.set(update.size, sizeData);
-          } else {
-            product.sizes[update.size] = sizeData;
-          }
-          product.markModified("sizes");
-        }
-      } else {
-        // Simple stock update
-        product.currentStock = Math.max(
-          0,
-          (product.currentStock || 0) - update.quantity,
-        );
+      const product = await Product.findById(item.productId);
+      if (!product) {
+        console.warn(`[GCash] Product not found: ${item.productId}`);
+        continue;
       }
 
+      const stockBefore = product.currentStock || 0;
+      const qty = item.quantity || 1;
+      const size = item.selectedSize || null;
+
+      if (size && product.sizes && typeof product.sizes === "object") {
+        // Size-based stock update
+        const sizeKey = findSizeKey(product.sizes, size);
+
+        if (sizeKey) {
+          const currentSizeData = product.sizes.get
+            ? product.sizes.get(sizeKey)
+            : product.sizes[sizeKey];
+          const currentQty = getSizeQty(currentSizeData);
+          const currentPrice = getSizePrice(currentSizeData);
+          const newQty = Math.max(0, currentQty - qty);
+
+          // Preserve price structure if it exists
+          if (
+            currentPrice !== null ||
+            (typeof currentSizeData === "object" && currentSizeData !== null)
+          ) {
+            if (product.sizes.set) {
+              product.sizes.set(sizeKey, {
+                quantity: newQty,
+                price:
+                  currentPrice !== null ? currentPrice : product.itemPrice || 0,
+              });
+            } else {
+              product.sizes[sizeKey] = {
+                quantity: newQty,
+                price:
+                  currentPrice !== null ? currentPrice : product.itemPrice || 0,
+              };
+            }
+          } else {
+            if (product.sizes.set) {
+              product.sizes.set(sizeKey, newQty);
+            } else {
+              product.sizes[sizeKey] = newQty;
+            }
+          }
+          product.markModified("sizes");
+        } else {
+          console.warn(
+            `[GCash] Size "${size}" not found for product ${product.itemName}`,
+          );
+        }
+
+        // Recalculate total currentStock from all sizes
+        const sizeEntries = product.sizes.entries
+          ? Array.from(product.sizes.entries())
+          : Object.entries(product.sizes);
+        let totalStock = 0;
+        for (const [, value] of sizeEntries) {
+          totalStock += getSizeQty(value);
+        }
+        product.currentStock = totalStock;
+      } else {
+        // Simple stock update (no sizes)
+        product.currentStock = Math.max(0, (product.currentStock || 0) - qty);
+      }
+
+      // Auto-manage displayInTerminal based on stock levels
+      if (product.currentStock === 0) {
+        product.displayInTerminal = false;
+      } else if (stockBefore === 0 && product.currentStock > 0) {
+        product.displayInTerminal = true;
+      }
+
+      product.lastUpdated = Date.now();
       await product.save();
     } catch (err) {
       console.error(
-        `[GCash] Stock update failed for product ${update._id}:`,
+        `[GCash] Stock update failed for product ${item.productId}:`,
         err.message,
       );
     }
   }
 
-  console.log("[GCash] Stock updated for", stockUpdates.length, "items");
+  console.log("[GCash] Stock updated for", transaction.items.length, "items");
 }

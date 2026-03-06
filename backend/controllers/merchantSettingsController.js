@@ -179,7 +179,7 @@ exports.testConnection = async (req, res) => {
         ? "https://api.paymongo.com/v1"
         : "https://api.paymongo.com/v1";
 
-    const response = await fetch(`${baseUrl}/sources?limit=1`, {
+    const response = await fetch(`${baseUrl}/payment_methods?limit=1`, {
       method: "GET",
       headers: {
         Authorization: `Basic ${Buffer.from(privateKey + ":").toString("base64")}`,
@@ -187,7 +187,8 @@ exports.testConnection = async (req, res) => {
       },
     });
 
-    if (response.ok) {
+    if (response.ok || response.status === 404) {
+      // 200 = success, 404 = authenticated but no resources (also valid)
       res.json({
         success: true,
         message: `Connected to PayMongo (${settings.environment}) successfully`,

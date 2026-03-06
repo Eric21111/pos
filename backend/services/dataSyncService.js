@@ -18,9 +18,7 @@ class DataSyncService {
   constructor() {
     this.isSyncing = false;
     this.localURI = "mongodb://localhost:27017/pos-system";
-    this.cloudURI =
-      process.env.MONGODB_URI ||
-      "mongodb+srv://libradillaeric116_db_user:jtzUYlu73JjrvkMz@expense-tracker.m9uzs1f.mongodb.net/pos-system?retryWrites=true&w=majority&appName=expense-tracker";
+    this.cloudURI = process.env.MONGODB_URI || "";
   }
 
   async sync() {

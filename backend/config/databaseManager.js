@@ -4,8 +4,7 @@ const dns = require("dns").promises;
 class DatabaseManager {
   constructor() {
     this.connection = null;
-    this.cloudURI =
-      process.env.MONGODB_URI || "mongodb+srv://consolvestudio_db_user:fnEHPQc0gC1dNS3U@cys.biyeclf.mongodb.net/?appName=Cys";
+    this.cloudURI = process.env.MONGODB_URI || "";
     this.localURI = "mongodb://localhost:27017/pos-system";
     this.currentURI = null;
     this.isOnline = false;

@@ -1,5 +1,5 @@
-const Product = require('../models/Product');
-const StockMovement = require('../models/StockMovement');
+const Product = require("../models/Product");
+const StockMovement = require("../models/StockMovement");
 
 exports.getAllProducts = async (req, res) => {
   try {
@@ -7,12 +7,10 @@ exports.getAllProducts = async (req, res) => {
     let limit = parseInt(req.query.limit);
     let skip = 0;
 
-    // Build projection: always exclude sizes/stockHistory, optionally exclude heavy fields
+    // Build projection: always exclude stockHistory, optionally exclude heavy fields
     // ?fields=minimal excludes itemImage (base64 strings can be 50-500KB per product)
-    const isMinimal = req.query.fields === 'minimal';
-    const projection = isMinimal
-      ? '-sizes -stockHistory -itemImage'
-      : '-sizes -stockHistory';
+    const isMinimal = req.query.fields === "minimal";
+    const projection = isMinimal ? "-stockHistory -itemImage" : "-stockHistory";
 
     let query = Product.find({}, projection).sort({ dateAdded: -1 });
 
@@ -25,22 +23,48 @@ exports.getAllProducts = async (req, res) => {
     // Run find and count in parallel instead of sequentially
     const [products, totalCount] = await Promise.all([
       query.lean(),
-      Product.countDocuments()
+      Product.countDocuments(),
     ]);
 
-    const formattedProducts = products.map(product => ({
-      ...product,
-      _id: product._id.toString(),
-      variant: product.variant || '',
-      size: product.size || '',
-      brandName: product.brandName || '',
-      costPrice: product.costPrice || 0,
-      reorderNumber: product.reorderNumber || 0,
-      supplierName: product.supplierName || '',
-      supplierContact: product.supplierContact || '',
-      displayInTerminal: product.displayInTerminal !== undefined ? product.displayInTerminal : true,
-      terminalStatus: product.displayInTerminal !== false ? 'shown' : 'not shown'
-    }));
+    const formattedProducts = products.map((product) => {
+      // Recalculate currentStock from sizes if sizes exist
+      let currentStock = product.currentStock || 0;
+      if (
+        product.sizes &&
+        typeof product.sizes === "object" &&
+        Object.keys(product.sizes).length > 0
+      ) {
+        currentStock = Object.values(product.sizes).reduce((sum, sizeData) => {
+          if (
+            typeof sizeData === "object" &&
+            sizeData !== null &&
+            sizeData.quantity !== undefined
+          ) {
+            return sum + (sizeData.quantity || 0);
+          }
+          return sum + (typeof sizeData === "number" ? sizeData : 0);
+        }, 0);
+      }
+
+      return {
+        ...product,
+        _id: product._id.toString(),
+        variant: product.variant || "",
+        size: product.size || "",
+        brandName: product.brandName || "",
+        costPrice: product.costPrice || 0,
+        currentStock,
+        reorderNumber: product.reorderNumber || 0,
+        supplierName: product.supplierName || "",
+        supplierContact: product.supplierContact || "",
+        displayInTerminal:
+          product.displayInTerminal !== undefined
+            ? product.displayInTerminal
+            : true,
+        terminalStatus:
+          product.displayInTerminal !== false ? "shown" : "not shown",
+      };
+    });
 
     res.json({
       success: true,
@@ -48,14 +72,14 @@ exports.getAllProducts = async (req, res) => {
       total: totalCount,
       totalPages: limit ? Math.ceil(totalCount / limit) : 1,
       currentPage: page,
-      data: formattedProducts
+      data: formattedProducts,
     });
   } catch (error) {
-    console.error('Error fetching products:', error);
+    console.error("Error fetching products:", error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching products',
-      error: error.message
+      message: "Error fetching products",
+      error: error.message,
     });
   }
 };
@@ -67,25 +91,49 @@ exports.getProductById = async (req, res) => {
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
+    }
+
+    // Recalculate currentStock from sizes if sizes exist
+    let currentStock = product.currentStock || 0;
+    if (
+      product.sizes &&
+      typeof product.sizes === "object" &&
+      Object.keys(product.sizes).length > 0
+    ) {
+      currentStock = Object.values(product.sizes).reduce((sum, sizeData) => {
+        if (
+          typeof sizeData === "object" &&
+          sizeData !== null &&
+          sizeData.quantity !== undefined
+        ) {
+          return sum + (sizeData.quantity || 0);
+        }
+        return sum + (typeof sizeData === "number" ? sizeData : 0);
+      }, 0);
     }
 
     const productResponse = {
       ...product,
-      displayInTerminal: product.displayInTerminal !== undefined ? product.displayInTerminal : true,
-      terminalStatus: product.displayInTerminal !== false ? 'shown' : 'not shown'
+      currentStock,
+      displayInTerminal:
+        product.displayInTerminal !== undefined
+          ? product.displayInTerminal
+          : true,
+      terminalStatus:
+        product.displayInTerminal !== false ? "shown" : "not shown",
     };
 
     res.json({
       success: true,
-      data: productResponse
+      data: productResponse,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error fetching product',
-      error: error.message
+      message: "Error fetching product",
+      error: error.message,
     });
   }
 };
@@ -98,19 +146,29 @@ exports.createProduct = async (req, res) => {
       if (productData.selectedSizes.length > 0 && productData.sizeQuantities) {
         // Construct sizes object
         productData.sizes = {};
-        productData.selectedSizes.forEach(size => {
+        productData.selectedSizes.forEach((size) => {
           let sizeData = productData.sizeQuantities[size];
 
           // If we have specific prices or variants, use object structure
-          if (productData.differentPricesPerSize || productData.differentVariantsPerSize) {
+          if (
+            productData.differentPricesPerSize ||
+            productData.differentVariantsPerSize
+          ) {
             sizeData = {
               quantity: productData.sizeQuantities[size],
-              price: productData.differentPricesPerSize ? (productData.sizePrices?.[size] || productData.itemPrice) : productData.itemPrice,
-              variant: productData.differentVariantsPerSize ? (productData.sizeVariants?.[size] || productData.variant) : productData.variant
+              price: productData.differentPricesPerSize
+                ? productData.sizePrices?.[size] || productData.itemPrice
+                : productData.itemPrice,
+              variant: productData.differentVariantsPerSize
+                ? productData.sizeVariants?.[size] || productData.variant
+                : productData.variant,
             };
 
             // Add cost price if available
-            if (productData.differentPricesPerSize && productData.sizeCostPrices?.[size]) {
+            if (
+              productData.differentPricesPerSize &&
+              productData.sizeCostPrices?.[size]
+            ) {
               sizeData.costPrice = productData.sizeCostPrices[size];
             }
           }
@@ -134,15 +192,17 @@ exports.createProduct = async (req, res) => {
 
     // Auto-generate unique SKU if not provided
     if (!productData.sku) {
-      const category = productData.category || 'Foods';
-      const variant = productData.variant || '';
+      const category = productData.category || "Foods";
+      const variant = productData.variant || "";
       const categoryCode = category.substring(0, 3).toUpperCase();
-      const variantCode = variant ? `-${variant.substring(0, 3).toUpperCase()}` : '';
+      const variantCode = variant
+        ? `-${variant.substring(0, 3).toUpperCase()}`
+        : "";
 
       // Generate random alphanumeric string (6 characters)
       const generateRandomCode = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let result = '';
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        let result = "";
         for (let i = 0; i < 6; i++) {
           result += chars.charAt(Math.floor(Math.random() * chars.length));
         }
@@ -151,7 +211,7 @@ exports.createProduct = async (req, res) => {
 
       // Keep generating until we find a unique SKU
       let attempts = 0;
-      let uniqueSku = '';
+      let uniqueSku = "";
       while (attempts < 10) {
         const randomCode = generateRandomCode();
         uniqueSku = `${categoryCode}-${randomCode}${variantCode}`;
@@ -167,33 +227,46 @@ exports.createProduct = async (req, res) => {
 
     const productResponse = {
       ...product.toObject(),
-      displayInTerminal: product.displayInTerminal !== undefined ? product.displayInTerminal : true,
-      terminalStatus: product.displayInTerminal !== false ? 'shown' : 'not shown'
+      displayInTerminal:
+        product.displayInTerminal !== undefined
+          ? product.displayInTerminal
+          : true,
+      terminalStatus:
+        product.displayInTerminal !== false ? "shown" : "not shown",
     };
 
     res.status(201).json({
       success: true,
-      message: 'Product created successfully',
-      data: productResponse
+      message: "Product created successfully",
+      data: productResponse,
     });
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        message: 'Product with this SKU already exists'
+        message: "Product with this SKU already exists",
       });
     }
 
     res.status(400).json({
       success: false,
-      message: 'Error creating product',
-      error: error.message
+      message: "Error creating product",
+      error: error.message,
     });
   }
 };
 
 // Helper function to log stock movements
-const logStockMovement = async (product, stockBefore, stockAfter, type, reason, handledBy, handledById, sizeQuantities = null) => {
+const logStockMovement = async (
+  product,
+  stockBefore,
+  stockAfter,
+  type,
+  reason,
+  handledBy,
+  handledById,
+  sizeQuantities = null,
+) => {
   try {
     const quantity = Math.abs(stockAfter - stockBefore);
     if (quantity === 0) return;
@@ -202,32 +275,40 @@ const logStockMovement = async (product, stockBefore, stockAfter, type, reason, 
       productId: product._id,
       sku: product.sku,
       itemName: product.itemName,
-      itemImage: product.itemImage || '',
+      itemImage: product.itemImage || "",
       category: product.category,
-      brandName: product.brandName || '',
-      type: type || (stockAfter > stockBefore ? 'Stock-In' : 'Stock-Out'),
+      brandName: product.brandName || "",
+      type: type || (stockAfter > stockBefore ? "Stock-In" : "Stock-Out"),
       quantity,
       stockBefore,
       stockAfter,
-      reason: reason || 'Other',
-      handledBy: handledBy || 'System',
-      handledById: handledById || '',
-      notes: '',
-      sizeQuantities: sizeQuantities || null
+      reason: reason || "Other",
+      handledBy: handledBy || "System",
+      handledById: handledById || "",
+      notes: "",
+      sizeQuantities: sizeQuantities || null,
     });
   } catch (error) {
-    console.error('Error logging stock movement:', error);
+    console.error("Error logging stock movement:", error);
   }
 };
 
 // Helper function to check if product has zero stock
 const hasZeroStock = (productData) => {
-  if (productData.sizes && typeof productData.sizes === 'object' && Object.keys(productData.sizes).length > 0) {
-    return Object.values(productData.sizes).every(sizeData => {
-      if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+  if (
+    productData.sizes &&
+    typeof productData.sizes === "object" &&
+    Object.keys(productData.sizes).length > 0
+  ) {
+    return Object.values(productData.sizes).every((sizeData) => {
+      if (
+        typeof sizeData === "object" &&
+        sizeData !== null &&
+        sizeData.quantity !== undefined
+      ) {
         return (sizeData.quantity || 0) === 0;
       }
-      return (typeof sizeData === 'number' ? sizeData : 0) === 0;
+      return (typeof sizeData === "number" ? sizeData : 0) === 0;
     });
   }
   return (productData.currentStock || 0) === 0;
@@ -254,19 +335,29 @@ exports.updateProduct = async (req, res) => {
       if (updateData.selectedSizes.length > 0 && updateData.sizeQuantities) {
         // Construct sizes object
         updateData.sizes = {};
-        updateData.selectedSizes.forEach(size => {
+        updateData.selectedSizes.forEach((size) => {
           let sizeData = updateData.sizeQuantities[size];
 
           // If we have specific prices or variants, use object structure
-          if (updateData.differentPricesPerSize || updateData.differentVariantsPerSize) {
+          if (
+            updateData.differentPricesPerSize ||
+            updateData.differentVariantsPerSize
+          ) {
             sizeData = {
               quantity: updateData.sizeQuantities[size],
-              price: updateData.differentPricesPerSize ? (updateData.sizePrices?.[size] || updateData.itemPrice) : updateData.itemPrice,
-              variant: updateData.differentVariantsPerSize ? (updateData.sizeVariants?.[size] || updateData.variant) : updateData.variant
+              price: updateData.differentPricesPerSize
+                ? updateData.sizePrices?.[size] || updateData.itemPrice
+                : updateData.itemPrice,
+              variant: updateData.differentVariantsPerSize
+                ? updateData.sizeVariants?.[size] || updateData.variant
+                : updateData.variant,
             };
 
             // Add cost price if available
-            if (updateData.differentPricesPerSize && updateData.sizeCostPrices?.[size]) {
+            if (
+              updateData.differentPricesPerSize &&
+              updateData.sizeCostPrices?.[size]
+            ) {
               sizeData.costPrice = updateData.sizeCostPrices[size];
             }
           }
@@ -290,7 +381,7 @@ exports.updateProduct = async (req, res) => {
     if (!productBefore) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
     }
 
@@ -303,25 +394,34 @@ exports.updateProduct = async (req, res) => {
     if (hasZeroStockNow && req.body.displayInTerminal === undefined) {
       // Auto-hide from terminal if stock reaches 0
       updateData.displayInTerminal = false;
-    } else if (!hasZeroStockNow && hadZeroStockBefore && req.body.displayInTerminal === undefined) {
+    } else if (
+      !hasZeroStockNow &&
+      hadZeroStockBefore &&
+      req.body.displayInTerminal === undefined
+    ) {
       // Auto-show in terminal if stock was 0 and now has stock (restock scenario)
       updateData.displayInTerminal = true;
     } else if (updateData.displayInTerminal === undefined) {
       // Keep existing setting
-      updateData.displayInTerminal = productBefore.displayInTerminal !== undefined
-        ? productBefore.displayInTerminal
-        : true;
+      updateData.displayInTerminal =
+        productBefore.displayInTerminal !== undefined
+          ? productBefore.displayInTerminal
+          : true;
     }
 
-    const product = await Product.findByIdAndUpdate(
-      productId,
-      updateData,
-      { new: true, runValidators: true }
-    );
+    const product = await Product.findByIdAndUpdate(productId, updateData, {
+      new: true,
+      runValidators: true,
+    });
 
     // Log stock movement if stock changed
     const stockAfter = product.currentStock;
-    if (stockBefore !== stockAfter && stockMovementType && stockMovementReason && handledBy) {
+    if (
+      stockBefore !== stockAfter &&
+      stockMovementType &&
+      stockMovementReason &&
+      handledBy
+    ) {
       await logStockMovement(
         product,
         stockBefore,
@@ -330,26 +430,30 @@ exports.updateProduct = async (req, res) => {
         stockMovementReason,
         handledBy,
         handledById,
-        stockMovementSizeQuantities
+        stockMovementSizeQuantities,
       );
     }
 
     const productResponse = {
       ...product.toObject(),
-      displayInTerminal: product.displayInTerminal !== undefined ? product.displayInTerminal : true,
-      terminalStatus: product.displayInTerminal !== false ? 'shown' : 'not shown'
+      displayInTerminal:
+        product.displayInTerminal !== undefined
+          ? product.displayInTerminal
+          : true,
+      terminalStatus:
+        product.displayInTerminal !== false ? "shown" : "not shown",
     };
 
     res.json({
       success: true,
-      message: 'Product updated successfully',
-      data: productResponse
+      message: "Product updated successfully",
+      data: productResponse,
     });
   } catch (error) {
     res.status(400).json({
       success: false,
-      message: 'Error updating product',
-      error: error.message
+      message: "Error updating product",
+      error: error.message,
     });
   }
 };
@@ -361,20 +465,20 @@ exports.deleteProduct = async (req, res) => {
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
     }
 
     res.json({
       success: true,
-      message: 'Product deleted successfully'
+      message: "Product deleted successfully",
     });
   } catch (error) {
-    console.error('Error deleting product:', error);
+    console.error("Error deleting product:", error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting product',
-      error: error.message
+      message: "Error deleting product",
+      error: error.message,
     });
   }
 };
@@ -388,32 +492,40 @@ exports.getProductsByCategory = async (req, res) => {
     res.json({
       success: true,
       count: products.length,
-      data: products
+      data: products,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error fetching products',
-      error: error.message
+      message: "Error fetching products",
+      error: error.message,
     });
   }
 };
 
 // Helper functions for size handling
-const findSizeKey = (sizes = {}, size = '') => {
+const findSizeKey = (sizes = {}, size = "") => {
   const normalized = size?.toLowerCase();
   return Object.keys(sizes).find((key) => key?.toLowerCase() === normalized);
 };
 
 const getSizeQuantity = (sizeData) => {
-  if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+  if (
+    typeof sizeData === "object" &&
+    sizeData !== null &&
+    sizeData.quantity !== undefined
+  ) {
     return sizeData.quantity;
   }
-  return typeof sizeData === 'number' ? sizeData : 0;
+  return typeof sizeData === "number" ? sizeData : 0;
 };
 
 const getSizePrice = (sizeData) => {
-  if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
+  if (
+    typeof sizeData === "object" &&
+    sizeData !== null &&
+    sizeData.price !== undefined
+  ) {
     return sizeData.price;
   }
   return null;
@@ -427,18 +539,21 @@ exports.updateStockAfterTransaction = async (req, res) => {
     if (!items || !Array.isArray(items)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid items data'
+        message: "Invalid items data",
       });
     }
 
-    const isStockIn = type === 'Stock-In';
-    const isStockOut = type === 'Stock-Out' || type === 'Pull-Out';
-    const movementType = type || 'Stock-Out';
-    const movementReason = reason || (isStockIn ? 'Returned Item' : 'Sold');
+    const isStockIn = type === "Stock-In";
+    const isStockOut = type === "Stock-Out" || type === "Pull-Out";
+    const movementType = type || "Stock-Out";
+    const movementReason = reason || (isStockIn ? "Returned Item" : "Sold");
 
-    const updatePromises = items.map(async (item) => {
+    // Process items sequentially to prevent race conditions when multiple
+    // items reference the same product (e.g., same shirt in different sizes)
+    const updatedProducts = [];
+    for (const item of items) {
       if (!item._id && !item.sku) {
-        throw new Error('Item missing both _id and sku fields');
+        throw new Error("Item missing both _id and sku fields");
       }
 
       let product = null;
@@ -450,7 +565,9 @@ exports.updateStockAfterTransaction = async (req, res) => {
       }
 
       if (!product) {
-        throw new Error(`Product not found (ID: ${item._id || 'N/A'}, SKU: ${item.sku || 'N/A'})`);
+        throw new Error(
+          `Product not found (ID: ${item._id || "N/A"}, SKU: ${item.sku || "N/A"})`,
+        );
       }
 
       const stockBefore = product.currentStock;
@@ -461,18 +578,23 @@ exports.updateStockAfterTransaction = async (req, res) => {
 
         if (!sizeKey) {
           if (isStockIn) {
-            const hasPriceStructure = Object.values(product.sizes).some(s => typeof s === 'object' && s !== null && s.price !== undefined);
+            const hasPriceStructure = Object.values(product.sizes).some(
+              (s) =>
+                typeof s === "object" && s !== null && s.price !== undefined,
+            );
             if (hasPriceStructure) {
               product.sizes[item.size] = {
                 quantity: item.quantity,
-                price: item.price || product.itemPrice || 0
+                price: item.price || product.itemPrice || 0,
               };
             } else {
               product.sizes[item.size] = item.quantity;
             }
-            product.markModified('sizes');
+            product.markModified("sizes");
           } else {
-            throw new Error(`Size ${item.size} not found for product ${product.itemName}`);
+            throw new Error(
+              `Size ${item.size} not found for product ${product.itemName}`,
+            );
           }
         } else {
           const currentSizeData = product.sizes[sizeKey];
@@ -480,22 +602,30 @@ exports.updateStockAfterTransaction = async (req, res) => {
           const currentPrice = getSizePrice(currentSizeData);
 
           if (isStockOut && currentQuantity < item.quantity) {
-            throw new Error(`Insufficient stock for ${product.itemName} (${item.size}). Available: ${currentQuantity}, Requested: ${item.quantity}`);
+            throw new Error(
+              `Insufficient stock for ${product.itemName} (${item.size}). Available: ${currentQuantity}, Requested: ${item.quantity}`,
+            );
           }
 
           const newQuantity = isStockIn
             ? (currentQuantity || 0) + item.quantity
             : Math.max(0, currentQuantity - item.quantity);
 
-          if (currentPrice !== null || (typeof currentSizeData === 'object' && currentSizeData !== null)) {
+          if (
+            currentPrice !== null ||
+            (typeof currentSizeData === "object" && currentSizeData !== null)
+          ) {
             product.sizes[sizeKey] = {
               quantity: newQuantity,
-              price: currentPrice !== null ? currentPrice : (item.price || product.itemPrice || 0)
+              price:
+                currentPrice !== null
+                  ? currentPrice
+                  : item.price || product.itemPrice || 0,
             };
           } else {
             product.sizes[sizeKey] = newQuantity;
           }
-          product.markModified('sizes');
+          product.markModified("sizes");
         }
 
         // Recalculate total stock from all sizes
@@ -507,7 +637,9 @@ exports.updateStockAfterTransaction = async (req, res) => {
       } else {
         // Handle products without sizes
         if (isStockOut && product.currentStock < item.quantity) {
-          throw new Error(`Insufficient stock for ${product.itemName}. Available: ${product.currentStock}, Requested: ${item.quantity}`);
+          throw new Error(
+            `Insufficient stock for ${product.itemName}. Available: ${product.currentStock}, Requested: ${item.quantity}`,
+          );
         }
 
         product.currentStock = isStockIn
@@ -534,35 +666,33 @@ exports.updateStockAfterTransaction = async (req, res) => {
         productId: product._id,
         sku: product.sku,
         itemName: product.itemName,
-        itemImage: product.itemImage || '',
+        itemImage: product.itemImage || "",
         category: product.category,
-        brandName: product.brandName || '',
+        brandName: product.brandName || "",
         type: movementType,
         quantity: item.quantity,
         stockBefore,
         stockAfter,
         reason: movementReason,
-        handledBy: performedByName || 'System',
-        handledById: performedById || '',
-        notes: item.size ? `Size: ${item.size}` : '',
-        sizeQuantities: item.size ? { [item.size]: item.quantity } : null
+        handledBy: performedByName || "System",
+        handledById: performedById || "",
+        notes: item.size ? `Size: ${item.size}` : "",
+        sizeQuantities: item.size ? { [item.size]: item.quantity } : null,
       });
 
-      return product;
-    });
-
-    const updatedProducts = await Promise.all(updatePromises);
+      updatedProducts.push(product);
+    }
 
     res.json({
       success: true,
-      message: 'Stock updated successfully',
-      data: updatedProducts
+      message: "Stock updated successfully",
+      data: updatedProducts,
     });
   } catch (error) {
-    console.error('Error updating stock:', error);
+    console.error("Error updating stock:", error);
     res.status(400).json({
       success: false,
-      message: error.message || 'Error updating stock'
+      message: error.message || "Error updating stock",
     });
   }
 };
@@ -576,30 +706,29 @@ exports.toggleDisplayInTerminal = async (req, res) => {
     const product = await Product.findByIdAndUpdate(
       id,
       { displayInTerminal, lastUpdated: Date.now() },
-      { new: true }
+      { new: true },
     );
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
     }
 
     res.json({
       success: true,
-      message: `Product ${displayInTerminal ? 'shown' : 'hidden'} in terminal`,
-      data: product
+      message: `Product ${displayInTerminal ? "shown" : "hidden"} in terminal`,
+      data: product,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error updating product',
-      error: error.message
+      message: "Error updating product",
+      error: error.message,
     });
   }
 };
-
 
 // Search products
 exports.searchProducts = async (req, res) => {
@@ -609,7 +738,7 @@ exports.searchProducts = async (req, res) => {
     if (!query) {
       return res.status(400).json({
         success: false,
-        message: 'Search query is required'
+        message: "Search query is required",
       });
     }
 
@@ -619,9 +748,9 @@ exports.searchProducts = async (req, res) => {
     // First try text search for relevance
     let products = await Product.find(
       { $text: { $search: query } },
-      { score: { $meta: "textScore" } }
+      { score: { $meta: "textScore" } },
     )
-      .select('-sizes') // Include itemImage, exclude heavy sizes
+      .select("-sizes") // Include itemImage, exclude heavy sizes
       .sort({ score: { $meta: "textScore" } })
       .lean();
 
@@ -629,13 +758,13 @@ exports.searchProducts = async (req, res) => {
     if (products.length === 0) {
       products = await Product.find({
         $or: [
-          { itemName: { $regex: query, $options: 'i' } },
-          { sku: { $regex: query, $options: 'i' } },
-          { category: { $regex: query, $options: 'i' } },
-          { brandName: { $regex: query, $options: 'i' } }
-        ]
+          { itemName: { $regex: query, $options: "i" } },
+          { sku: { $regex: query, $options: "i" } },
+          { category: { $regex: query, $options: "i" } },
+          { brandName: { $regex: query, $options: "i" } },
+        ],
       })
-        .select('-sizes') // Include itemImage, exclude heavy sizes
+        .select("-sizes") // Include itemImage, exclude heavy sizes
         .sort({ dateAdded: -1 })
         .limit(50) // Limit regex results for performance
         .lean();
@@ -644,14 +773,14 @@ exports.searchProducts = async (req, res) => {
     res.json({
       success: true,
       count: products.length,
-      data: products
+      data: products,
     });
   } catch (error) {
-    console.error('Error searching products:', error);
+    console.error("Error searching products:", error);
     res.status(500).json({
       success: false,
-      message: 'Error searching products',
-      error: error.message
+      message: "Error searching products",
+      error: error.message,
     });
   }
 };
@@ -664,24 +793,33 @@ exports.getInventoryStats = async (req, res) => {
           _id: null,
           totalItems: { $sum: 1 },
           inStock: {
-            $sum: { $cond: [{ $gt: ["$currentStock", 0] }, 1, 0] }
+            $sum: { $cond: [{ $gt: ["$currentStock", 0] }, 1, 0] },
           },
           lowStock: {
             $sum: {
               $cond: [
-                { $and: [{ $gt: ["$currentStock", 0] }, { $lte: ["$currentStock", 10] }] },
+                {
+                  $and: [
+                    { $gt: ["$currentStock", 0] },
+                    { $lte: ["$currentStock", 10] },
+                  ],
+                },
                 1,
-                0
-              ]
-            }
+                0,
+              ],
+            },
           },
           outOfStock: {
-            $sum: { $cond: [{ $eq: ["$currentStock", 0] }, 1, 0] }
+            $sum: { $cond: [{ $eq: ["$currentStock", 0] }, 1, 0] },
           },
-          inventoryValue: { $sum: { $multiply: ["$currentStock", "$itemPrice"] } },
-          totalCostValue: { $sum: { $multiply: ["$currentStock", "$costPrice"] } }
-        }
-      }
+          inventoryValue: {
+            $sum: { $multiply: ["$currentStock", "$itemPrice"] },
+          },
+          totalCostValue: {
+            $sum: { $multiply: ["$currentStock", "$costPrice"] },
+          },
+        },
+      },
     ]);
 
     const result = stats[0] || {
@@ -690,30 +828,30 @@ exports.getInventoryStats = async (req, res) => {
       lowStock: 0,
       outOfStock: 0,
       inventoryValue: 0,
-      totalCostValue: 0
+      totalCostValue: 0,
     };
 
     // Calculate margins
     const grossProfit = result.inventoryValue - result.totalCostValue;
-    const grossMargin = result.inventoryValue > 0
-      ? (grossProfit / result.inventoryValue) * 100
-      : 0;
+    const grossMargin =
+      result.inventoryValue > 0
+        ? (grossProfit / result.inventoryValue) * 100
+        : 0;
 
     res.json({
       success: true,
       data: {
         ...result,
         grossProfit,
-        grossMargin
-      }
+        grossMargin,
+      },
     });
-
   } catch (error) {
-    console.error('Error getting inventory stats:', error);
+    console.error("Error getting inventory stats:", error);
     res.status(500).json({
       success: false,
-      message: 'Error getting inventory stats',
-      error: error.message
+      message: "Error getting inventory stats",
+      error: error.message,
     });
   }
 };

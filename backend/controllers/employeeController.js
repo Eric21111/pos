@@ -385,7 +385,7 @@ exports.toggleStatus = async (req, res) => {
       });
     }
 
-    const newStatus = employee.status === 'active' ? 'inactive' : 'active';
+    const newStatus = employee.status === 'Active' ? 'Inactive' : 'Active';
 
     const updatedEmployee = await Employee.findByIdAndUpdate(
       id,
@@ -397,7 +397,7 @@ exports.toggleStatus = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Employee ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`,
+      message: `Employee ${newStatus === 'Active' ? 'activated' : 'deactivated'} successfully`,
       data: employeeWithoutPin
     });
   } catch (error) {
@@ -501,7 +501,6 @@ exports.sendTemporaryPin = async (req, res) => {
     res.json({
       success: true,
       message: emailSent ? 'Temporary PIN sent to email successfully' : 'Temporary PIN generated (email not sent)',
-      tempPin, // Include in response for testing/display purposes
       emailSent
     });
   } catch (error) {

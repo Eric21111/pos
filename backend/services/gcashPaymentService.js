@@ -91,6 +91,11 @@ class GCashPaymentService {
       throw new Error("Minimum GCash payment amount is ₱100.00");
     }
 
+    // Redirect URLs after payment — points to our own server (or frontend)
+    const webhookBaseUrl =
+      process.env.WEBHOOK_BASE_URL ||
+      `http://localhost:${process.env.PORT || 5000}`;
+
     const payload = {
       data: {
         attributes: {
@@ -98,8 +103,8 @@ class GCashPaymentService {
           currency: "PHP",
           type: "gcash",
           redirect: {
-            success: `${config.baseUrl}/payments/gcash/success?order=${merchantOrderId}`,
-            failed: `${config.baseUrl}/payments/gcash/failed?order=${merchantOrderId}`,
+            success: `${webhookBaseUrl}/api/payments/gcash/redirect?status=success&order=${merchantOrderId}`,
+            failed: `${webhookBaseUrl}/api/payments/gcash/redirect?status=failed&order=${merchantOrderId}`,
           },
           billing: {
             name: config.merchantName || "POS Customer",

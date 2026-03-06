@@ -1,15 +1,22 @@
 const nodemailer = require('nodemailer');
 
-const sendEmail = async (to, subject, text, html) => {
-    try {
-        const transporter = nodemailer.createTransport({
+// Create transporter once and reuse across all emails (avoids opening a new SMTP connection per email)
+let transporter = null;
+const getTransporter = () => {
+    if (!transporter) {
+        transporter = nodemailer.createTransport({
             service: process.env.EMAIL_SERVICE || 'gmail',
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS
             }
         });
+    }
+    return transporter;
+};
 
+const sendEmail = async (to, subject, text, html) => {
+    try {
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to,
@@ -18,7 +25,7 @@ const sendEmail = async (to, subject, text, html) => {
             html
         };
 
-        const info = await transporter.sendMail(mailOptions);
+        const info = await getTransporter().sendMail(mailOptions);
         console.log('Email sent: ' + info.response);
         return { success: true, info };
     } catch (error) {

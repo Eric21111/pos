@@ -104,7 +104,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
       path: "/reports",
       gradient:
         "linear-gradient(135deg, #C2A68C 0%, #AD7F65 50%, #76462B 100%)",
-      ownerOnly: true,
+      ownerOnly: false,
       requiredPermission: "generateReports",
     },
     {

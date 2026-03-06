@@ -83,7 +83,28 @@ setExpiryCronWsClients(wsPaymentClients);
 // Connect to database
 connectDB();
 
-app.use(cors());
+// CORS: Restrict to known origins
+const allowedOrigins = [
+  "http://localhost:5173",    // Vite dev server
+  "http://localhost:3000",    // Alternate dev port
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:3000",
+  process.env.FRONTEND_URL,  // Production frontend URL (set in .env)
+  process.env.WEBHOOK_BASE_URL, // ngrok tunnel URL
+].filter(Boolean); // Remove undefined values
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, server-to-server, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+      return callback(null, true);
+    }
+    console.warn(`[CORS] Blocked request from origin: ${origin}`);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+}));
 app.use(compression()); // Gzip compress all responses (~60-80% smaller payloads for mobile)
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
@@ -126,6 +147,7 @@ app.use("/api/categories", require("./routes/categoryRoutes"));
 app.use("/api/brand-partners", require("./routes/brandPartnerRoutes"));
 app.use("/api/sync", require("./routes/syncRoutes"));
 app.use("/api/reports", require("./routes/reportRoutes"));
+app.use("/api/data-management", require("./routes/dataManagementRoutes"));
 
 // GCash Payment Integration Routes
 app.use("/api/merchant-settings", require("./routes/merchantSettingsRoutes"));

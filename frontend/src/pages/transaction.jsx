@@ -1,22 +1,22 @@
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
-    memo,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    FaCheckCircle,
-    FaChevronDown,
-    FaChevronLeft,
-    FaChevronRight,
-    FaExclamationTriangle,
-    FaEye,
-    FaPrint,
-    FaSearch,
-    FaUndoAlt
+  FaCheckCircle,
+  FaChevronDown,
+  FaChevronLeft,
+  FaChevronRight,
+  FaExclamationTriangle,
+  FaEye,
+  FaPrint,
+  FaSearch,
+  FaUndoAlt
 } from "react-icons/fa";
 import CompletedIcon from "../assets/completed.svg";
 import TotalTransactionIcon from "../assets/total-transaction.svg";
@@ -108,13 +108,13 @@ const Dropdown = ({
           setIsOpen((prev) => !prev);
         }}
         className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${isOpen
-            ? "border-[#AD7F65] shadow-lg " +
-            (theme === "dark"
-              ? "bg-[#2A2724] text-white"
-              : "bg-white text-gray-700")
-            : theme === "dark"
-              ? "border-gray-600 bg-[#2A2724] text-gray-300 hover:border-[#AD7F65]"
-              : "border-gray-200 bg-white hover:border-[#AD7F65] text-gray-700"
+          ? "border-[#AD7F65] shadow-lg " +
+          (theme === "dark"
+            ? "bg-[#2A2724] text-white"
+            : "bg-white text-gray-700")
+          : theme === "dark"
+            ? "border-gray-600 bg-[#2A2724] text-gray-300 hover:border-[#AD7F65]"
+            : "border-gray-200 bg-white hover:border-[#AD7F65] text-gray-700"
           }`}
       >
         <span className="text-sm font-medium">
@@ -131,8 +131,8 @@ const Dropdown = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             className={`absolute z-20 mt-2 w-44 rounded-xl border border-gray-100 shadow-2xl overflow-hidden ${theme === "dark"
-                ? "bg-[#2A2724] border-gray-600"
-                : "bg-white border-gray-100"
+              ? "bg-[#2A2724] border-gray-600"
+              : "bg-white border-gray-100"
               }`}
             onClick={(e) => e.stopPropagation()}
           >
@@ -144,10 +144,10 @@ const Dropdown = ({
                   setIsOpen(false);
                 }}
                 className={`px-4 py-2 text-sm cursor-pointer transition-colors ${option === selected
-                    ? "bg-[#F6EEE7] text-[#76462B] font-semibold"
-                    : theme === "dark"
-                      ? "text-gray-300 hover:bg-[#352F2A]"
-                      : "text-gray-700 hover:bg-gray-50"
+                  ? "bg-[#F6EEE7] text-[#76462B] font-semibold"
+                  : theme === "dark"
+                    ? "text-gray-300 hover:bg-[#352F2A]"
+                    : "text-gray-700 hover:bg-gray-50"
                   }`}
               >
                 {option}
@@ -565,8 +565,8 @@ const Transaction = () => {
     const transactionDate = new Date(transaction.checkedOutAt);
     const now = new Date();
     const diffTime = Math.abs(now - transactionDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays < 2; // Less than 2 days old
+    const diffHours = diffTime / (1000 * 60 * 60);
+    return diffHours <= 48; // Within 2 days (48 hours)
   };
 
   const handleViewClick = (transaction) => {
@@ -1102,10 +1102,10 @@ const Transaction = () => {
             <button
               onClick={handleExportButtonClick}
               className={`rounded-2xl shadow-md flex flex-col items-center justify-center px-5 py-4 transition-colors ${isExportSelectionMode
-                  ? "border border-[#AD7F65] bg-[#AD7F65]/5"
-                  : theme === "dark"
-                    ? "bg-[#2A2724] hover:bg-[#352F2A]"
-                    : "bg-white hover:bg-gray-50"
+                ? "border border-[#AD7F65] bg-[#AD7F65]/5"
+                : theme === "dark"
+                  ? "bg-[#2A2724] hover:bg-[#352F2A]"
+                  : "bg-white hover:bg-gray-50"
                 }`}
               style={{ minWidth: "100px" }}
             >
@@ -1132,8 +1132,8 @@ const Transaction = () => {
               <button
                 onClick={handleCancelExportSelection}
                 className={`rounded-2xl shadow-md px-4 py-2 text-xs font-medium border transition-colors ${theme === "dark"
-                    ? "bg-[#2A2724] border-gray-600 text-gray-400 hover:bg-[#352F2A]"
-                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                  ? "bg-[#2A2724] border-gray-600 text-gray-400 hover:bg-[#352F2A]"
+                  : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                   }`}
               >
                 Cancel
@@ -1147,8 +1147,8 @@ const Transaction = () => {
         <div className="flex flex-col lg:flex-row gap-6">
           <div
             className={`flex-1 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.06)] p-6 border ${theme === "dark"
-                ? "bg-[#2A2724] border-[#4A4037]"
-                : "bg-white border-white/80"
+              ? "bg-[#2A2724] border-[#4A4037]"
+              : "bg-white border-white/80"
               }`}
           >
             <div className="flex flex-col xl:flex-row xl:items-center gap-4 mb-4">
@@ -1162,8 +1162,8 @@ const Transaction = () => {
                   }}
                   placeholder="Search by receipt number..."
                   className={`w-full border rounded-2xl h-12 pl-12 pr-4 shadow-inner focus:outline-none focus:border-[#AD7F65] focus:ring focus:ring-[#AD7F65]/20 transition-all ${theme === "dark"
-                      ? "bg-[#1E1B18] border-gray-600 text-white placeholder-gray-500"
-                      : "bg-white border-gray-200 text-gray-900"
+                    ? "bg-[#1E1B18] border-gray-600 text-white placeholder-gray-500"
+                    : "bg-white border-gray-200 text-gray-900"
                     }`}
                 />
               </div>
@@ -1289,8 +1289,8 @@ const Transaction = () => {
                         key={trx._id}
                         onClick={() => handleRowClick(trx)}
                         className={`cursor-pointer border-b transition-all ${theme === "dark"
-                            ? "border-gray-700"
-                            : "border-gray-100"
+                          ? "border-gray-700"
+                          : "border-gray-100"
                           } ${isActive
                             ? theme === "dark"
                               ? "bg-[#352F2A]"
@@ -1364,8 +1364,8 @@ const Transaction = () => {
                                 handleViewClick(trx);
                               }}
                               className={`w-9 h-9 border rounded-xl flex items-center justify-center shadow-sm hover:shadow-md hover:-translate-y-0.5 whitespace-nowrap transition-all ${theme === "dark"
-                                  ? "bg-[#2A2724] border-gray-600 text-gray-400 hover:border-green-500 hover:text-green-500"
-                                  : "bg-white border-gray-200 text-gray-500 hover:border-green-500 hover:text-green-600"
+                                ? "bg-[#2A2724] border-gray-600 text-gray-400 hover:border-green-500 hover:text-green-500"
+                                : "bg-white border-gray-200 text-gray-500 hover:border-green-500 hover:text-green-600"
                                 }`}
                             >
                               <FaEye />
@@ -1377,8 +1377,8 @@ const Transaction = () => {
                                 handlePrintClick(trx);
                               }}
                               className={`w-9 h-9 border rounded-xl flex items-center justify-center shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all ${theme === "dark"
-                                  ? "bg-[#2A2724] border-gray-600 text-gray-400 hover:border-blue-500 hover:text-blue-500"
-                                  : "bg-white border-gray-200 text-gray-500 hover:border-blue-500 hover:text-blue-600"
+                                ? "bg-[#2A2724] border-gray-600 text-gray-400 hover:border-blue-500 hover:text-blue-500"
+                                : "bg-white border-gray-200 text-gray-500 hover:border-blue-500 hover:text-blue-600"
                                 }`}
                             >
                               <FaPrint />
@@ -1393,8 +1393,8 @@ const Transaction = () => {
                                     handleReturnClick(trx);
                                   }}
                                   className={`w-9 h-9 border rounded-xl flex items-center justify-center shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all ${theme === "dark"
-                                      ? "bg-[#2A2724] border-gray-600 text-gray-400 hover:border-orange-500 hover:text-orange-500"
-                                      : "bg-white border-gray-200 text-gray-500 hover:border-orange-500 hover:text-orange-600"
+                                    ? "bg-[#2A2724] border-gray-600 text-gray-400 hover:border-orange-500 hover:text-orange-500"
+                                    : "bg-white border-gray-200 text-gray-500 hover:border-orange-500 hover:text-orange-600"
                                     }`}
                                 >
                                   <FaUndoAlt />
@@ -1422,8 +1422,8 @@ const Transaction = () => {
               </div>
               <div
                 className={`flex items-center gap-2 rounded-full border px-3 py-1 shadow-inner ${theme === "dark"
-                    ? "bg-[#1E1B18] border-gray-600"
-                    : "bg-white border-gray-200"
+                  ? "bg-[#1E1B18] border-gray-600"
+                  : "bg-white border-gray-200"
                   }`}
               >
                 <button
@@ -1432,12 +1432,12 @@ const Transaction = () => {
                   }
                   disabled={currentPage === 1}
                   className={`p-2 rounded-full ${currentPage === 1
-                      ? theme === "dark"
-                        ? "text-gray-600"
-                        : "text-gray-300"
-                      : theme === "dark"
-                        ? "hover:bg-[#2A2724] text-gray-400"
-                        : "hover:bg-gray-50 text-gray-600"
+                    ? theme === "dark"
+                      ? "text-gray-600"
+                      : "text-gray-300"
+                    : theme === "dark"
+                      ? "hover:bg-[#2A2724] text-gray-400"
+                      : "hover:bg-gray-50 text-gray-600"
                     }`}
                 >
                   <FaChevronLeft />
@@ -1451,8 +1451,8 @@ const Transaction = () => {
                         key={pageNumber}
                         onClick={() => setCurrentPage(pageNumber)}
                         className={`w-8 h-8 rounded-full text-sm font-semibold ${currentPage === pageNumber
-                            ? "bg-[#AD7F65] text-white shadow-md"
-                            : "text-gray-600 hover:bg-gray-50"
+                          ? "bg-[#AD7F65] text-white shadow-md"
+                          : "text-gray-600 hover:bg-gray-50"
                           }`}
                       >
                         {pageNumber}
@@ -1463,8 +1463,8 @@ const Transaction = () => {
                 <button
                   onClick={() => setCurrentPage(totalPages)}
                   className={`w-8 h-8 rounded-full text-sm font-semibold ${currentPage === totalPages
-                      ? "bg-[#AD7F65] text-white shadow-md"
-                      : "text-gray-600 hover:bg-gray-50"
+                    ? "bg-[#AD7F65] text-white shadow-md"
+                    : "text-gray-600 hover:bg-gray-50"
                     }`}
                 >
                   {totalPages}
@@ -1475,12 +1475,12 @@ const Transaction = () => {
                   }
                   disabled={currentPage === totalPages}
                   className={`p-2 rounded-full ${currentPage === totalPages
-                      ? theme === "dark"
-                        ? "text-gray-600"
-                        : "text-gray-300"
-                      : theme === "dark"
-                        ? "hover:bg-[#2A2724] text-gray-400"
-                        : "hover:bg-gray-50 text-gray-600"
+                    ? theme === "dark"
+                      ? "text-gray-600"
+                      : "text-gray-300"
+                    : theme === "dark"
+                      ? "hover:bg-[#2A2724] text-gray-400"
+                      : "hover:bg-gray-50 text-gray-600"
                     }`}
                 >
                   <FaChevronRight />
@@ -1492,8 +1492,8 @@ const Transaction = () => {
           <div className="w-full lg:w-[380px] xl:w-[420px]">
             <div
               className={`rounded-2xl border shadow-[0_20px_45px_rgba(0,0,0,0.08)] p-6 sticky top-8 ${theme === "dark"
-                  ? "bg-[#2A2724] border-[#4A4037]"
-                  : "bg-white border-white"
+                ? "bg-[#2A2724] border-[#4A4037]"
+                : "bg-white border-white"
                 }`}
             >
               <div className="mb-4">

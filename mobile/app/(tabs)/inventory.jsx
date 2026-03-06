@@ -5,28 +5,36 @@ import StockOutModal from "@/components/inventory/StockOutModal";
 import Header from "@/components/shared/header";
 import { useData } from "@/context/DataContext";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import * as ScreenOrientation from 'expo-screen-orientation';
+import * as ScreenOrientation from "expo-screen-orientation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  AppState,
-  FlatList,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    AppState,
+    FlatList,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Table View Component
-const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, onEndReached, loadingMore }) => {
+const InventoryTable = ({
+  items = [],
+  onBack,
+  onEditItem,
+  onRefresh,
+  loading,
+  onEndReached,
+  loadingMore,
+}) => {
   const [menuVisible, setMenuVisible] = useState(null);
 
   // Stock Modal States
@@ -46,29 +54,29 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
 
   const menuItems = [
     {
-      value: 'edit',
-      icon: 'pencil',
-      iconColor: '#4a90e2',
-      bgColor: 'rgba(74, 144, 226, 0.1)'
+      value: "edit",
+      icon: "pencil",
+      iconColor: "#4a90e2",
+      bgColor: "rgba(74, 144, 226, 0.1)",
     },
     {
-      value: 'stockIn',
-      icon: 'add-circle',
-      iconColor: '#2ecc71',
-      bgColor: 'rgba(46, 204, 113, 0.1)'
+      value: "stockIn",
+      icon: "add-circle",
+      iconColor: "#2ecc71",
+      bgColor: "rgba(46, 204, 113, 0.1)",
     },
     {
-      value: 'stockOut',
-      icon: 'remove-circle',
-      iconColor: '#e67e22',
-      bgColor: 'rgba(230, 126, 34, 0.1)'
+      value: "stockOut",
+      icon: "remove-circle",
+      iconColor: "#e67e22",
+      bgColor: "rgba(230, 126, 34, 0.1)",
     },
     {
-      value: 'archive',
-      icon: 'archive',
-      iconColor: '#9b59b6',
-      bgColor: 'rgba(155, 89, 182, 0.1)'
-    }
+      value: "archive",
+      icon: "archive",
+      iconColor: "#9b59b6",
+      bgColor: "rgba(155, 89, 182, 0.1)",
+    },
   ];
 
   const toggleMenu = (itemId) => {
@@ -81,15 +89,17 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
   };
 
   const renderItem = ({ item = {} }) => {
-    const itemId = item._id || item.id || '';
-    const sku = item.sku || 'N/A';
-    const name = item.name || 'No Name';
-    const brand = item.brand || 'N/A';
-    const category = item.category || 'N/A';
+    const itemId = item._id || item.id || "";
+    const sku = item.sku || "N/A";
+    const name = item.name || "No Name";
+    const brand = item.brand || "N/A";
+    const category = item.category || "N/A";
     const price = item.price || 0;
     const stock = item.stock || item.quantity || 0;
-    const dateAdded = item.dateAdded || item.createdAt ?
-      new Date(item.dateAdded || item.createdAt).toLocaleDateString() : 'N/A';
+    const dateAdded =
+      item.dateAdded || item.createdAt
+        ? new Date(item.dateAdded || item.createdAt).toLocaleDateString()
+        : "N/A";
 
     const isMenuVisible = menuVisible === itemId;
 
@@ -99,8 +109,17 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
         <Text style={[styles.tableCell, { flex: 1.3 }]}>{name}</Text>
         <Text style={[styles.tableCell, { flex: 0.9 }]}>{brand}</Text>
         <Text style={[styles.tableCell, { flex: 0.9 }]}>{category}</Text>
-        <Text style={[styles.tableCell, { flex: 0.7 }]}>₱{typeof price === 'number' ? price.toFixed(2) : '0.00'}</Text>
-        <Text style={[styles.tableCell, { flex: 0.4, color: (stock || 0) < 4 ? '#E74C3C' : '#000' }]}>{stock}</Text>
+        <Text style={[styles.tableCell, { flex: 0.7 }]}>
+          ₱{typeof price === "number" ? price.toFixed(2) : "0.00"}
+        </Text>
+        <Text
+          style={[
+            styles.tableCell,
+            { flex: 0.4, color: (stock || 0) < 4 ? "#E74C3C" : "#000" },
+          ]}
+        >
+          {stock}
+        </Text>
         <Text style={[styles.tableCell, { flex: 0.7 }]}>{dateAdded}</Text>
         <View style={[styles.tableCell, { flex: 0.8 }]}>
           <View style={styles.actionButtonContainer}>
@@ -116,7 +135,10 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
                 {menuItems.map((menuItem) => (
                   <TouchableOpacity
                     key={menuItem.value}
-                    style={[styles.menuItem, { backgroundColor: menuItem.bgColor }]}
+                    style={[
+                      styles.menuItem,
+                      { backgroundColor: menuItem.bgColor },
+                    ]}
                     onPress={() => handleMenuAction(menuItem.value, itemId)}
                   >
                     <Ionicons
@@ -136,58 +158,61 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
   };
 
   const handleAction = async (action, itemId) => {
-    const item = items.find(item => (item._id || item.id) === itemId);
+    const item = items.find((item) => (item._id || item.id) === itemId);
 
     if (!item) return;
 
-    if (action === 'edit') {
+    if (action === "edit") {
       onEditItem(item);
       return;
     }
 
-    if (action === 'stockIn') {
+    if (action === "stockIn") {
       setStockItem(item);
       setShowStockIn(true);
       return;
     }
 
-    if (action === 'stockOut') {
+    if (action === "stockOut") {
       setStockItem(item);
       setShowStockOut(true);
       return;
     }
 
-    if (action === 'archive') {
+    if (action === "archive") {
       Alert.alert(
-        'Archive Item',
-        'Are you sure you want to archive this item?',
+        "Archive Item",
+        "Are you sure you want to archive this item?",
         [
           {
-            text: 'Cancel',
-            style: 'cancel',
+            text: "Cancel",
+            style: "cancel",
           },
           {
-            text: 'Archive',
-            style: 'destructive',
+            text: "Archive",
+            style: "destructive",
             onPress: async () => {
               try {
                 // Archive the item using API
-                const { archiveAPI } = require('../../services/api');
+                const { archiveAPI } = require("../../services/api");
                 await archiveAPI.archive({
                   productId: item._id || item.id,
                   productName: item.name,
-                  reason: 'Archived from mobile app'
+                  reason: "Archived from mobile app",
                 });
-                Alert.alert('Success', 'Item archived successfully');
+                Alert.alert("Success", "Item archived successfully");
                 // Refresh the table data
                 onRefresh();
               } catch (error) {
-                Alert.alert('Error', 'Failed to archive item: ' + error.message);
+                Alert.alert(
+                  "Error",
+                  "Failed to archive item: " + error.message,
+                );
               }
             },
           },
         ],
-        { cancelable: true }
+        { cancelable: true },
       );
     }
   };
@@ -198,98 +223,135 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
     try {
       setStockLoading(true);
 
-      const { productAPI } = require('../../services/api');
+      const { productAPI } = require("../../services/api");
 
       // We need to fetch the full product details first to get the sizes structure
       // The item from the list might be normalized/simplified
       const response = await productAPI.getById(stockItem._id || stockItem.id);
 
       if (!response.success) {
-        throw new Error('Failed to fetch product details');
+        throw new Error("Failed to fetch product details");
       }
 
       const fullProduct = response.data;
-      const updatedSizes = { ...(fullProduct.sizes || {}) };
 
       // Helper to get quantity from size data
       const getSizeQty = (sizeData) => {
-        if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+        if (
+          typeof sizeData === "object" &&
+          sizeData !== null &&
+          sizeData.quantity !== undefined
+        ) {
           return sizeData.quantity;
         }
-        return typeof sizeData === 'number' ? sizeData : 0;
+        return typeof sizeData === "number" ? sizeData : 0;
       };
 
       // Helper to get price from size data
       const getSizePrice = (sizeData) => {
-        if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
+        if (
+          typeof sizeData === "object" &&
+          sizeData !== null &&
+          sizeData.price !== undefined
+        ) {
           return sizeData.price;
         }
         return null;
       };
 
-      stockData.selectedSizes.forEach(size => {
-        const currentSizeData = updatedSizes[size];
-        const currentQty = getSizeQty(currentSizeData);
-        const currentPrice = getSizePrice(currentSizeData);
-        const addQty = stockData.sizes[size] || 0;
-        const newQty = currentQty + addQty;
-
-        // Preserve price structure if it exists
-        if (currentPrice !== null || (typeof currentSizeData === 'object' && currentSizeData !== null)) {
-          updatedSizes[size] = {
-            quantity: newQty,
-            price: currentPrice !== null ? currentPrice : (fullProduct.itemPrice || 0)
-          };
-        } else {
-          updatedSizes[size] = newQty;
-        }
-      });
-
-      const totalStock = Object.values(updatedSizes).reduce((sum, sizeData) => sum + getSizeQty(sizeData), 0);
-      const stockBefore = fullProduct.currentStock || 0;
-
       // Prepare user info - Fetch actual logged-in user from AsyncStorage
       const storedEmployeeStr = await AsyncStorage.getItem("currentEmployee");
-      let handledBy = 'Mobile User';
-      let handledById = 'mobile_user_id';
+      let handledBy = "Mobile User";
+      let handledById = "mobile_user_id";
 
       if (storedEmployeeStr) {
         try {
           const parsedUser = JSON.parse(storedEmployeeStr);
-          handledBy = parsedUser.name || `${parsedUser.firstName || ''} ${parsedUser.lastName || ''}`.trim() || 'Mobile User';
-          handledById = parsedUser._id || parsedUser.id || 'mobile_user_id';
+          handledBy =
+            parsedUser.name ||
+            `${parsedUser.firstName || ""} ${parsedUser.lastName || ""}`.trim() ||
+            "Mobile User";
+          handledById = parsedUser._id || parsedUser.id || "mobile_user_id";
         } catch (e) {
           console.error("Failed to parse current employee", e);
         }
       }
 
-      // Calculate size quantities that were added
-      const sizeQuantitiesAdded = {};
-      stockData.selectedSizes.forEach(size => {
-        const addQty = stockData.sizes[size] || 0;
-        if (addQty > 0) {
-          sizeQuantitiesAdded[size] = addQty;
-        }
-      });
+      if (stockData.noSizes) {
+        // Product without sizes - simple quantity update
+        const newStock = (fullProduct.currentStock || 0) + stockData.quantity;
 
-      await productAPI.update(fullProduct._id, {
-        currentStock: totalStock,
-        sizes: updatedSizes,
-        stockMovementType: 'Stock-In',
-        stockMovementReason: stockData.reason || 'Restock',
-        handledBy: handledBy,
-        handledById: handledById,
-        stockMovementSizeQuantities: Object.keys(sizeQuantitiesAdded).length > 0 ? sizeQuantitiesAdded : null
-      });
+        await productAPI.update(fullProduct._id, {
+          currentStock: newStock,
+          stockMovementType: "Stock-In",
+          stockMovementReason: stockData.reason || "Restock",
+          handledBy: handledBy,
+          handledById: handledById,
+          stockMovementSizeQuantities: null,
+        });
+      } else {
+        // Product with sizes
+        const updatedSizes = { ...(fullProduct.sizes || {}) };
 
-      Alert.alert('Success', 'Stock added successfully');
+        stockData.selectedSizes.forEach((size) => {
+          const currentSizeData = updatedSizes[size];
+          const currentQty = getSizeQty(currentSizeData);
+          const currentPrice = getSizePrice(currentSizeData);
+          const addQty = stockData.sizes[size] || 0;
+          const newQty = currentQty + addQty;
+
+          // Preserve price structure if it exists
+          if (
+            currentPrice !== null ||
+            (typeof currentSizeData === "object" && currentSizeData !== null)
+          ) {
+            updatedSizes[size] = {
+              quantity: newQty,
+              price:
+                currentPrice !== null
+                  ? currentPrice
+                  : fullProduct.itemPrice || 0,
+            };
+          } else {
+            updatedSizes[size] = newQty;
+          }
+        });
+
+        const totalStock = Object.values(updatedSizes).reduce(
+          (sum, sizeData) => sum + getSizeQty(sizeData),
+          0,
+        );
+
+        // Calculate size quantities that were added
+        const sizeQuantitiesAdded = {};
+        stockData.selectedSizes.forEach((size) => {
+          const addQty = stockData.sizes[size] || 0;
+          if (addQty > 0) {
+            sizeQuantitiesAdded[size] = addQty;
+          }
+        });
+
+        await productAPI.update(fullProduct._id, {
+          currentStock: totalStock,
+          sizes: updatedSizes,
+          stockMovementType: "Stock-In",
+          stockMovementReason: stockData.reason || "Restock",
+          handledBy: handledBy,
+          handledById: handledById,
+          stockMovementSizeQuantities:
+            Object.keys(sizeQuantitiesAdded).length > 0
+              ? sizeQuantitiesAdded
+              : null,
+        });
+      }
+
+      Alert.alert("Success", "Stock added successfully");
       setShowStockIn(false);
       setStockItem(null);
       onRefresh(true);
-
     } catch (error) {
-      console.error('Error adding stock:', error);
-      Alert.alert('Error', 'Failed to update stock: ' + error.message);
+      console.error("Error adding stock:", error);
+      Alert.alert("Error", "Failed to update stock: " + error.message);
     } finally {
       setStockLoading(false);
     }
@@ -301,135 +363,210 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
     try {
       setStockLoading(true);
 
-      const { productAPI, archiveAPI } = require('../../services/api');
+      const { productAPI, archiveAPI } = require("../../services/api");
 
       // Fetch full product details
       const response = await productAPI.getById(stockItem._id || stockItem.id);
 
       if (!response.success) {
-        throw new Error('Failed to fetch product details');
+        throw new Error("Failed to fetch product details");
       }
 
       const fullProduct = response.data;
-      const updatedSizes = { ...(fullProduct.sizes || {}) };
 
       // Helper to get quantity from size data
       const getSizeQty = (sizeData) => {
-        if (typeof sizeData === 'object' && sizeData !== null && sizeData.quantity !== undefined) {
+        if (
+          typeof sizeData === "object" &&
+          sizeData !== null &&
+          sizeData.quantity !== undefined
+        ) {
           return sizeData.quantity;
         }
-        return typeof sizeData === 'number' ? sizeData : 0;
+        return typeof sizeData === "number" ? sizeData : 0;
       };
 
       // Helper to get price from size data
       const getSizePrice = (sizeData) => {
-        if (typeof sizeData === 'object' && sizeData !== null && sizeData.price !== undefined) {
+        if (
+          typeof sizeData === "object" &&
+          sizeData !== null &&
+          sizeData.price !== undefined
+        ) {
           return sizeData.price;
         }
         return null;
       };
 
-      stockData.selectedSizes.forEach(size => {
-        const currentSizeData = updatedSizes[size];
-        const currentQty = getSizeQty(currentSizeData);
-        const currentPrice = getSizePrice(currentSizeData);
-        const removeQty = stockData.sizes[size] || 0;
-        const newQty = Math.max(0, currentQty - removeQty);
-
-        // Preserve price structure if it exists
-        if (currentPrice !== null || (typeof currentSizeData === 'object' && currentSizeData !== null)) {
-          updatedSizes[size] = {
-            quantity: newQty,
-            price: currentPrice !== null ? currentPrice : (fullProduct.itemPrice || 0)
-          };
-        } else {
-          updatedSizes[size] = newQty;
-        }
-      });
-
-      const totalStock = Object.values(updatedSizes).reduce((sum, sizeData) => sum + getSizeQty(sizeData), 0);
-
       // Determine type based on reason
       const movementType =
-        stockData.reason === 'Damaged' ||
-          stockData.reason === 'Lost' ||
-          stockData.reason === 'Expired' ||
-          stockData.reason === 'Defective'
-          ? 'Pull-Out'
-          : 'Stock-Out';
+        stockData.reason === "Damaged" ||
+        stockData.reason === "Lost" ||
+        stockData.reason === "Expired" ||
+        stockData.reason === "Defective"
+          ? "Pull-Out"
+          : "Stock-Out";
 
       // Values for tracking - Fetch actual logged-in user from AsyncStorage
       const storedEmployeeStr = await AsyncStorage.getItem("currentEmployee");
-      let handledBy = 'Mobile User';
-      let handledById = 'mobile_user_id';
+      let handledBy = "Mobile User";
+      let handledById = "mobile_user_id";
 
       if (storedEmployeeStr) {
         try {
           const parsedUser = JSON.parse(storedEmployeeStr);
-          handledBy = parsedUser.name || `${parsedUser.firstName || ''} ${parsedUser.lastName || ''}`.trim() || 'Mobile User';
-          handledById = parsedUser._id || parsedUser.id || 'mobile_user_id';
+          handledBy =
+            parsedUser.name ||
+            `${parsedUser.firstName || ""} ${parsedUser.lastName || ""}`.trim() ||
+            "Mobile User";
+          handledById = parsedUser._id || parsedUser.id || "mobile_user_id";
         } catch (e) {
           console.error("Failed to parse current employee", e);
         }
       }
 
-      const sizeQuantitiesRemoved = {};
-      stockData.selectedSizes.forEach(size => {
-        const removeQty = stockData.sizes[size] || 0;
-        if (removeQty > 0) {
-          sizeQuantitiesRemoved[size] = removeQty;
+      if (stockData.noSizes) {
+        // Product without sizes - simple quantity update
+        const newStock = Math.max(
+          0,
+          (fullProduct.currentStock || 0) - stockData.quantity,
+        );
+
+        await productAPI.update(fullProduct._id, {
+          currentStock: newStock,
+          stockMovementType: movementType,
+          stockMovementReason: stockData.reason || "Sold",
+          handledBy: handledBy,
+          handledById: handledById,
+          stockMovementSizeQuantities: null,
+        });
+
+        // Archive items if reason is Damaged, Defective, or Expired
+        const archiveReasons = ["Damaged", "Defective", "Expired"];
+        if (archiveReasons.includes(stockData.reason)) {
+          try {
+            await archiveAPI.archive({
+              productId: fullProduct._id,
+              itemName: fullProduct.itemName,
+              sku: fullProduct.sku,
+              variant: fullProduct.variant || "",
+              selectedSize: fullProduct.size || "",
+              category: fullProduct.category,
+              brandName: fullProduct.brandName || "",
+              itemPrice: fullProduct.itemPrice || 0,
+              costPrice: fullProduct.costPrice || 0,
+              quantity: stockData.quantity,
+              itemImage: fullProduct.itemImage || "",
+              reason:
+                stockData.reason === "Defective"
+                  ? "Defective"
+                  : stockData.reason,
+              archivedBy: handledBy,
+              archivedById: handledById,
+              source: "stock-out",
+              notes: `Stock out - ${stockData.reason}`,
+            });
+          } catch (archiveError) {
+            console.error("Error archiving item:", archiveError);
+          }
         }
-      });
+      } else {
+        // Product with sizes
+        const updatedSizes = { ...(fullProduct.sizes || {}) };
 
-      await productAPI.update(fullProduct._id, {
-        currentStock: totalStock,
-        sizes: updatedSizes,
-        stockMovementType: movementType,
-        stockMovementReason: stockData.reason || 'Sold',
-        handledBy: handledBy,
-        handledById: handledById,
-        stockMovementSizeQuantities: Object.keys(sizeQuantitiesRemoved).length > 0 ? sizeQuantitiesRemoved : null
-      });
+        stockData.selectedSizes.forEach((size) => {
+          const currentSizeData = updatedSizes[size];
+          const currentQty = getSizeQty(currentSizeData);
+          const currentPrice = getSizePrice(currentSizeData);
+          const removeQty = stockData.sizes[size] || 0;
+          const newQty = Math.max(0, currentQty - removeQty);
 
-      // Archive items if reason is Damaged, Defective, or Expired
-      const archiveReasons = ['Damaged', 'Defective', 'Expired'];
-      if (archiveReasons.includes(stockData.reason)) {
-        const totalQuantityRemoved = Object.values(sizeQuantitiesRemoved).reduce((sum, qty) => sum + qty, 0);
-        const sizesString = stockData.selectedSizes.join(', ');
+          // Preserve price structure if it exists
+          if (
+            currentPrice !== null ||
+            (typeof currentSizeData === "object" && currentSizeData !== null)
+          ) {
+            updatedSizes[size] = {
+              quantity: newQty,
+              price:
+                currentPrice !== null
+                  ? currentPrice
+                  : fullProduct.itemPrice || 0,
+            };
+          } else {
+            updatedSizes[size] = newQty;
+          }
+        });
 
-        try {
-          await archiveAPI.archive({
-            productId: fullProduct._id,
-            itemName: fullProduct.itemName,
-            sku: fullProduct.sku,
-            variant: fullProduct.variant || '',
-            selectedSize: sizesString,
-            category: fullProduct.category,
-            brandName: fullProduct.brandName || '',
-            itemPrice: fullProduct.itemPrice || 0,
-            costPrice: fullProduct.costPrice || 0,
-            quantity: totalQuantityRemoved,
-            itemImage: fullProduct.itemImage || '',
-            reason: stockData.reason === 'Defective' ? 'Defective' : stockData.reason,
-            archivedBy: handledBy,
-            archivedById: handledById,
-            source: 'stock-out',
-            notes: `Stock out - ${stockData.reason}. Sizes: ${sizesString}`
-          });
-        } catch (archiveError) {
-          console.error('Error archiving item:', archiveError);
-          // Don't fail the whole operation if archiving fails
+        const totalStock = Object.values(updatedSizes).reduce(
+          (sum, sizeData) => sum + getSizeQty(sizeData),
+          0,
+        );
+
+        const sizeQuantitiesRemoved = {};
+        stockData.selectedSizes.forEach((size) => {
+          const removeQty = stockData.sizes[size] || 0;
+          if (removeQty > 0) {
+            sizeQuantitiesRemoved[size] = removeQty;
+          }
+        });
+
+        await productAPI.update(fullProduct._id, {
+          currentStock: totalStock,
+          sizes: updatedSizes,
+          stockMovementType: movementType,
+          stockMovementReason: stockData.reason || "Sold",
+          handledBy: handledBy,
+          handledById: handledById,
+          stockMovementSizeQuantities:
+            Object.keys(sizeQuantitiesRemoved).length > 0
+              ? sizeQuantitiesRemoved
+              : null,
+        });
+
+        // Archive items if reason is Damaged, Defective, or Expired
+        const archiveReasons = ["Damaged", "Defective", "Expired"];
+        if (archiveReasons.includes(stockData.reason)) {
+          const totalQuantityRemoved = Object.values(
+            sizeQuantitiesRemoved,
+          ).reduce((sum, qty) => sum + qty, 0);
+          const sizesString = stockData.selectedSizes.join(", ");
+
+          try {
+            await archiveAPI.archive({
+              productId: fullProduct._id,
+              itemName: fullProduct.itemName,
+              sku: fullProduct.sku,
+              variant: fullProduct.variant || "",
+              selectedSize: sizesString,
+              category: fullProduct.category,
+              brandName: fullProduct.brandName || "",
+              itemPrice: fullProduct.itemPrice || 0,
+              costPrice: fullProduct.costPrice || 0,
+              quantity: totalQuantityRemoved,
+              itemImage: fullProduct.itemImage || "",
+              reason:
+                stockData.reason === "Defective"
+                  ? "Defective"
+                  : stockData.reason,
+              archivedBy: handledBy,
+              archivedById: handledById,
+              source: "stock-out",
+              notes: `Stock out - ${stockData.reason}. Sizes: ${sizesString}`,
+            });
+          } catch (archiveError) {
+            console.error("Error archiving item:", archiveError);
+          }
         }
       }
 
-      Alert.alert('Success', 'Stock removed successfully');
+      Alert.alert("Success", "Stock removed successfully");
       setShowStockOut(false);
       setStockItem(null);
       onRefresh(true);
-
     } catch (error) {
-      console.error('Error removing stock:', error);
-      Alert.alert('Error', 'Failed to update stock: ' + error.message);
+      console.error("Error removing stock:", error);
+      Alert.alert("Error", "Failed to update stock: " + error.message);
     } finally {
       setStockLoading(false);
     }
@@ -453,7 +590,11 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
         <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Price</Text>
         <Text style={[styles.tableHeaderCell, { flex: 0.4 }]}>Stock</Text>
         <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Date Added</Text>
-        <Text style={[styles.tableHeaderCell, { flex: 0.8, textAlign: 'center' }]}>Actions</Text>
+        <Text
+          style={[styles.tableHeaderCell, { flex: 0.8, textAlign: "center" }]}
+        >
+          Actions
+        </Text>
       </View>
 
       {loading ? (
@@ -465,20 +606,24 @@ const InventoryTable = ({ items = [], onBack, onEditItem, onRefresh, loading, on
         <FlatList
           data={items}
           renderItem={renderItem}
-          keyExtractor={item => (item._id || item.id || Math.random()).toString()}
+          keyExtractor={(item) =>
+            (item._id || item.id || Math.random()).toString()
+          }
           contentContainerStyle={{ paddingBottom: 20 }}
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
-          ListFooterComponent={loadingMore ? (
-            <View style={{ padding: 10 }}>
-              <ActivityIndicator size="small" color="#8B4513" />
-            </View>
-          ) : null}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={{ padding: 10 }}>
+                <ActivityIndicator size="small" color="#8B4513" />
+              </View>
+            ) : null
+          }
           refreshControl={
             <RefreshControl
               refreshing={loading}
               onRefresh={onRefresh}
-              colors={['#8B4513']}
+              colors={["#8B4513"]}
               tintColor="#8B4513"
             />
           }
@@ -522,7 +667,7 @@ export default function Inventory() {
     fetchProducts: fetchCachedProducts,
     invalidateCache,
     inventoryStats, // Use stats from context
-    calculateDashboardStats // To refresh stats
+    calculateDashboardStats, // To refresh stats
   } = useData();
 
   const [showTableView, setShowTableView] = useState(false);
@@ -543,7 +688,7 @@ export default function Inventory() {
   // Reset to portrait when component unmounts
   useEffect(() => {
     return () => {
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== "web") {
         ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
       }
     };
@@ -551,9 +696,12 @@ export default function Inventory() {
 
   // Handle app state changes (background/foreground)
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
       // App coming to foreground - check if data is stale
-      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === "active"
+      ) {
         const timeSinceLastFetch = Date.now() - lastFetchTime.current;
         if (timeSinceLastFetch > STALE_TIME) {
           fetchProductsOptimized(true);
@@ -568,14 +716,15 @@ export default function Inventory() {
   const normalizeProduct = useCallback((product = {}) => {
     return {
       ...product,
-      name: product.name || product.itemName || 'No Name',
-      brand: product.brand || product.brandName || 'N/A',
+      name: product.name || product.itemName || "No Name",
+      brand: product.brand || product.brandName || "N/A",
       price: product.price ?? product.itemPrice ?? 0,
       stock: product.stock ?? product.currentStock ?? 0,
-      category: product.category || 'Uncategorized',
-      sku: product.sku || 'N/A',
-      itemImage: product.itemImage || product.image || '',
-      dateAdded: product.dateAdded || product.createdAt || product.updatedAt || null,
+      category: product.category || "Uncategorized",
+      sku: product.sku || "N/A",
+      itemImage: product.itemImage || product.image || "",
+      dateAdded:
+        product.dateAdded || product.createdAt || product.updatedAt || null,
       costPrice: product.costPrice ?? 0,
     };
   }, []);
@@ -587,14 +736,14 @@ export default function Inventory() {
 
   // Helper function for date formatting - defined before useMemo that uses it
   const formatDateAdded = useCallback((date) => {
-    if (!date) return 'Unknown';
+    if (!date) return "Unknown";
     const now = new Date();
     const itemDate = new Date(date);
     const diffTime = Math.abs(now - itemDate);
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays} days ago`;
     return itemDate.toLocaleDateString();
   }, []);
@@ -610,70 +759,73 @@ export default function Inventory() {
         return dateB - dateA;
       })
       .slice(0, 5)
-      .map(p => ({
+      .map((p) => ({
         id: p._id || p.id,
         name: p.name,
         category: p.category,
         stock: p.stock || 0,
-        dateAdded: formatDateAdded(p.createdAt || p.dateAdded)
+        dateAdded: formatDateAdded(p.createdAt || p.dateAdded),
       }));
   }, [products, formatDateAdded]);
-
-
 
   const loadingProducts = productsLoading && initialLoad;
 
   // Optimized fetch function with debouncing, stale check, and pagination support
-  const fetchProductsOptimized = useCallback(async (forceRefresh = false, loadMore = false) => {
-
-    // Prevent concurrent fetches
-    if (isFetching.current) {
-      return;
-    }
-
-    // Determine requested page
-    const requestedPage = loadMore ? page + 1 : 1;
-
-    try {
-      isFetching.current = true;
-      if (loadMore) setLoadingMore(true);
-
-      if (forceRefresh) {
-        invalidateCache('products');
-        // Also refresh stats when forcing refresh
-        calculateDashboardStats(true);
-      } else if (!loadMore) {
-        // If simply reloading first page, check if we should refresh stats too
-        // (Just to keep them in sync on screen load)
-        calculateDashboardStats(false);
+  const fetchProductsOptimized = useCallback(
+    async (forceRefresh = false, loadMore = false) => {
+      // Prevent concurrent fetches
+      if (isFetching.current) {
+        return;
       }
 
-      const response = await fetchCachedProducts(forceRefresh, { page: requestedPage, limit: 20 });
+      // Determine requested page
+      const requestedPage = loadMore ? page + 1 : 1;
 
-      if (response && response.data) {
-        if (loadMore) {
-          setPage(prev => prev + 1);
-        } else {
-          setPage(1);
+      try {
+        isFetching.current = true;
+        if (loadMore) setLoadingMore(true);
+
+        if (forceRefresh) {
+          invalidateCache("products");
+          // Also refresh stats when forcing refresh
+          calculateDashboardStats(true);
+        } else if (!loadMore) {
+          // If simply reloading first page, check if we should refresh stats too
+          // (Just to keep them in sync on screen load)
+          calculateDashboardStats(false);
         }
 
-        // Check if there are more pages
-        if (response.totalPages) {
-          setHasMore(requestedPage < response.totalPages);
-        } else {
-          // Fallback if backend doesn't return pagination metadata
-          setHasMore(response.data.length === 20);
+        const response = await fetchCachedProducts(forceRefresh, {
+          page: requestedPage,
+          limit: 20,
+        });
+
+        if (response && response.data) {
+          if (loadMore) {
+            setPage((prev) => prev + 1);
+          } else {
+            setPage(1);
+          }
+
+          // Check if there are more pages
+          if (response.totalPages) {
+            setHasMore(requestedPage < response.totalPages);
+          } else {
+            // Fallback if backend doesn't return pagination metadata
+            setHasMore(response.data.length === 20);
+          }
         }
+
+        lastFetchTime.current = Date.now();
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      } finally {
+        isFetching.current = false;
+        setLoadingMore(false);
       }
-
-      lastFetchTime.current = Date.now();
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    } finally {
-      isFetching.current = false;
-      setLoadingMore(false);
-    }
-  }, [invalidateCache, fetchCachedProducts, calculateDashboardStats, page]);
+    },
+    [invalidateCache, fetchCachedProducts, calculateDashboardStats, page],
+  );
 
   // Load products on focus with optimization
   useFocusEffect(
@@ -681,7 +833,8 @@ export default function Inventory() {
       const loadData = async () => {
         // Only fetch if data is stale or empty
         const timeSinceLastFetch = Date.now() - lastFetchTime.current;
-        const shouldFetch = cachedProducts.length === 0 || timeSinceLastFetch > STALE_TIME;
+        const shouldFetch =
+          cachedProducts.length === 0 || timeSinceLastFetch > STALE_TIME;
 
         if (shouldFetch) {
           await fetchProductsOptimized(false);
@@ -689,13 +842,16 @@ export default function Inventory() {
         setInitialLoad(false);
       };
       loadData();
-    }, [fetchProductsOptimized, cachedProducts.length])
+    }, [fetchProductsOptimized, cachedProducts.length]),
   );
 
   // Handle manual refresh (always force)
-  const fetchProducts = useCallback(async (forceRefresh = false) => {
-    await fetchProductsOptimized(forceRefresh);
-  }, [fetchProductsOptimized]);
+  const fetchProducts = useCallback(
+    async (forceRefresh = false) => {
+      await fetchProductsOptimized(forceRefresh);
+    },
+    [fetchProductsOptimized],
+  );
 
   const [editingItem, setEditingItem] = useState(null);
 
@@ -766,7 +922,7 @@ export default function Inventory() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                colors={['#8B4513']}
+                colors={["#8B4513"]}
                 tintColor="#8B4513"
               />
             }
@@ -774,10 +930,18 @@ export default function Inventory() {
             {/* TOP ACTION BUTTONS */}
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#16a34a', flex: 1 }]}
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: "#16a34a", flex: 1 },
+                ]}
                 onPress={() => setShowAddItem(true)}
               >
-                <Ionicons name="add" size={20} color="#fff" style={styles.buttonIcon} />
+                <Ionicons
+                  name="add"
+                  size={20}
+                  color="#fff"
+                  style={styles.buttonIcon}
+                />
                 <Text style={styles.actionButtonText}>Add Item</Text>
               </TouchableOpacity>
 
@@ -790,28 +954,35 @@ export default function Inventory() {
             </TouchableOpacity> */}
             </View>
 
-
-
-
             {/* SUMMARY STATS */}
             <View style={styles.statsRow}>
               <View style={[styles.statCard, styles.statCardDark]}>
-                <Text style={[styles.statValue, { color: "#fff" }]}>{inventoryStats.totalItems}</Text>
-                <Text style={[styles.statLabel, { color: "#d1d5db" }]}>Total Items</Text>
+                <Text style={[styles.statValue, { color: "#fff" }]}>
+                  {inventoryStats.totalItems}
+                </Text>
+                <Text style={[styles.statLabel, { color: "#d1d5db" }]}>
+                  Total Items
+                </Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={[styles.statValue, { color: "#16a34a" }]}>{inventoryStats.inStock}</Text>
+                <Text style={[styles.statValue, { color: "#16a34a" }]}>
+                  {inventoryStats.inStock}
+                </Text>
                 <Text style={styles.statLabel}>In-Stock</Text>
               </View>
             </View>
 
             <View style={styles.statsRow}>
               <View style={styles.statCard}>
-                <Text style={[styles.statValue, { color: "#D97706" }]}>{inventoryStats.lowStock}</Text>
+                <Text style={[styles.statValue, { color: "#D97706" }]}>
+                  {inventoryStats.lowStock}
+                </Text>
                 <Text style={styles.statLabel}>Low Stock</Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={[styles.statValue, { color: "#DC2626" }]}>{inventoryStats.outOfStock}</Text>
+                <Text style={[styles.statValue, { color: "#DC2626" }]}>
+                  {inventoryStats.outOfStock}
+                </Text>
                 <Text style={styles.statLabel}>Out of Stock</Text>
               </View>
             </View>
@@ -839,7 +1010,12 @@ export default function Inventory() {
                         {item.category}
                       </Text>
                       <Text style={styles.separator}>•</Text>
-                      <Text style={[styles.stockText, { color: item.stock <= 10 ? '#DC2626' : '#0369A1' }]}>
+                      <Text
+                        style={[
+                          styles.stockText,
+                          { color: item.stock <= 10 ? "#DC2626" : "#0369A1" },
+                        ]}
+                      >
                         {item.stock} in stock
                       </Text>
                     </View>
@@ -850,17 +1026,30 @@ export default function Inventory() {
             </View>
 
             {/* VIEW INVENTORY BUTTON */}
-            <View style={[styles.actionButtonsContainer, { justifyContent: 'center', marginTop: 5, marginBottom: 10 }]}>
+            <View
+              style={[
+                styles.actionButtonsContainer,
+                { justifyContent: "center", marginTop: 5, marginBottom: 10 },
+              ]}
+            >
               <TouchableOpacity
-                style={[styles.actionButton, {
-                  backgroundColor: '#1f1f1f',
-                  width: '90%',
-                  maxWidth: '100%',
-                  paddingVertical: 15
-                }]}
+                style={[
+                  styles.actionButton,
+                  {
+                    backgroundColor: "#1f1f1f",
+                    width: "90%",
+                    maxWidth: "100%",
+                    paddingVertical: 15,
+                  },
+                ]}
                 onPress={() => setShowTableView(true)}
               >
-                <Ionicons name="grid" size={20} color="#ffffffff" style={styles.buttonIcon} />
+                <Ionicons
+                  name="grid"
+                  size={20}
+                  color="#ffffffff"
+                  style={styles.buttonIcon}
+                />
                 <Text style={styles.actionButtonText}>View Inventory</Text>
               </TouchableOpacity>
             </View>
@@ -877,19 +1066,33 @@ export default function Inventory() {
                 </View>
               ) : (
                 products.map((product) => (
-                  <View key={(product._id || product.id || Math.random()).toString()} style={styles.productListItem}>
+                  <View
+                    key={(
+                      product._id ||
+                      product.id ||
+                      Math.random()
+                    ).toString()}
+                    style={styles.productListItem}
+                  >
                     <View>
-                      <Text style={styles.productName}>{product.name || 'Unnamed Product'}</Text>
+                      <Text style={styles.productName}>
+                        {product.name || "Unnamed Product"}
+                      </Text>
                       <Text style={styles.productMeta}>
-                        {product.category || 'Uncategorized'} • SKU: {product.sku || 'N/A'}
+                        {product.category || "Uncategorized"} • SKU:{" "}
+                        {product.sku || "N/A"}
                       </Text>
                     </View>
                     <View style={styles.productRight}>
-                      <Text style={styles.productPrice}>₱{Number(product.price || 0).toFixed(2)}</Text>
-                      <Text style={[
-                        styles.productStock,
-                        (product.stock || 0) <= 10 ? styles.lowStock : null
-                      ]}>
+                      <Text style={styles.productPrice}>
+                        ₱{Number(product.price || 0).toFixed(2)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.productStock,
+                          (product.stock || 0) <= 10 ? styles.lowStock : null,
+                        ]}
+                      >
                         {product.stock || 0} in stock
                       </Text>
                     </View>
@@ -906,18 +1109,18 @@ export default function Inventory() {
 
 const styles = StyleSheet.create({
   actionButtonsContainer: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
     paddingHorizontal: 10,
     gap: 10,
   },
   actionButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 12,
     borderRadius: 8,
     flex: 1,
@@ -926,125 +1129,125 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   actionButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: "#fff",
+    fontWeight: "600",
     fontSize: 16,
   },
 
   tableContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
 
     zIndex: 1,
   },
   tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#8B4513',
+    flexDirection: "row",
+    backgroundColor: "#8B4513",
     padding: 15,
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 5,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   closeButton: {
-    backgroundColor: '#000000ff',
+    backgroundColor: "#000000ff",
     borderRadius: 20,
     width: 36,
     height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,  // Reduced from 20 to 10 to move it left
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 10, // Reduced from 20 to 10 to move it left
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: "#fff",
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
   },
   tableTitle: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   tableHeaderRow: {
-    flexDirection: 'row',
-    backgroundColor: '#F5F0E5',
+    flexDirection: "row",
+    backgroundColor: "#F5F0E5",
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderTopWidth: 1,
-    borderColor: '#E0D9C8',
+    borderColor: "#E0D9C8",
   },
   tableHeaderCell: {
-    fontWeight: '600',
-    textAlign: 'left',
+    fontWeight: "600",
+    textAlign: "left",
     paddingHorizontal: 12,
-    color: '#333333',
+    color: "#333333",
   },
   tableRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: "#E0E0E0",
     paddingVertical: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   actionButtonContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   menuButton: {
     padding: 10,
     borderRadius: 20,
     width: 42,
     height: 42,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.03)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.03)",
   },
   menuContainer: {
-    position: 'absolute',
+    position: "absolute",
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 8,
     zIndex: 1000,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   menuItem: {
     width: 40,
     height: 40,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   menuIcon: {
     fontSize: 20,
   },
   tableCell: {
     padding: 10,
-    textAlign: 'left',
-    justifyContent: 'center',
+    textAlign: "left",
+    justifyContent: "center",
     borderRightWidth: 1,
-    borderRightColor: '#eee',
+    borderRightColor: "#eee",
     zIndex: 1,
   },
   tableList: {
@@ -1052,8 +1255,8 @@ const styles = StyleSheet.create({
   },
 
   actionButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     marginTop: 10,
     marginBottom: 10,
@@ -1061,9 +1264,9 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 12,
     borderRadius: 8,
     marginHorizontal: 5,
@@ -1073,8 +1276,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   actionButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: "#fff",
+    fontWeight: "600",
     fontSize: 14,
   },
   container: {
@@ -1104,7 +1307,7 @@ const styles = StyleSheet.create({
   },
   main: {
     flex: 1,
-    width: '100%',
+    width: "100%",
   },
   scrollContent: {
     paddingBottom: 20,
@@ -1232,10 +1435,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   coltitle: {
-    fontSize: 13, fontWeight: "600", color: "#333"
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#333",
   },
   colsubtitle: {
-    color: "#999", fontSize: 11, marginTop: 2
+    color: "#999",
+    fontSize: 11,
+    marginTop: 2,
   },
   viewMore: { color: "#AD7F65", fontWeight: "600", fontSize: 12 },
   recentlyAddedContainer: {
@@ -1260,22 +1467,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 2,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
   recentItemCategory: {
     fontSize: 12,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   separator: {
     marginHorizontal: 6,
-    color: '#D1D5DB',
+    color: "#D1D5DB",
   },
   stockText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   recentItemName: {
     fontSize: 14,
@@ -1312,8 +1519,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     margin: 16,
     alignItems: "center",
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
   },
   addItemText: {
     color: "#fff",
@@ -1323,13 +1530,13 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 32,
   },
   loadingText: {
     marginTop: 12,
-    color: '#666',
+    color: "#666",
     fontSize: 14,
   },
   allProductsContainer: {
@@ -1342,38 +1549,38 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   productListItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: "#e0e0e0",
   },
   productName: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   productMeta: {
     fontSize: 12,
-    color: '#6B7280',
+    color: "#6B7280",
     marginTop: 2,
   },
   productRight: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   productPrice: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#5D4037',
+    fontWeight: "600",
+    color: "#5D4037",
   },
   productStock: {
     fontSize: 12,
-    color: '#0369A1',
+    color: "#0369A1",
     marginTop: 2,
   },
   lowStock: {
-    color: '#DC2626',
-    fontWeight: '600',
+    color: "#DC2626",
+    fontWeight: "600",
   },
 });

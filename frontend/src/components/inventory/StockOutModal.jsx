@@ -31,12 +31,16 @@ const StockOutModal = ({ isOpen, onClose, product, onConfirm, loading }) => {
     return typeof sizeData === "number" ? sizeData : 0;
   };
 
-  const availableSizes =
-    product.sizes && typeof product.sizes === "object"
-      ? Object.keys(product.sizes).filter(
-          (size) => getSizeQuantity(product.sizes[size]) > 0,
-        )
-      : [];
+  const hasSizes =
+    product.sizes &&
+    typeof product.sizes === "object" &&
+    Object.keys(product.sizes).length > 0;
+
+  const availableSizes = hasSizes
+    ? Object.keys(product.sizes).filter(
+        (size) => getSizeQuantity(product.sizes[size]) > 0,
+      )
+    : [];
 
   useEffect(() => {
     if (isOpen && product) {
@@ -88,11 +92,37 @@ const StockOutModal = ({ isOpen, onClose, product, onConfirm, loading }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (availableSizes.length === 0) {
-      alert("This product has no sizes available");
+    // Validate other reason if "Other" is selected
+    if (reason === "Other" && !otherReason.trim()) {
+      alert("Please specify the reason");
       return;
     }
 
+    const finalReason =
+      reason === "Other" ? `Other: ${otherReason.trim()}` : reason;
+
+    if (!hasSizes) {
+      // Product without sizes - use simple quantity
+      const qty = parseInt(quantity) || 0;
+      if (qty <= 0) {
+        alert("Please enter a valid quantity");
+        return;
+      }
+      if (qty > (product.currentStock || 0)) {
+        alert(
+          `Cannot remove more than available stock (${product.currentStock || 0})`,
+        );
+        return;
+      }
+      onConfirm({
+        quantity: qty,
+        noSizes: true,
+        reason: finalReason,
+      });
+      return;
+    }
+
+    // Product with sizes
     if (selectedSizes.length === 0) {
       alert("Please select at least one size");
       return;
@@ -124,15 +154,6 @@ const StockOutModal = ({ isOpen, onClose, product, onConfirm, loading }) => {
       );
       return;
     }
-
-    // Validate other reason if "Other" is selected
-    if (reason === "Other" && !otherReason.trim()) {
-      alert("Please specify the reason");
-      return;
-    }
-
-    const finalReason =
-      reason === "Other" ? `Other: ${otherReason.trim()}` : reason;
 
     onConfirm({
       sizes: sizeQuantities,
@@ -257,13 +278,13 @@ const StockOutModal = ({ isOpen, onClose, product, onConfirm, loading }) => {
                   </div>
                 </div>
 
-                <div>
-                  <label
-                    className={`block text-xs mb-2 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
-                  >
-                    Sizes Optional - Select multiple sizes
-                  </label>
-                  {availableSizes.length > 0 ? (
+                {hasSizes ? (
+                  <div>
+                    <label
+                      className={`block text-xs mb-2 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
+                    >
+                      Select sizes to remove stock from
+                    </label>
                     <div className="grid grid-cols-4 gap-2 mb-3">
                       {availableSizes.map((size) => {
                         const currentQty =
@@ -296,64 +317,91 @@ const StockOutModal = ({ isOpen, onClose, product, onConfirm, loading }) => {
                         );
                       })}
                     </div>
-                  ) : (
-                    <div className="text-xs text-gray-400 italic mb-3">
-                      No sizes available for this product
-                    </div>
-                  )}
-                  <div
-                    className={`space-y-2 mt-3 p-3 rounded-lg ${theme === "dark" ? "bg-[#2A2724]" : "bg-gray-50"}`}
-                  >
-                    <label
-                      className={`block text-xs font-semibold mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}
+                    <div
+                      className={`space-y-2 mt-3 p-3 rounded-lg ${theme === "dark" ? "bg-[#2A2724]" : "bg-gray-50"}`}
                     >
-                      Quantity per Size:
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {selectedSizes.length > 0 ? (
-                        selectedSizes.map((size) => {
-                          const currentQty =
-                            product.sizes && product.sizes[size]
-                              ? getSizeQuantity(product.sizes[size])
-                              : 0;
-                          const maxQty = currentQty;
-                          return (
-                            <div key={size}>
-                              <label
-                                className={`block text-xs mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
-                              >
-                                {size}{" "}
-                                <span className="text-gray-500">
-                                  (Current: {currentQty})
-                                </span>
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                max={maxQty}
-                                value={sizeQuantities[size] || ""}
-                                onChange={(e) =>
-                                  handleSizeQuantityChange(size, e.target.value)
-                                }
-                                placeholder="Enter quantity"
-                                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === "dark" ? "bg-[#1E1B18] border-gray-700 text-white placeholder-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
-                              />
-                              {sizeQuantities[size] > maxQty && (
-                                <p className="text-xs text-red-500 mt-1">
-                                  Cannot exceed {maxQty}
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="col-span-2 text-xs text-gray-400 italic">
-                          Select sizes above to add quantities
-                        </div>
-                      )}
+                      <label
+                        className={`block text-xs font-semibold mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}
+                      >
+                        Quantity per Size:
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedSizes.length > 0 ? (
+                          selectedSizes.map((size) => {
+                            const currentQty =
+                              product.sizes && product.sizes[size]
+                                ? getSizeQuantity(product.sizes[size])
+                                : 0;
+                            const maxQty = currentQty;
+                            return (
+                              <div key={size}>
+                                <label
+                                  className={`block text-xs mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
+                                >
+                                  {size}{" "}
+                                  <span className="text-gray-500">
+                                    (Current: {currentQty})
+                                  </span>
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={maxQty}
+                                  value={sizeQuantities[size] || ""}
+                                  onChange={(e) =>
+                                    handleSizeQuantityChange(
+                                      size,
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Enter quantity"
+                                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === "dark" ? "bg-[#1E1B18] border-gray-700 text-white placeholder-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
+                                />
+                                {sizeQuantities[size] > maxQty && (
+                                  <p className="text-xs text-red-500 mt-1">
+                                    Cannot exceed {maxQty}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="col-span-2 text-xs text-gray-400 italic">
+                            Select sizes above to add quantities
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <label
+                      className={`block text-xs mb-2 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
+                    >
+                      Quantity to Remove
+                    </label>
+                    <p
+                      className={`text-xs mb-2 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}
+                    >
+                      Current Stock: {product.currentStock || 0}
+                    </p>
+                    <input
+                      type="number"
+                      min="1"
+                      max={product.currentStock || 0}
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      placeholder="Enter quantity to remove"
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AD7F65] focus:border-transparent ${theme === "dark" ? "bg-[#2A2724] border-gray-600 text-white placeholder-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
+                    />
+                    {parseInt(quantity) > (product.currentStock || 0) && (
+                      <p className="text-xs text-red-500 mt-1">
+                        Cannot exceed current stock ({product.currentStock || 0}
+                        )
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label

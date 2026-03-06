@@ -1,7 +1,11 @@
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
-const ProtectedRoute = ({ children, requiredPermission, ownerOnly = false }) => {
+const ProtectedRoute = ({
+  children,
+  requiredPermission,
+  ownerOnly = false,
+}) => {
   const { currentUser, hasPermission, isOwner } = useAuth();
   const location = useLocation();
 
@@ -11,7 +15,7 @@ const ProtectedRoute = ({ children, requiredPermission, ownerOnly = false }) => 
   }
 
   // Force PIN reset if required
-  if (currentUser.requiresPinReset && location.pathname !== '/set-pin') {
+  if (currentUser.requiresPinReset && location.pathname !== "/set-pin") {
     return <Navigate to="/set-pin" replace />;
   }
 
@@ -23,12 +27,14 @@ const ProtectedRoute = ({ children, requiredPermission, ownerOnly = false }) => 
   // If route is owner-only and user is not owner, redirect
   if (ownerOnly) {
     // Redirect to first available page
-    if (hasPermission('posTerminal')) {
+    if (hasPermission("posTerminal")) {
       return <Navigate to="/terminal" replace />;
-    } else if (hasPermission('inventory')) {
+    } else if (hasPermission("inventory")) {
       return <Navigate to="/inventory" replace />;
-    } else if (hasPermission('viewTransactions')) {
+    } else if (hasPermission("viewTransactions")) {
       return <Navigate to="/transactions" replace />;
+    } else if (hasPermission("generateReports")) {
+      return <Navigate to="/reports" replace />;
     } else {
       return <Navigate to="/settings" replace />;
     }
@@ -38,12 +44,14 @@ const ProtectedRoute = ({ children, requiredPermission, ownerOnly = false }) => 
   if (requiredPermission) {
     if (!hasPermission(requiredPermission)) {
       // Redirect to first available page
-      if (hasPermission('posTerminal')) {
+      if (hasPermission("posTerminal")) {
         return <Navigate to="/terminal" replace />;
-      } else if (hasPermission('inventory')) {
+      } else if (hasPermission("inventory")) {
         return <Navigate to="/inventory" replace />;
-      } else if (hasPermission('viewTransactions')) {
+      } else if (hasPermission("viewTransactions")) {
         return <Navigate to="/transactions" replace />;
+      } else if (hasPermission("generateReports")) {
+        return <Navigate to="/reports" replace />;
       } else {
         return <Navigate to="/settings" replace />;
       }
@@ -54,4 +62,3 @@ const ProtectedRoute = ({ children, requiredPermission, ownerOnly = false }) => 
 };
 
 export default ProtectedRoute;
-

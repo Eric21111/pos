@@ -28,6 +28,7 @@ const BrandPartners = lazy(() => import("./pages/owner/BrandPartners"));
 const Categories = lazy(() => import("./pages/owner/Categories"));
 const SetNewPin = lazy(() => import("./pages/SetNewPin"));
 const OwnerOnboarding = lazy(() => import("./pages/OwnerOnboarding"));
+const ManageData = lazy(() => import("./pages/ManageData"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -313,6 +314,18 @@ function App() {
                       <MainLayout>
                         <Suspense fallback={<PageLoader />}>
                           <Settings />
+                        </Suspense>
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/manage-data"
+                  element={
+                    <ProtectedRoute requiredPermission={null}>
+                      <MainLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <ManageData />
                         </Suspense>
                       </MainLayout>
                     </ProtectedRoute>

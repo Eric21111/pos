@@ -28,11 +28,11 @@ const Terminal = () => {
   const { currentUser } = useAuth();
   const { getCachedData, setCachedData, isCacheValid, invalidateCache } =
     useDataCache();
-  // Get userId from currentUser for transaction recording
+  // Get userId from currentUser for transaction recording and cart identification
   const userId =
     currentUser?._id || currentUser?.id || currentUser?.email || "guest";
-  // Use a shared cart ID so cart persists across all users - cart is tied to the POS terminal, not individual users
-  const cartId = "pos-shared-cart";
+  // Use the user's ID so each employee has their own cart
+  const cartId = userId;
   const [products, setProducts] = useState(
     () => getCachedData("products") || [],
   );
@@ -151,7 +151,7 @@ const Terminal = () => {
   }, []);
 
   // Load cart from server first (database is source of truth), fallback to localStorage
-  // Cart is shared across all users - tied to POS terminal, not individual users
+  // Cart is specific to each user - identified by userId
   useEffect(() => {
     let isMounted = true;
 
@@ -170,7 +170,7 @@ const Terminal = () => {
           } else {
             // Server has no items - check localStorage as fallback
             try {
-              const savedCart = localStorage.getItem("pos_cart");
+              const savedCart = localStorage.getItem(`pos_cart_${cartId}`);
               if (savedCart) {
                 const parsedCart = JSON.parse(savedCart);
                 if (Array.isArray(parsedCart) && parsedCart.length > 0) {
@@ -202,7 +202,7 @@ const Terminal = () => {
         );
         // Fallback to localStorage if server fails
         try {
-          const savedCart = localStorage.getItem("pos_cart");
+          const savedCart = localStorage.getItem(`pos_cart_${cartId}`);
           if (savedCart) {
             const parsedCart = JSON.parse(savedCart);
             if (Array.isArray(parsedCart)) {
@@ -262,15 +262,15 @@ const Terminal = () => {
     saveCartToServer();
   }, [cart, cartId, cartReadyForSync]);
 
-  // Save cart to localStorage (shared across all users)
+  // Save cart to localStorage (user-specific)
   useEffect(() => {
     if (!cartReadyForSync) return;
     try {
-      localStorage.setItem("pos_cart", JSON.stringify(cart));
+      localStorage.setItem(`pos_cart_${cartId}`, JSON.stringify(cart));
     } catch (error) {
       console.warn("Unable to persist cart", error);
     }
-  }, [cart, cartReadyForSync]);
+  }, [cart, cartId, cartReadyForSync]);
 
   const filteredProducts = useMemo(() => {
     let filtered = products;
@@ -366,8 +366,8 @@ const Terminal = () => {
     }
   };
 
-  const handleProductClick = (product) => {
-    // Open modal instead of expanding
+  const handleProductClick = async (product) => {
+    // Open modal immediately with basic product data
     setSelectedProduct(product);
     setShowProductModal(true);
 
@@ -375,13 +375,22 @@ const Terminal = () => {
     if (!productQuantities[product._id]) {
       setProductQuantities({ ...productQuantities, [product._id]: 1 });
     }
+    // Don't auto-select size - let user pick
     if (!productSizes[product._id]) {
-      const availableSizes =
-        product.sizes && typeof product.sizes === "object"
-          ? Object.keys(product.sizes)
-          : [];
-      const defaultSize = availableSizes.length > 0 ? availableSizes[0] : "";
-      setProductSizes({ ...productSizes, [product._id]: defaultSize });
+      setProductSizes({ ...productSizes, [product._id]: "" });
+    }
+
+    // Fetch full product details (including sizes) in the background
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/products/${product._id}`,
+      );
+      const data = await response.json();
+      if (data.success && data.data) {
+        setSelectedProduct(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching product details:", error);
     }
   };
 
@@ -1413,10 +1422,21 @@ const Terminal = () => {
     invalidateCache("products");
     invalidateCache("transactions");
 
-    // Refresh products (stock was updated by webhook handler)
-    fetchProducts().catch((err) =>
-      console.warn("Background product refresh failed:", err),
-    );
+    // Stock is updated asynchronously on the server after webhook confirmation,
+    // so we need a short delay before refreshing to get updated stock values.
+    setTimeout(() => {
+      fetchProducts().catch((err) =>
+        console.warn("Background product refresh failed:", err),
+      );
+    }, 1500);
+
+    // Second refresh to catch any slower stock updates
+    setTimeout(() => {
+      invalidateCache("products");
+      fetchProducts().catch((err) =>
+        console.warn("Second product refresh failed:", err),
+      );
+    }, 4000);
 
     // Close QR modal
     setShowQRPaymentModal(false);

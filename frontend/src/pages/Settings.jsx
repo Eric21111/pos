@@ -1,30 +1,32 @@
 import {
-  memo,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    memo,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  FaBox,
-  FaCamera,
-  FaCheckCircle,
-  FaCog,
-  FaDownload,
-  FaEye,
-  FaEyeSlash,
-  FaKey,
-  FaLink,
-  FaPalette,
-  FaShieldAlt,
-  FaSpinner,
-  FaSync,
-  FaTimesCircle,
-  FaTrash,
-  FaUser
+    FaBox,
+    FaCamera,
+    FaCheckCircle,
+    FaCog,
+    FaDatabase,
+    FaDownload,
+    FaEye,
+    FaEyeSlash,
+    FaKey,
+    FaLink,
+    FaPalette,
+    FaShieldAlt,
+    FaSpinner,
+    FaSync,
+    FaTimesCircle,
+    FaTrash,
+    FaUser,
 } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 import defaultAvatar from "../assets/default.jpeg";
 import SuccessModal from "../components/inventory/SuccessModal";
 import Header from "../components/shared/header";
@@ -36,6 +38,7 @@ const Settings = () => {
   const { isExpanded } = useContext(SidebarContext);
   const { isOwner, currentUser, login } = useAuth();
   const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("personal");
   const [currentPin, setCurrentPin] = useState(["", "", "", "", "", ""]);
   const [newPin, setNewPin] = useState(["", "", "", "", "", ""]);
@@ -709,6 +712,13 @@ const Settings = () => {
             }`}
           >
             GCash Configuration
+          </button>
+          <button
+            onClick={() => navigate("/manage-data")}
+            className={`px-6 py-3 font-bold rounded-xl transition-all shadow-md flex items-center gap-2 ${theme === "dark" ? "bg-[#2A2724] text-gray-300 border border-gray-700 hover:border-[#AD7F65]" : "bg-white text-gray-800 border border-gray-200 hover:border-[#AD7F65]"}`}
+          >
+            <FaDatabase className="w-4 h-4" />
+            Manage Data
           </button>
         </div>
       )}
@@ -1524,7 +1534,6 @@ const Settings = () => {
               </button>
             </div>
           </div>
-
 
           {/* Data Synchronization Card */}
           <div

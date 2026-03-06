@@ -129,17 +129,16 @@ employeeSchema.methods.comparePin = async function (candidatePin) {
     console.warn('[comparePin] Employee has no PIN field');
     return false;
   }
-  
+
   // Check if PIN is hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
   if (this.pin.startsWith('$2')) {
     // PIN is hashed, use bcrypt.compare
     return await bcrypt.compare(candidatePin, this.pin);
   } else {
-    // PIN might be stored as plain text (legacy or error case)
-    // For security, we should hash it, but for now, do direct comparison
-    // This should not happen in production, but helps with debugging
-    console.warn('[comparePin] PIN appears to be stored as plain text - this should not happen');
-    return candidatePin === this.pin;
+    // PIN is stored as plain text — this is a data integrity error.
+    // Never allow plaintext comparison; always reject and log a critical warning.
+    console.error('[comparePin] CRITICAL: PIN is stored as plain text for employee', this._id, '— rejecting login. Re-hash this PIN immediately.');
+    return false;
   }
 };
 

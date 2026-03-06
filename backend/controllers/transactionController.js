@@ -20,15 +20,20 @@ const toObjectId = (id) => {
 
 // Generate a unique receipt number
 const generateUniqueReceiptNumber = async () => {
-  const timestamp = Date.now().toString().slice(-6);
-  let receiptNo = timestamp.padStart(6, '0');
-
-  const existing = await SalesTransaction.findOne({ receiptNo });
-  if (existing) {
-    receiptNo = (timestamp + Math.floor(Math.random() * 10)).slice(-6);
+  let attempts = 0;
+  while (attempts < 10) {
+    // Generate a random 6-digit number (100000–999999)
+    const receiptNo = Math.floor(100000 + Math.random() * 900000).toString();
+    const existing = await SalesTransaction.findOne({ receiptNo });
+    if (!existing) {
+      return receiptNo;
+    }
+    attempts++;
   }
-
-  return receiptNo;
+  // Fallback: timestamp + random to minimize collision chance
+  const timestamp = Date.now().toString().slice(-4);
+  const random = Math.floor(10 + Math.random() * 90).toString();
+  return `${timestamp}${random}`;
 };
 
 // Generate a unique void ID
@@ -298,7 +303,7 @@ exports.voidTransaction = async (req, res) => {
       });
     }
 
-    if (transaction.status === 'voided') {
+    if (transaction.status === 'Voided') {
       return res.status(400).json({
         success: false,
         message: 'Transaction is already voided'
@@ -442,7 +447,7 @@ exports.returnItems = async (req, res) => {
       change: returnAmount,
       cashierName: returnedByName || '',
       cashierId: returnedById || returnedBy || '',
-      status: 'completed',
+      status: 'Completed',
       originalTransactionId: originalTransaction._id,
       returnReason,
       returnedBy: returnedBy || returnedById,
