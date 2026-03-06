@@ -154,8 +154,34 @@ const DiscountManagement = () => {
   };
 
 
-  const handleEditClick = (discount) => {
-    setEditingDiscount(discount);
+  const handleEditClick = async (discount) => {
+    // If discount has productIds, fetch product details for the picker
+    if (discount.appliesTo === 'products' && discount.productIds && discount.productIds.length > 0) {
+      try {
+        const response = await fetch('http://localhost:5000/api/products');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          const selectedProducts = data.data.filter(p =>
+            discount.productIds.includes(p._id)
+          ).map(p => ({
+            _id: p._id,
+            itemName: p.itemName,
+            sku: p.sku,
+            itemImage: p.itemImage,
+            category: p.category,
+            brandName: p.brandName
+          }));
+          setEditingDiscount({ ...discount, selectedProducts });
+        } else {
+          setEditingDiscount(discount);
+        }
+      } catch (error) {
+        console.error('Error fetching products for edit:', error);
+        setEditingDiscount(discount);
+      }
+    } else {
+      setEditingDiscount(discount);
+    }
     setShowAddModal(true);
   };
 
@@ -168,8 +194,9 @@ const DiscountManagement = () => {
         discountValue: parseFloat(formData.discountValue),
         appliesTo: formData.appliesTo,
         category: formData.appliesTo === 'category' ? formData.category : null,
+        productIds: formData.appliesTo === 'products' ? formData.selectedProducts.map(p => p._id) : [],
         validFrom: formData.noExpiration ? null : formData.validFrom,
-        validTo: formData.noExpiration ? null : formData.validUntil, // Note: backend uses validTo, modal uses validUntil
+        validTo: formData.noExpiration ? null : formData.validUntil,
         noExpiration: formData.noExpiration,
         minPurchaseAmount: formData.minPurchaseAmount ? parseFloat(formData.minPurchaseAmount) : 0,
         maxPurchaseAmount: formData.maxPurchaseAmount ? parseFloat(formData.maxPurchaseAmount) : null,
@@ -207,9 +234,9 @@ const DiscountManagement = () => {
         discountValue: parseFloat(formData.discountValue),
         appliesTo: formData.appliesTo,
         category: formData.appliesTo === 'category' ? formData.category : null,
+        productIds: formData.appliesTo === 'products' ? formData.selectedProducts.map(p => p._id) : [],
         validFrom: formData.noExpiration ? null : formData.validFrom,
-        validFrom: formData.noExpiration ? null : formData.validFrom,
-        validTo: formData.noExpiration ? null : formData.validUntil, // Changed validUntil to validTo for backend consistency
+        validTo: formData.noExpiration ? null : formData.validUntil,
         noExpiration: formData.noExpiration,
         minPurchaseAmount: formData.minPurchaseAmount ? parseFloat(formData.minPurchaseAmount) : 0,
         maxPurchaseAmount: formData.maxPurchaseAmount ? parseFloat(formData.maxPurchaseAmount) : null,
