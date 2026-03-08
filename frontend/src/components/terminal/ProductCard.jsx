@@ -1,7 +1,8 @@
+import React from "react";
 import { MdCategory } from "react-icons/md";
 import { useTheme } from "../../context/ThemeContext";
 
-export default function ProductCard({ product, onToggleExpand }) {
+function ProductCard({ product, onToggleExpand }) {
   const { theme } = useTheme();
 
   // Helper function to get quantity from size data (handles both number and object formats)
@@ -77,17 +78,15 @@ export default function ProductCard({ product, onToggleExpand }) {
 
   return (
     <div
-      className={`mb-4 rounded-2xl transition-all duration-300 ease-out overflow-hidden border-4 shadow hover:shadow-xl hover:border-[#AD7F65] cursor-pointer ${
-        theme === "dark"
-          ? "bg-[#1E1B18] border-gray-700"
-          : "bg-white border-gray-200"
-      }`}
-      onClick={onToggleExpand}
+      className={`mb-4 rounded-2xl transition-all duration-300 ease-out overflow-hidden border-4 shadow hover:shadow-xl hover:border-[#AD7F65] cursor-pointer ${theme === "dark"
+        ? "bg-[#1E1B18] border-gray-700"
+        : "bg-white border-gray-200"
+        }`}
+      onClick={() => onToggleExpand(product)}
     >
       <div
-        className={`aspect-square flex items-center justify-center overflow-hidden ${
-          theme === "dark" ? "bg-[#2A2724]" : "bg-gray-100"
-        }`}
+        className={`aspect-square flex items-center justify-center overflow-hidden ${theme === "dark" ? "bg-[#2A2724]" : "bg-gray-100"
+          }`}
       >
         {product.itemImage && product.itemImage.trim() !== "" ? (
           <img
@@ -111,9 +110,8 @@ export default function ProductCard({ product, onToggleExpand }) {
         </h3>
         <div className="flex justify-between items-start gap-1 min-h-[36px]">
           <span
-            className={`leading-tight ${priceRange.isRange ? "text-[11px]" : "text-sm"} ${
-              theme === "dark" ? "text-gray-400" : "text-gray-500"
-            }`}
+            className={`leading-tight ${priceRange.isRange ? "text-[11px]" : "text-sm"} ${theme === "dark" ? "text-gray-400" : "text-gray-500"
+              }`}
           >
             {priceRange.isRange
               ? `₱${priceRange.min.toFixed(0)} - ₱${priceRange.max.toFixed(0)}`
@@ -129,7 +127,7 @@ export default function ProductCard({ product, onToggleExpand }) {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onToggleExpand();
+            onToggleExpand(product);
           }}
           className="w-full mt-2 py-2 text-xs text-white rounded-lg border hover:opacity-90 transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-sm hover:shadow-md"
           style={{
@@ -144,3 +142,5 @@ export default function ProductCard({ product, onToggleExpand }) {
     </div>
   );
 }
+
+export default React.memo(ProductCard);

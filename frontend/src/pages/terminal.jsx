@@ -345,6 +345,18 @@ const Terminal = () => {
     return filtered;
   }, [products, selectedCategory, searchQuery, sortOption]);
 
+  // Create a memoized map for O(1) product lookups
+  const productMap = useMemo(() => {
+    const map = new Map();
+    if (products && Array.isArray(products)) {
+      products.forEach(p => {
+        const pId = p._id || p.id;
+        if (pId) map.set(pId.toString(), p);
+      });
+    }
+    return map;
+  }, [products]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedCategory, searchQuery]);
@@ -366,7 +378,7 @@ const Terminal = () => {
     }
   };
 
-  const handleProductClick = async (product) => {
+  const handleProductClick = useCallback(async (product) => {
     // Open modal immediately with basic product data
     setSelectedProduct(product);
     setShowProductModal(true);
@@ -392,7 +404,7 @@ const Terminal = () => {
     } catch (error) {
       console.error("Error fetching product details:", error);
     }
-  };
+  }, [productQuantities, productSizes]);
 
   const handleCloseProductModal = () => {
     setShowProductModal(false);
@@ -415,8 +427,8 @@ const Terminal = () => {
       // Handle both formats: number or object with quantity
       availableStock =
         typeof sizeData === "object" &&
-        sizeData !== null &&
-        sizeData.quantity !== undefined
+          sizeData !== null &&
+          sizeData.quantity !== undefined
           ? sizeData.quantity
           : typeof sizeData === "number"
             ? sizeData
@@ -448,8 +460,8 @@ const Terminal = () => {
       // Handle both formats: number or object with quantity
       availableStock =
         typeof sizeData === "object" &&
-        sizeData !== null &&
-        sizeData.quantity !== undefined
+          sizeData !== null &&
+          sizeData.quantity !== undefined
           ? sizeData.quantity
           : typeof sizeData === "number"
             ? sizeData
@@ -616,7 +628,7 @@ const Terminal = () => {
       setCart(
         cart.map((item) =>
           item._id === product._id &&
-          (item.selectedSize || "") === (defaultSize || "")
+            (item.selectedSize || "") === (defaultSize || "")
             ? { ...item, quantity: item.quantity + 1 }
             : item,
         ),
@@ -784,9 +796,9 @@ const Terminal = () => {
               .trim();
             const voidSize = String(
               itemToVoid.selectedSize ||
-                itemToVoid.size ||
-                resolveItemSize(itemToVoid) ||
-                "",
+              itemToVoid.size ||
+              resolveItemSize(itemToVoid) ||
+              "",
             )
               .toLowerCase()
               .trim();
@@ -841,9 +853,9 @@ const Terminal = () => {
               .trim();
             const voidSize = String(
               itemToVoid.selectedSize ||
-                itemToVoid.size ||
-                resolveItemSize(itemToVoid) ||
-                "",
+              itemToVoid.size ||
+              resolveItemSize(itemToVoid) ||
+              "",
             )
               .toLowerCase()
               .trim();
@@ -906,9 +918,9 @@ const Terminal = () => {
                 .trim();
               const voidSize = String(
                 itemToVoid.selectedSize ||
-                  itemToVoid.size ||
-                  resolveItemSize(itemToVoid) ||
-                  "",
+                itemToVoid.size ||
+                resolveItemSize(itemToVoid) ||
+                "",
               )
                 .toLowerCase()
                 .trim();
@@ -1065,14 +1077,13 @@ const Terminal = () => {
         // First check if item has category field
         let itemCategory = item.category;
 
-        // If not, try to find it from products array
+        // If not, try to find it from products map
         if (!itemCategory) {
           const productId = item._id || item.productId || item.id;
-          const product = products.find((p) => {
-            const pId = p._id || p.id;
-            return pId && productId && pId.toString() === productId.toString();
-          });
-          itemCategory = product?.category;
+          if (productId) {
+            const product = productMap.get(productId.toString());
+            itemCategory = product?.category;
+          }
         }
 
         // Check if item's category matches the discount category
@@ -1165,13 +1176,10 @@ const Terminal = () => {
             let itemCategory = item.category;
             if (!itemCategory) {
               const productId = item._id || item.productId || item.id;
-              const product = products.find((p) => {
-                const pId = p._id || p.id;
-                return (
-                  pId && productId && pId.toString() === productId.toString()
-                );
-              });
-              itemCategory = product?.category;
+              if (productId) {
+                const product = productMap.get(productId.toString());
+                itemCategory = product?.category;
+              }
             }
 
             if (itemCategory === selectedDiscount.category) {
@@ -1315,8 +1323,8 @@ const Terminal = () => {
         const errorData = await transactionResponse.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            errorData.error ||
-            `Transaction recording failed: ${transactionResponse.status} ${transactionResponse.statusText}`,
+          errorData.error ||
+          `Transaction recording failed: ${transactionResponse.status} ${transactionResponse.statusText}`,
         );
       }
 
@@ -1324,8 +1332,8 @@ const Terminal = () => {
       if (!transactionData.success) {
         throw new Error(
           transactionData.message ||
-            transactionData.error ||
-            "Failed to record transaction",
+          transactionData.error ||
+          "Failed to record transaction",
         );
       }
 
@@ -1522,13 +1530,12 @@ const Terminal = () => {
               <button
                 key={cat.name}
                 onClick={() => setSelectedCategory(cat.name)}
-                className={`flex items-center justify-center px-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border truncate ${
-                  selectedCategory === cat.name
+                className={`flex items-center justify-center px-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border truncate ${selectedCategory === cat.name
                     ? "bg-[#AD7F65] text-white border-[#AD7F65] shadow-md"
                     : theme === "dark"
                       ? "bg-[#2A2724] text-gray-300 border-gray-600 hover:bg-[#352F2A]"
                       : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
+                  }`}
                 title={cat.name}
               >
                 <span className="truncate w-full text-center">{cat.name}</span>

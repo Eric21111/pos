@@ -179,6 +179,18 @@ const OrderSummary = ({
     }
   };
 
+  // Create a memoized map for O(1) product lookups
+  const productMap = useMemo(() => {
+    const map = new Map();
+    if (products && Array.isArray(products)) {
+      products.forEach(p => {
+        const pId = p._id || p.id;
+        if (pId) map.set(pId.toString(), p);
+      });
+    }
+    return map;
+  }, [products]);
+
   // Helper to calculate total discount percentage for an item
   const getItemTotalDiscountPercent = (item) => {
     if (!selectedDiscounts || selectedDiscounts.length === 0) return 0;
@@ -189,11 +201,10 @@ const OrderSummary = ({
     let itemCategory = item.category;
     if (!itemCategory && products.length > 0) {
       const productId = item._id || item.productId || item.id;
-      const product = products.find(p => {
-        const pId = p._id || p.id;
-        return (pId && productId && (pId.toString() === productId.toString()));
-      });
-      itemCategory = product?.category;
+      if (productId) {
+        const product = productMap.get(productId.toString());
+        itemCategory = product?.category;
+      }
     }
 
     selectedDiscounts.forEach(discount => {
